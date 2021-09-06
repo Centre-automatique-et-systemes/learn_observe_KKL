@@ -229,12 +229,16 @@ class LuenebergerObserver(nn.Module):
 
     """
 
-    def __init__(self, dim_x: int, dim_y: int):
+    def __init__(self, dim_x: int, dim_y: int, dim_z: int = None):
         super(LuenebergerObserver, self).__init__()
 
         self.dim_x = dim_x
         self.dim_y = dim_y
-        self.dim_z = dim_y * (dim_x + 1)
+
+        if dim_z is None:
+            self.dim_z = dim_y * (dim_x + 1)
+        else:
+            self.dim_z = dim_z
 
         if self.dim_x < 1:
             raise ValueError('dim_x must be 1 or greater')
@@ -274,7 +278,7 @@ class LuenebergerObserver(nn.Module):
             'encoder' + str(self.encoder_layers),
             'decoder' + str(self.decoder_layers),
         ])
-
+    
     def set_dynamics(self, system):
         """
         Set the dynamic functions for the Lueneberger Observer, from a
