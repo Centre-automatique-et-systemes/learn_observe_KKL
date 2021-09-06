@@ -1,0 +1,24 @@
+# Macos file system
+.DS_Store
+
+# local env files
+.env.local
+.env.*.local
+__pycache__/
+*/__pycache__/
+__init__.pyc
+main.py
+
+# Log files
+runs/
+experiments/
+jupyter_notebook/runs/
+
+# Editor directories and files
+.idea
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
