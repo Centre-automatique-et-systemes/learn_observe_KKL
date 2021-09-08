@@ -317,7 +317,6 @@ class LuenebergerObserver(nn.Module):
             poles=np.roots(a))
         return torch.Tensor(whole_D.gain_matrix)
 
-    @staticmethod
     def phi(self, z: torch.tensor) -> torch.tensor:
         """
         @Staticmethod.
@@ -377,7 +376,7 @@ class LuenebergerObserver(nn.Module):
                 z_dot = torch.matmul(self.D, z)+self.F*self.measurement(t)
             else:
                 z_dot = torch.matmul(self.D, z)+self.F*self.measurement(t) + \
-                    torch.mul(self.phi(z), self.u_new(t)-self.u_0(t))
+                    torch.mul(self.phi(z), self.u_1(t)-self.u(t))
             return z_dot
 
         # Output timestemps of solver
@@ -633,6 +632,6 @@ class LuenebergerObserver(nn.Module):
         """
         tq, sol = self.simulate(measurement, tsim, dt)
 
-        x_hat = self.decoder(sol)
+        x_hat = self.decoder(sol[:,:,0])
 
         return x_hat

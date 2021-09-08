@@ -341,6 +341,9 @@ class RevDuffing(System):
         self.dim_x = 2
         self.dim_y = 1
 
+        self.u = self.null_controller
+        self.u_1 = self.null_controller
+
     def f(self, x):
         x_0 = torch.reshape(torch.pow(x[1, :], 3), (1, -1))
         x_1 = torch.reshape(-x[0, :], (1, -1))
@@ -351,9 +354,6 @@ class RevDuffing(System):
 
     def g(self, x):
         return torch.zeros(x.shape[0], x.shape[1])
-
-    def u(self, t):
-        return 0
 
 
 class VanDerPohl(System):
@@ -367,6 +367,9 @@ class VanDerPohl(System):
 
         self.eps = 1
 
+        self.u = self.null_controller
+        self.u_1 = self.null_controller
+
     def f(self, x):
         x_0 = torch.reshape(x[1, :], (1, -1))
         x_1 = torch.reshape(self.eps*(1-torch.pow(x[0, :], 2))*x[1, :]-x[0, :], (1, -1))
@@ -379,6 +382,3 @@ class VanDerPohl(System):
         zeros = torch.reshape(torch.zeros_like(x[1, :]), (1, -1))
         ones = torch.reshape(torch.ones_like(x[0, :]), (1, -1))
         return torch.cat((zeros, ones))
-
-    def u(self, t):
-        return 10e-3 + 9.99 * 10e-5*t
