@@ -2,13 +2,13 @@
 
 """
 This module implements the Luenberger Observer for linear and
-non-linear system. The Lueneberger Observer class implements the
+non-linear system. The Luenberger Observer class implements the
 autoencoder model which needs to be trained on a given dynamical
 sytem and has an easy to use interface to minimize the parameter
 tuning on your side.
 
 The general approach to use this model is as follows. Firstly,
-the Lueneberger Observer must be initiated with the dimension of
+the Luenberger Observer must be initiated with the dimension of
 the state variable x and the dimension of the measurement of the
 dynamical system. In order to use the observer system the matrices
 D and F must be initiated appropriately to the given system dynamics.
@@ -34,13 +34,13 @@ Exceptions for different method inputs are documented in the method.
 
 Examples
 --------
-The following example constructs a Lueneberger Observer for a non-linear
+The following example constructs a Luenberger Observer for a non-linear
 system, and plots the results of the estimation.
 
 .. code-block:: Python
 
     import matplotlib.pyplot as plt
-    from lena.lueneberger_observer import LuenebergerObserver
+    from lena.luenberger_observer import LuenbergerObserver
     from lena.system import RevDuffing
     from lena.learner import Learner
 
@@ -48,8 +48,8 @@ system, and plots the results of the estimation.
     system = RevDuffing()
     data = system.generate_mesh([-2.,2.], 4000)
 
-    # Initiate the Lueneberger Observer
-    observer = LuenebergerObserver(2, 1)
+    # Initiate the Luenberger Observer
+    observer = LuenbergerObserver(2, 1)
     observer.set_dynamics(system)
 
     # Train the model
@@ -71,7 +71,7 @@ system, and plots the results of the estimation.
     plt.show()
 
 
-Lueneberger Observer library.
+Luenberger Observer library.
 http://github.com/Centre-automatique-et-systemes/lena
 
 This is licensed under an MIT license. See the readme.MD file
@@ -91,8 +91,8 @@ import math
 import numpy as np
 
 
-class LuenebergerObserver(nn.Module):
-    """ Implements a Lueneberger observer. You are responsible for setting the
+class LuenbergerObserver(nn.Module):
+    """ Implements a Luenberger observer. You are responsible for setting the
     state variables and functions to reasonable values; the defaults  will
     not give you a functional observer.
 
@@ -101,7 +101,7 @@ class LuenebergerObserver(nn.Module):
 
     In brief, you will first construct this object, specifying the size of
     the state vector with dim_x and the size of the measurement vector that
-    you will be using with dim_y. The state vector dim_z for the Lueneberger Observer
+    you will be using with dim_y. The state vector dim_z for the Luenberger Observer
     will then automatically be set.
 
     After construction the observer will have default matrices D and F created for you,
@@ -116,10 +116,10 @@ class LuenebergerObserver(nn.Module):
     --------
     .. code-block:: Python
 
-        from lena.lueneberger_observer import LuenebergerObserver
+        from lena.luenberger_observer import LuenbergerObserver
 
-        # Initiate the Lueneberger Observer
-        observer = LuenebergerObserver(2, 1)
+        # Initiate the Luenberger Observer
+        observer = LuenbergerObserver(2, 1)
 
         # Set observer dynamic functions
         observer.set_dynamics(system)
@@ -145,7 +145,7 @@ class LuenebergerObserver(nn.Module):
     Params
     ----------
     dim_x : int
-        Number of state variables of the dynamical system driving the Lueneberger Observer.
+        Number of state variables of the dynamical system driving the Luenberger Observer.
         For example, if you are tracking the position and velocity of an object, dim_x would be 2.
 
     dim_y : int
@@ -155,7 +155,7 @@ class LuenebergerObserver(nn.Module):
     Attributes
     ----------
     dim_z : int
-        Number of state variables of Lueneberger Observer given dim_x and dim_y.
+        Number of state variables of Luenberger Observer given dim_x and dim_y.
         dim_z = dim_y * (dim_x + 1)
 
     F : torch.tensor
@@ -196,7 +196,7 @@ class LuenebergerObserver(nn.Module):
         bessel filter given the cutoff frequency.
 
     simulate(y: torch.tensor, tsim: tuple, dt: float) : [torch.tensor, torch.tensor]
-        Simulate Lueneberger Observer with dynamics and D, F matrices in time.
+        Simulate Luenberger Observer with dynamics and D, F matrices in time.
 
     create_layers(num_hl: int, size_hl: int, activation: torch.nn, dim_in: int, dim_out: int) : nn.ModuleList()
         Helper function that creates a list containing the network architecture.
@@ -205,7 +205,7 @@ class LuenebergerObserver(nn.Module):
         Compute latent space for a given input.
 
     decoder(z: torch.tensor) -> torch.tensor:
-        Estimates x_hat vector given the simulated data from the Lueneberger Observer.
+        Estimates x_hat vector given the simulated data from the Luenberger Observer.
 
     loss(x: torch.tensor, x_hat: torch.tensor, z_hat: torch.tensor) :
         [torch.tensor, torch.tensor, torch.tensor]
@@ -229,8 +229,10 @@ class LuenebergerObserver(nn.Module):
 
     """
 
-    def __init__(self, dim_x: int, dim_y: int, dim_z: int = None):
-        super(LuenebergerObserver, self).__init__()
+    def __init__(self, dim_x: int, dim_y: int, dim_z: int = None, method: str = "Autoencoder"):
+        super(LuenbergerObserver, self).__init__()
+
+        self.method = method
 
         self.dim_x = dim_x
         self.dim_y = dim_y
@@ -256,7 +258,7 @@ class LuenebergerObserver(nn.Module):
         # Define encoder and decoder architecture
         num_hl = 5
         size_hl = 40
-        act = nn.ReLU()
+        act = nn.Tanh()
 
         self.encoder_layers = self.create_layers(num_hl, size_hl, act, self.dim_x, self.dim_z)
         self.decoder_layers = self.create_layers(num_hl, size_hl, act, self.dim_z, self.dim_x)
@@ -269,7 +271,7 @@ class LuenebergerObserver(nn.Module):
 
     def __repr__(self):
         return '\n'.join([
-            'Lueneberger Observer object',
+            'Luenberger Observer object',
             'dim_x ' + str(self.dim_x),
             'dim_y ' + str(self.dim_y),
             'dim_z ' + str(self.dim_z),
@@ -278,10 +280,18 @@ class LuenebergerObserver(nn.Module):
             'encoder' + str(self.encoder_layers),
             'decoder' + str(self.decoder_layers),
         ])
-    
+
+    def __call__(self, *input):
+        if self.method == "T":
+            return self.forward_T(*input)
+        elif self.method == "T_star":
+            return self.forward_T_star(*input)
+        elif self.method == "Autoencoder":
+            return self.forward_autoencoder(*input)
+
     def set_dynamics(self, system):
         """
-        Set the dynamic functions for the Lueneberger Observer, from a
+        Set the dynamic functions for the Luenberger Observer, from a
         given system object.
 
         Parameters
@@ -320,7 +330,7 @@ class LuenebergerObserver(nn.Module):
     def phi(self, z: torch.tensor) -> torch.tensor:
         """
         @Staticmethod.
-        Returns matrix for the forward function driving the Lueneberger Observer
+        Returns matrix for the forward function driving the Luenberger Observer
         simulation. See reference for a detailed explanation.
 
         Parameters
@@ -334,7 +344,6 @@ class LuenebergerObserver(nn.Module):
             Computed matrix from the observer state vector.
         """
         # Compute jacobian for T^*(z)
-        # TODO check jacobian
         dTdy = torch.autograd.functional.jacobian(
             self.encoder, self.decoder(z.T), create_graph=False, strict=False, vectorize=False)
 
@@ -559,9 +568,15 @@ class LuenebergerObserver(nn.Module):
         loss_1 = self.recon_lambda * mse(x, x_hat)
 
         # Compute gradients of T_u with respect to inputs
-        dTdx = torch.autograd.functional.jacobian(
+        dTdh = torch.autograd.functional.jacobian(
             self.encoder, x, create_graph=False, strict=False, vectorize=False)
-        dTdx = dTdx[dTdx != 0].reshape((batch_size, self.dim_z, self.dim_x))
+        dTdx = torch.zeros((batch_size, self.dim_z, self.dim_x))
+
+        # dTdx = dTdx[dTdx != 0].reshape((batch_size, self.dim_z, self.dim_x))
+
+        for i in range(dTdh.shape[0]):
+            for j in range(dTdh.shape[1]):
+                dTdx[i, j, :] = dTdh[i, j, i, :]
 
         # lhs = dTdx * f(x)
         lhs = torch.zeros((self.dim_z, batch_size)).to(self.device)
@@ -579,7 +594,7 @@ class LuenebergerObserver(nn.Module):
 
         return loss_1 + loss_2, loss_1, loss_2
 
-    def forward(self, x: torch.tensor) -> torch.tensor:
+    def forward_autoencoder(self, x: torch.tensor) -> torch.tensor:
         """
         Forward function for autoencoder. Used for training the model.
         Computation follows as:
@@ -607,6 +622,48 @@ class LuenebergerObserver(nn.Module):
 
         return z, x_hat
 
+    def forward_T(self, x: torch.tensor) -> torch.tensor:
+        """
+        Forward function for T. Used for training the model.
+        Computation follows as:
+        z = encoder(x)
+
+        Parameters
+        ----------
+        x: torch.tensor
+            State vector of the system driving the observer.
+
+        Returns
+        ----------
+        z: torch.tensor
+            State vector of the observer.
+        """
+        # Enocde input space
+        z = self.encoder(x)
+
+        return z
+
+    def forward_T_star(self, z: torch.tensor) -> torch.tensor:
+        """
+        Forward function for T_star. Used for training the model.
+        Computation follows as:
+        x_hat = decoder(z)
+
+        Parameters
+        ----------
+        z: torch.tensor
+            State vector of the the observer.
+
+        Returns
+        ----------
+        x_hat: torch.tensor
+            State vector of the observer.
+        """
+        # Decode latent space
+        x_hat = self.decoder(z)
+
+        return x_hat
+
     def predict(self,  measurement: torch.tensor, tsim: tuple, dt: int) -> torch.tensor:
         """
         Forward function for autoencoder. Used for training the model.
@@ -632,6 +689,6 @@ class LuenebergerObserver(nn.Module):
         """
         tq, sol = self.simulate(measurement, tsim, dt)
 
-        x_hat = self.decoder(sol[:,:,0])
+        x_hat = self.decoder(sol[:, :, 0])
 
         return x_hat

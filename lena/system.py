@@ -8,7 +8,7 @@ and setting the control input to different functions.
 
 This module also contains two non-linear example systems. The Reversed Duffing
 class implements the classic Duffing oscillator in a reversed form.
-Van der Pohl implements the system with default parameters.
+Van der Pol implements the system with default parameters.
 
 
 Examples
@@ -55,7 +55,7 @@ For more examples see the test subdirectory, or refer to the
 book cited below. In it I both teach Kalman filtering from basic
 principles, and teach the use of this library in great detail.
 
-Lueneberger Observer library.
+Luenberger Observer library.
 http://github.com/Centre-automatique-et-systemes/lena
 
 This is licensed under an MIT license. See the readme.MD file
@@ -73,7 +73,7 @@ from scipy import signal
 
 
 class System():
-    """ Implements a Lueneberger observer. You are responsible for setting the
+    """ Implements a Luenberger observer. You are responsible for setting the
     state variables and functions to reasonable values; the defaults  will
     not give you a functional observer.
 
@@ -82,7 +82,7 @@ class System():
 
     In brief, you will first construct this object, specifying the size of
     the state vector with dim_x and the size of the measurement vector that
-    you will be using with dim_y. The state vector dim_z for the Lueneberger Observer
+    you will be using with dim_y. The state vector dim_z for the Luenberger Observer
     will then automatically be set.
 
     After construction the observer will have default matrices D and F created for you,
@@ -356,7 +356,7 @@ class RevDuffing(System):
         return torch.zeros(x.shape[0], x.shape[1])
 
 
-class VanDerPohl(System):
+class VanDerPol(System):
     """ See https://en.wikipedia.org/wiki/Van_der_Pol_oscillator for detailed 
     reference for this system. 
     """
