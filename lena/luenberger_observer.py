@@ -87,6 +87,7 @@ from torch import nn
 from scipy import signal
 from torchdiffeq import odeint
 from scipy import linalg
+from smt.sampling_methods import LHS
 import math
 import numpy as np
 
@@ -229,7 +230,7 @@ class LuenbergerObserver(nn.Module):
 
     """
 
-    def __init__(self, dim_x: int, dim_y: int, dim_z: int = None, method: str = "Autoencoder"):
+    def __init__(self, dim_x: int, dim_y: int, method: str = "Autoencoder", dim_z: int = None):
         super(LuenbergerObserver, self).__init__()
 
         self.method = method
@@ -363,8 +364,8 @@ class LuenbergerObserver(nn.Module):
 
         Parameters
         ----------
-        y_0: torch.tensor
-            Initial value for observer simulation.
+        y: torch.tensor
+            Measurment expected to be in form (t, y).
 
         tsim: tuple
             Tuple of (Start, End) time of simulation.
@@ -401,6 +402,94 @@ class LuenbergerObserver(nn.Module):
         z = odeint(dydt, z_0, tq)
 
         return tq, z
+
+    def simulate_system(self, y_0: torch.tensor, tsim: tuple, dt) -> torch.tensor:
+        """
+        Simulate Luenberger observer driven by a dynamical system.
+
+        Parameters
+        ----------
+        y_0: torch.tensor
+            Initial value for simulation.
+
+        tsim: tuple
+            Tuple of (Start, End) time of simulation.
+
+        dt: float
+            Step width of tsim.
+
+        Returns
+        ----------
+        tq: torch.tensor
+            Tensor of timesteps of tsim.
+
+        sol: torch.tensor
+            Solution of the simulation.
+        """
+        def dydt(t, y):
+            x = y[0:self.dim_x]
+            z = y[self.dim_x:len(y)]
+            x_dot = self.f(x) + self.g(x) * self.u(t)
+            z_dot = torch.matmul(self.D, z)+self.F*self.h(x)
+            return torch.cat((x_dot, z_dot))
+
+        # Output timestemps of solver
+        tq = torch.arange(tsim[0], tsim[1], dt)
+
+        # Solve
+        sol = odeint(dydt, y_0, tq)
+
+        return tq, sol
+
+    def generate_data_svl(self, limits: tuple, num_samples: int, k: int = 10, dt: float = 1e-2):
+        """
+        Generated grid of data points by simulating the system backward and forward in time.
+
+        Parameters
+        ----------
+        limits: tuple
+            Limits in x and y direction sampled from LHS.
+
+        num_samples: int
+            Number of samples in compact set.
+
+        k: int
+            Parameter for t_c = k/min(lambda)
+
+        dt: float
+            Simulation step.
+
+        Returns
+        ----------
+        data: torch.tensor
+            Pairs of (x, z) data points.
+        """
+        if limits[1] < limits[0]:
+            raise ValueError('limits[0] must be strictly smaller than limits[0]')
+
+        limits = np.array([limits, limits])
+        sampling = LHS(xlimits=limits)
+        mesh = torch.tensor(sampling(num_samples))
+
+        t_c = k/min(abs(linalg.eig(self.D)[0].real))
+
+        y_0 = torch.zeros((self.dim_x + self.dim_z, num_samples))
+        y_1 = y_0.clone()
+
+        # Simulate backward in time
+        tsim = (0, -t_c)
+        y_0[:self.dim_x, :] = torch.transpose(mesh, 0, 1)
+        tq_bw, data_bw = self.simulate_system(y_0, tsim, -dt)
+
+        # Simulate forward in time starting from the last point from previous simulation
+        tsim = (-t_c, 0)
+        y_1[:self.dim_x, :] = data_bw[-1, :self.dim_x, :]
+        tq, data_fw = self.simulate_system(y_1, tsim, dt)
+
+        # Data contains (x_i, z_i) pairs in shape [dim_z, number_simulations]
+        data = torch.transpose(data_fw[-1, :, :], 0, 1)
+
+        return data
 
     @staticmethod
     def interpolate_func(x: torch.tensor) -> callable:

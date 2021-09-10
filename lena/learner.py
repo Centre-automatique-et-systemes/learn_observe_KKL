@@ -7,7 +7,9 @@ import matplotlib.pyplot as plt
 
 
 class Learner:
-    def __init__(self, observer, training_data, tensorboard=False):
+    def __init__(self, observer, training_data, tensorboard=False, method="Autoencoder"):
+
+        self.method = method
 
         self.model = observer
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -36,22 +38,36 @@ class Learner:
     def set_tensorboard(self) -> None:
         self.writer = SummaryWriter()
 
-    def forward(self, x, step):
+    def forward(self, batch, step):
 
         # Zero gradients
         self.optimizer.zero_grad()
 
-        # Predict
-        z_hat, x_hat = self.model(x)
+        if self.method == "Autoencoder":
+            x = batch.to(self.device)
+        else:
+            x = batch[:, :self.model.dim_x].to(self.device)
+            z = batch[:, self.model.dim_x:].to(self.device)
 
-        loss, loss1, loss2 = self.model.loss(x, x_hat, z_hat)
+        if self.method == "Autoencoder":
+            # Predict
+            z_hat, x_hat = self.model(x)
+
+            loss, loss1, loss2 = self.model.loss(x, x_hat, z_hat)
+        elif self.method == "T":
+            z_hat = self.model(x)
+
+            mse = torch.nn.MSELoss()
+            loss = mse(z, z_hat)
+        elif self.method == "T_star":
+            x_hat = self.model(z)
+            mse = torch.nn.MSELoss()
+            loss = mse(x, x_hat)
 
         # Write loss to tensorboard
         if self.tensorboard:
             self.writer.add_scalars("Loss/train", {
                 'loss': loss,
-                'loss1': loss1,
-                'loss2': loss2,
             }, step)
             self.writer.flush()
 
@@ -65,11 +81,9 @@ class Learner:
 
             for i, batch in enumerate(self.trainloader, 0):
 
-                x = batch.to(self.device)
-
                 step = i + (epoch*len(self.trainloader))
 
-                self.forward(x, step)
+                self.forward(batch, step)
 
             print('====> Epoch: {} done! LR: {}'.format(epoch + 1, self.optimizer.param_groups[0]["lr"]))
 
