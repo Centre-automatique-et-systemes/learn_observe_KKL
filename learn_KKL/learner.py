@@ -7,7 +7,10 @@ import matplotlib.pyplot as plt
 
 
 class Learner:
-    def __init__(self, observer, training_data, tensorboard=False, method="Autoencoder"):
+    def __init__(self, observer, training_data, tensorboard=False,
+                 method="Autoencoder", num_epochs=50, batch_size=10, lr=1e-3,
+                 scheduler=torch.optim.lr_scheduler.ReduceLROnPlateau,
+                 scheduler_options=None):
 
         self.method = method
 
@@ -16,11 +19,20 @@ class Learner:
         self.model.to(self.device)
         self.tensorboard = tensorboard
 
-        self.num_epochs = 20
+        self.num_epochs = num_epochs
 
-        self.set_train_loader(training_data, 10)
-        self.set_optimizer(0.001)
-        self.set_scheduler(self.optimizer, [5, 10, 20])
+        self.set_train_loader(training_data, batch_size=batch_size)
+        self.set_optimizer(lr)
+        if scheduler_options is None:
+            self.scheduler_options = {
+                'mode': 'min', 'factor': 0.8, 'patience': 10, 'threshold': 0.1,
+                'verbose': True}
+        else:
+            self.scheduler_options = scheduler_options
+        self.optim_scheduler = scheduler(self.optimizer, **scheduler_options)
+        # self.optim_stopper = pl.callbacks.early_stopping.EarlyStopping(
+        #     monitor='val_loss', min_delta=0.5, patience=100,
+        #     verbose=False, mode='min')
 
         if tensorboard:
             self.set_tensorboard()
@@ -31,9 +43,6 @@ class Learner:
 
     def set_optimizer(self, learning_rate) -> None:
         self.optimizer = optim.Adam(self.model.parameters(), lr=learning_rate)
-
-    def set_scheduler(self, optimizer, milestones) -> None:
-        self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=milestones, gamma=0.1)
 
     def set_tensorboard(self) -> None:
         self.writer = SummaryWriter()

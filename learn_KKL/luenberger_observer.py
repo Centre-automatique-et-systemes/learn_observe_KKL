@@ -150,12 +150,22 @@ class LuenbergerObserver(nn.Module):
     dim_y : int
         Number of of measurement inputs. For example, if the sensor provides you with position in y, dim_y would be 1.
 
+    dim_z : int
+        Number of state variables of Luenberger Observer given dim_x and dim_y.
+        Default: dim_z = dim_y * (dim_x + 1)
+
+    method : str
+        Method used to compute the forward pass of the observer. Either "Autoencoder", "T" or "T_star".
+
+    wc : float
+        Cut-off frequency of the Bessel filter used to define D. By default,
+        D is chosen such that it has the same poles as a Bessel filter of
+        cut-off frequency 2 * np.pi * wc.
+
+
 
     Attributes
     ----------
-    dim_z : int
-        Number of state variables of Luenberger Observer given dim_x and dim_y.
-        dim_z = dim_y * (dim_x + 1)
 
     F : torch.tensor
         dim_z X 1 matrix F driving the dynamical system of the Luenberger observer.
@@ -229,7 +239,7 @@ class LuenbergerObserver(nn.Module):
     """
 
     def __init__(self, dim_x: int, dim_y: int, method: str = "Autoencoder",
-                 dim_z: int = None, wc=1.):
+                 dim_z: int = None, wc: float = 1.):
         super(LuenbergerObserver, self).__init__()
 
         self.method = method
