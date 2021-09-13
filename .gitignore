@@ -22,3 +22,6 @@ jupyter_notebook/runs/
 *.njsproj
 *.sln
 *.sw?
+
+# Build files
+*egg-info

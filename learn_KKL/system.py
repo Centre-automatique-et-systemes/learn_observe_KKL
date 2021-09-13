@@ -19,7 +19,7 @@ in time as well as the phase potrait.
 .. code-block:: Python
 
     import matplotlib.pyplot as plt
-    from lena.system import RevDuffing
+    from learn_KKL.system import RevDuffing
 
     # Get reversed duffing as example system
     system = RevDuffing()

@@ -40,9 +40,9 @@ system, and plots the results of the estimation.
 .. code-block:: Python
 
     import matplotlib.pyplot as plt
-    from lena.luenberger_observer import LuenbergerObserver
-    from lena.system import RevDuffing
-    from lena.learner import Learner
+    from learn_KKL.luenberger_observer import LuenbergerObserver
+    from learn_KKL.system import RevDuffing
+    from learn_KKL.learner import Learner
 
     # Get reversed duffing as example system
     system = RevDuffing()
@@ -117,7 +117,7 @@ class LuenbergerObserver(nn.Module):
     --------
     .. code-block:: Python
 
-        from lena.luenberger_observer import LuenbergerObserver
+        from learn_KKL.luenberger_observer import LuenbergerObserver
 
         # Initiate the Luenberger Observer
         observer = LuenbergerObserver(2, 1)

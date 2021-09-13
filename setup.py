@@ -1,12 +1,13 @@
 from setuptools import setup
 
 setup(
-    name='lena',
+    name='learn_observe_KKL',
     url='https://github.com/Centre-automatique-et-systemes/lena',
     author='Lukas Bahr',
-    packages=['lena'],
+    packages=['learn_KKL'],
     install_requires=['numpy', 'torch', 'scipy', 'matplotlib', 'torchdiffeq', 'smt'],
-    version='0.01',
+    version='0.1.0',
     license='MIT',
-    description='Implementation of lena',
+    description='Implementation of the paper: "Learning to observe with KKL '
+                'observers"',
 )
