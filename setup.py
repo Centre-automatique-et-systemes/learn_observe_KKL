@@ -7,7 +7,7 @@ setup(
     packages=['learn_KKL'],
     install_requires=['numpy', 'torch', 'scipy', 'matplotlib', 'torchdiffeq',
                       'smt', 'jupyter', 'tensorboard', 'seaborn',
-                      'pytorch-lightning'],
+                      'pytorch-lightning', 'dill'],
     version='0.1.0',
     license='MIT',
     description='Implementation of the paper: "Learning to observe with KKL '

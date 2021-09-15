@@ -1,12 +1,11 @@
 import os
-import torch
-import torch.nn as nn
-import torch.optim as optim
-import torch.utils as utils
-import matplotlib.pyplot as plt
-import pytorch_lightning as pl
-from torch.utils.tensorboard import SummaryWriter
 from datetime import date
+
+import dill as pkl
+import pytorch_lightning as pl
+import torch
+import torch.optim as optim
+
 
 # TODO heritate from pytorch lightning and use it directly!
 
@@ -69,10 +68,10 @@ class Learner(pl.LightningModule):
     def forward(self, batch):
         # Compute x_hat and/or z_hat depending on the method
         if self.method == "Autoencoder":
-            x = batch#.to(self.device)
+            x = batch  # .to(self.device)
         else:
-            x = batch[:, :self.model.dim_x]#.to(self.device)
-            z = batch[:, self.model.dim_x:]#.to(self.device)
+            x = batch[:, :self.model.dim_x]  # .to(self.device)
+            z = batch[:, self.model.dim_x:]  # .to(self.device)
 
         if self.method == "Autoencoder":
             z_hat, x_hat = self.model(x)
@@ -139,9 +138,7 @@ class Learner(pl.LightningModule):
 
         with open(self.results_folder + '/model.pkl', 'wb') as f:
             pkl.dump(self.model, f, protocol=4)
-        logging.info(f'Saved model in {self.results_folder}')
-
-
+        print(f'Saved model in {self.results_folder}')
 
 # class Learner:
 #     def __init__(self, observer, training_data, tensorboard=False,
