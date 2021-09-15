@@ -15,6 +15,7 @@ class Learner(pl.LightningModule):
                  optimizer=optim.Adam, optimizer_options=None,
                  scheduler=optim.lr_scheduler.ReduceLROnPlateau,
                  scheduler_options=None):
+        super().__init__()
         # General parameters
         self.method = method
         self.model = observer
@@ -25,7 +26,6 @@ class Learner(pl.LightningModule):
         self.validation_data = validation_data
 
         # Optimization
-        self.num_epochs = num_epochs
         self.batch_size = batch_size
         self.optim_lr = lr
         self.optimizer = optimizer
@@ -37,7 +37,7 @@ class Learner(pl.LightningModule):
         i = 0
         while os.path.isdir(f"{i}"):
             i += 1
-        self.results_folder = os.path.join(os.getcwd(), date.today(), i)
+        self.results_folder = os.path.join(os.getcwd(), str(date.today()), i)
 
         # Save hyperparameters
         self.save_hyperparameters()
