@@ -1,10 +1,15 @@
-import os
+import os, sys
 from datetime import date
 
 import dill as pkl
 import pytorch_lightning as pl
 import torch
 import torch.optim as optim
+from torch.utils.data import DataLoader
+
+# Set double precision by default
+torch.set_default_tensor_type(torch.DoubleTensor)
+torch.set_default_dtype(torch.float64)
 
 
 # TODO heritate from pytorch lightning and use it directly!
@@ -15,7 +20,7 @@ class Learner(pl.LightningModule):
                  optimizer=optim.Adam, optimizer_options=None,
                  scheduler=optim.lr_scheduler.ReduceLROnPlateau,
                  scheduler_options=None):
-        super().__init__()
+        super(Learner, self).__init__()
         # General parameters
         self.method = method
         self.model = observer
@@ -35,22 +40,23 @@ class Learner(pl.LightningModule):
 
         # Folder to save results
         i = 0
-        while os.path.isdir(f"{i}"):
+        while os.path.isdir(os.path.join(
+                os.getcwd(), 'runs', str(date.today()), f"exp_{i}")):
             i += 1
-        self.results_folder = os.path.join(os.getcwd(), str(date.today()), i)
-
-        # Save hyperparameters
-        self.save_hyperparameters()
+        self.results_folder = os.path.join(
+            os.getcwd(), 'runs', str(date.today()), f"exp_{i}")
+        print(f'Results saved in in {self.results_folder}')
 
     def configure_optimizers(self):
         # https://pytorch-lightning.readthedocs.io/en/stable/common/optimizers.html
         # https://github.com/PyTorchLightning/pytorch-lightning/issues/2976
-        if self.optim_options is not None:
-            optim_options = self.optim_options
+        if self.optimizer_options is not None:
+            optimizer_options = self.optimizer_options
         else:
-            optim_options = {}
+            optimizer_options = {}
         parameters = self.model.parameters()
-        optimizer = self.optimizer(parameters, self.optim_lr, **optim_options)
+        optimizer = self.optimizer(parameters, self.optim_lr,
+                                   **optimizer_options)
         if self.scheduler:
             if self.scheduler_options:
                 scheduler_options = self.scheduler_options
@@ -69,17 +75,14 @@ class Learner(pl.LightningModule):
         # Compute x_hat and/or z_hat depending on the method
         if self.method == "Autoencoder":
             x = batch  # .to(self.device)
-        else:
-            x = batch[:, :self.model.dim_x]  # .to(self.device)
-            z = batch[:, self.model.dim_x:]  # .to(self.device)
-
-        if self.method == "Autoencoder":
             z_hat, x_hat = self.model(x)
             return z_hat, x_hat
         elif self.method == "T":
+            x = batch[:, :self.model.dim_x]  # .to(self.device)
             z_hat = self.model(x)
             return z_hat
         elif self.method == "T_star":
+            z = batch[:, self.model.dim_x:]  # .to(self.device)
             x_hat = self.model(z)
             return x_hat
         else:
@@ -94,18 +97,21 @@ class Learner(pl.LightningModule):
         # Compute transformation and loss depending on the method
         if self.method == "Autoencoder":
             z_hat, x_hat = self.forward(batch)
-            loss1, loss2, loss3 = self.model.loss(x, x_hat, z_hat)
-            loss = loss1 + loss2 + loss3
+            loss, loss1, loss2 = self.model.loss(batch, x_hat, z_hat)
         elif self.method == "T":
+            z = batch[:, self.model.dim_x:]
             z_hat = self.forward(batch)
-            mse = torch.nn.MSELoss()
-            loss = mse(z, z_hat)
+            # mse = torch.nn.MSELoss()
+            # loss = mse(z, z_hat)
+            loss = self.model.loss(z, z_hat)
         elif self.method == "T_star":
+            x = batch[:, :self.model.dim_x]
             x_hat = self.forward(batch)
-            mse = torch.nn.MSELoss()
-            loss = mse(x, x_hat)
+            # mse = torch.nn.MSELoss()
+            # loss = mse(x, x_hat)
+            loss = self.model.loss(x, x_hat)
         self.log('train_loss', loss, on_step=True, prog_bar=True)
-        logs = {'train_loss': loss}
+        logs = {'train_loss': loss.detach()}
         return {'loss': loss, 'log': logs}
 
     def val_dataloader(self):
@@ -115,30 +121,37 @@ class Learner(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         # Compute transformation and loss depending on the method
-        if self.method == "Autoencoder":
-            z_hat, x_hat = self.forward(batch)
-            loss1, loss2, loss3 = self.model.loss(x, x_hat, z_hat)
-            loss = loss1 + loss2 + loss3
-        elif self.method == "T":
-            z_hat = self.forward(batch)
-            mse = torch.nn.MSELoss()
-            loss = mse(z, z_hat)
-        elif self.method == "T_star":
-            x_hat = self.forward(batch)
-            mse = torch.nn.MSELoss()
-            loss = mse(x, x_hat)
-        self.log('val_loss', loss, on_step=True, prog_bar=True)
-        logs = {'val_loss': loss}
-        return {'loss': loss, 'log': logs}
+        with torch.no_grad():
+            if self.method == "Autoencoder":
+                z_hat, x_hat = self.forward(batch)
+                loss, loss1, loss2 = self.model.loss(batch, x_hat, z_hat)
+            elif self.method == "T":
+                z = batch[:, self.model.dim_x:]
+                z_hat = self.forward(batch)
+                # mse = torch.nn.MSELoss()
+                # loss = mse(z, z_hat)
+                loss = self.model.loss(z, z_hat)
+            elif self.method == "T_star":
+                x = batch[:, :self.model.dim_x]
+                x_hat = self.forward(batch)
+                # mse = torch.nn.MSELoss()
+                # loss = mse(x, x_hat)
+                loss = self.model.loss(x, x_hat)
+            self.log('val_loss', loss, on_step=True, prog_bar=True)
+            logs = {'val_loss': loss.detach()}
+            return {'loss': loss, 'log': logs}
 
     def save_results(self, checkpoint_path=None):
-        if checkpoint_path:
-            checkpoint_model = torch.load(checkpoint_path)
-            self.load_state_dict(checkpoint_model['state_dict'])
+        with torch.no_grad():
+            if checkpoint_path:
+                checkpoint_model = torch.load(checkpoint_path)
+                self.load_state_dict(checkpoint_model['state_dict'])
 
-        with open(self.results_folder + '/model.pkl', 'wb') as f:
-            pkl.dump(self.model, f, protocol=4)
-        print(f'Saved model in {self.results_folder}')
+
+
+            with open(self.results_folder + '/model.pkl', 'wb') as f:
+                pkl.dump(self.model, f, protocol=4)
+            print(f'Saved model in {self.results_folder}')
 
 # class Learner:
 #     def __init__(self, observer, training_data, tensorboard=False,

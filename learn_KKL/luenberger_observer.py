@@ -89,6 +89,10 @@ from torch import nn
 from torchdiffeq import odeint
 from torchinterp1d import Interp1d
 
+# Set double precision by default
+torch.set_default_tensor_type(torch.DoubleTensor)
+torch.set_default_dtype(torch.float64)
+
 
 class LuenbergerObserver(nn.Module):
     """ Implements a Luenberger observer. You are responsible for setting the
@@ -177,7 +181,7 @@ class LuenbergerObserver(nn.Module):
         Default set to gpu if available. Used for training the model on either cpu or gpu.
 
     recon_lambda : float
-        Default set to 1.01. Multiplacator on reconstruction loss.
+        Default set to 1.01. Multiplicator on reconstruction loss.
 
 
     Methods
@@ -469,7 +473,8 @@ class LuenbergerObserver(nn.Module):
     def generate_data_svl(self, limits: tuple, num_samples: int, k: int = 10,
                           dt: float = 1e-2):
         """
-        Generated grid of data points by simulating the system backward and forward in time.
+        Generate a grid of data points by simulating the system backward and
+        forward in time.
 
         Parameters
         ----------
@@ -492,11 +497,11 @@ class LuenbergerObserver(nn.Module):
         """
         if limits[1] < limits[0]:
             raise ValueError(
-                'limits[0] must be strictly smaller than limits[0]')
+                'limits[0] must be strictly smaller than limits[1]')
 
         limits = np.array([limits, limits])
         sampling = LHS(xlimits=limits)
-        mesh = torch.tensor(sampling(num_samples))
+        mesh = torch.as_tensor(sampling(num_samples))
 
         t_c = k / min(abs(linalg.eig(self.D)[0].real))
 
@@ -648,12 +653,12 @@ class LuenbergerObserver(nn.Module):
 
         return z
 
-    def loss(
+    def loss_autoencoder(
             self, x: torch.tensor, x_hat: torch.tensor,
             z_hat: torch.tensor) -> torch.tensor:
         """
-        Loss function for training the observer model.
-        See reference for detailed information.
+        Loss function for training the observer model with the autoencoder
+        method. See reference for detailed information.
 
         Parameters
         ----------
@@ -672,10 +677,10 @@ class LuenbergerObserver(nn.Module):
             Reconstruction loss plus PDE loss.
 
         loss_1: torch.tensor
-            Reconstruction loss MSE(x,x_hat).
+            Reconstruction loss MSE(x, x_hat).
 
         loss_2: torch.tensor
-            PDE loss MSE(dTdx*f(x),D*z+F*h(x)).
+            PDE loss MSE(dTdx*f(x), D*z+F*h(x)).
         """
         # Init mean squared error
         batch_size = x.shape[0]
@@ -711,6 +716,60 @@ class LuenbergerObserver(nn.Module):
         loss_2 = mse(lhs, rhs)
 
         return loss_1 + loss_2, loss_1, loss_2
+
+    def loss_T(
+            self, z: torch.tensor, z_hat: torch.tensor) -> torch.tensor:
+        """
+        Loss function for training only the forward transformation T.
+
+        Parameters
+        ----------
+        z: torch.tensor
+            State vector of the observer.
+
+        z_hat: torch.tensor
+            Estimation of the state vector of the observer.
+
+        Returns
+        ----------
+        loss: torch.tensor
+            Reconstruction loss MSE(z, z_hat).
+        """
+        mse = torch.nn.MSELoss()
+        loss = mse(z, z_hat)
+        return loss
+
+
+    def loss_T_star(
+            self, x: torch.tensor, x_hat: torch.tensor) -> torch.tensor:
+        """
+        Loss function for training only the forward transformation T.
+
+        Parameters
+        ----------
+        x: torch.tensor
+            State vector of the system.
+
+        x_hat: torch.tensor
+            Estimation of the state vector of the system.
+
+        Returns
+        ----------
+        loss: torch.tensor
+            Reconstruction loss MSE(x, x_hat).
+        """
+        mse = torch.nn.MSELoss()
+        loss = mse(x, x_hat)
+        return loss
+
+
+    def loss(self, *input):
+        if self.method == "T":
+            return self.loss_T(*input)
+        elif self.method == "T_star":
+            return self.loss_T_star(*input)
+        elif self.method == "Autoencoder":
+            return self.loss_autoencoder(*input)
 
     def forward_autoencoder(self, x: torch.tensor) -> torch.tensor:
         """

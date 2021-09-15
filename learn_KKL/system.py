@@ -71,6 +71,10 @@ from math import pi
 from smt.sampling_methods import LHS
 from scipy import signal
 
+# Set double precision by default
+torch.set_default_tensor_type(torch.DoubleTensor)
+torch.set_default_dtype(torch.float64)
+
 
 class System():
     """ Implements a Luenberger observer. You are responsible for setting the
@@ -188,7 +192,7 @@ class System():
             sampling = LHS(xlimits=limits)
             mesh = sampling(num_samples)
 
-        return torch.Tensor(mesh)
+        return torch.as_tensor(mesh)
 
     def simulate(self, x_0: torch.tensor, tsim: tuple, dt) -> torch.tensor:
         """
