@@ -342,6 +342,7 @@ class RevDuffing(System):
     """
 
     def __init__(self):
+        super().__init__()
         self.dim_x = 2
         self.dim_y = 1
 
@@ -366,6 +367,7 @@ class VanDerPol(System):
     """
 
     def __init__(self):
+        super().__init__()
         self.dim_x = 2
         self.dim_y = 1
 

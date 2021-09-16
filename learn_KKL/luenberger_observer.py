@@ -442,7 +442,7 @@ class LuenbergerObserver(nn.Module):
         return tq, z
 
     def simulate_system(self, y_0: torch.tensor, tsim: tuple,
-                        dt) -> torch.tensor:
+                        dt, only_x: bool = False) -> torch.tensor:
         """
         Simulate Luenberger observer driven by a dynamical system.
 
@@ -457,6 +457,9 @@ class LuenbergerObserver(nn.Module):
         dt: float
             Step width of tsim.
 
+        only_x: bool
+            Whether to simulate both x and z or only x.
+
         Returns
         ----------
         tq: torch.tensor
@@ -470,7 +473,10 @@ class LuenbergerObserver(nn.Module):
             x = y[0:self.dim_x]
             z = y[self.dim_x:len(y)]
             x_dot = self.f(x) + self.g(x) * self.u(t)
-            z_dot = torch.matmul(self.D, z) + self.F * self.h(x)
+            if only_x:
+                z_dot = torch.zeros_like(z)
+            else:
+                z_dot = torch.matmul(self.D, z) + self.F * self.h(x)
             return torch.cat((x_dot, z_dot))
 
         # Output timestemps of solver
@@ -519,12 +525,13 @@ class LuenbergerObserver(nn.Module):
         y_0 = torch.zeros((self.dim_x + self.dim_z, num_samples))
         y_1 = y_0.clone()
 
-        # Simulate backward in time
+        # Simulate only x system backward in time
         tsim = (0, -t_c)
         y_0[:self.dim_x, :] = torch.transpose(mesh, 0, 1)
-        tq_bw, data_bw = self.simulate_system(y_0, tsim, -dt)
+        tq_bw, data_bw = self.simulate_system(y_0, tsim, -dt, only_x=True)
 
-        # Simulate forward in time starting from the last point from previous simulation
+        # Simulate both x and z forward in time starting from the last point
+        # from previous simulation
         tsim = (-t_c, 0)
         y_1[:self.dim_x, :] = data_bw[-1, :self.dim_x, :]
         tq, data_fw = self.simulate_system(y_1, tsim, dt)

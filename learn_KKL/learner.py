@@ -1,4 +1,4 @@
-import os, sys
+import os
 from datetime import date
 
 import dill as pkl
@@ -97,7 +97,12 @@ class Learner(pl.LightningModule):
         # Compute transformation and loss depending on the method
         if self.method == "Autoencoder":
             z_hat, x_hat = self.forward(batch)
-            loss, _, _ = self.model.loss(self.method, batch, x_hat, z_hat)
+            loss, loss1, loss2 = self.model.loss(self.method, batch, x_hat,
+                                                 z_hat)
+            self.log('train_loss1', loss1, on_step=True, prog_bar=False,
+                     logger=True)
+            self.log('train_loss2', loss2, on_step=True, prog_bar=False,
+                     logger=True)
         elif self.method == "T":
             z = batch[:, self.model.dim_x:]
             z_hat = self.forward(batch)
@@ -111,7 +116,6 @@ class Learner(pl.LightningModule):
             # loss = mse(x, x_hat)
             loss = self.model.loss(self.method, x, x_hat)
         self.log('train_loss', loss, on_step=True, prog_bar=True, logger=True)
-        self.logger.add_scalar('val_loss', loss, self.current_epoch)
         logs = {'train_loss': loss.detach()}
         return {'loss': loss, 'log': logs}
 
@@ -125,7 +129,12 @@ class Learner(pl.LightningModule):
         with torch.no_grad():
             if self.method == "Autoencoder":
                 z_hat, x_hat = self.forward(batch)
-                loss, _, _ = self.model.loss(self.method, batch, x_hat, z_hat)
+                loss, loss1, loss2 = self.model.loss(self.method, batch,
+                                                     x_hat, z_hat)
+                self.log('val_loss1', loss1, on_step=True, prog_bar=False,
+                         logger=True)
+                self.log('val_loss2', loss2, on_step=True, prog_bar=False,
+                         logger=True)
             elif self.method == "T":
                 z = batch[:, self.model.dim_x:]
                 z_hat = self.forward(batch)
@@ -139,7 +148,6 @@ class Learner(pl.LightningModule):
                 # loss = mse(x, x_hat)
                 loss = self.model.loss(self.method, x, x_hat)
             self.log('val_loss', loss, on_step=True, prog_bar=True, logger=True)
-            self.logger.add_scalar('val_loss', loss, self.current_epoch)
             logs = {'val_loss': loss.detach()}
             return {'loss': loss, 'log': logs}
 
