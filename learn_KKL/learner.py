@@ -75,15 +75,15 @@ class Learner(pl.LightningModule):
         # Compute x_hat and/or z_hat depending on the method
         if self.method == "Autoencoder":
             x = batch  # .to(self.device)
-            z_hat, x_hat = self.model(x)
+            z_hat, x_hat = self.model(self.method, x)
             return z_hat, x_hat
         elif self.method == "T":
             x = batch[:, :self.model.dim_x]  # .to(self.device)
-            z_hat = self.model(x)
+            z_hat = self.model(self.method, x)
             return z_hat
         elif self.method == "T_star":
             z = batch[:, self.model.dim_x:]  # .to(self.device)
-            x_hat = self.model(z)
+            x_hat = self.model(self.method, z)
             return x_hat
         else:
             raise KeyError(f'Unknown method {self.method}')
@@ -97,20 +97,21 @@ class Learner(pl.LightningModule):
         # Compute transformation and loss depending on the method
         if self.method == "Autoencoder":
             z_hat, x_hat = self.forward(batch)
-            loss, loss1, loss2 = self.model.loss(batch, x_hat, z_hat)
+            loss, _, _ = self.model.loss(self.method, batch, x_hat, z_hat)
         elif self.method == "T":
             z = batch[:, self.model.dim_x:]
             z_hat = self.forward(batch)
             # mse = torch.nn.MSELoss()
             # loss = mse(z, z_hat)
-            loss = self.model.loss(z, z_hat)
+            loss = self.model.loss(self.method, z, z_hat)
         elif self.method == "T_star":
             x = batch[:, :self.model.dim_x]
             x_hat = self.forward(batch)
             # mse = torch.nn.MSELoss()
             # loss = mse(x, x_hat)
-            loss = self.model.loss(x, x_hat)
-        self.log('train_loss', loss, on_step=True, prog_bar=True)
+            loss = self.model.loss(self.method, x, x_hat)
+        self.log('train_loss', loss, on_step=True, prog_bar=True, logger=True)
+        self.logger.add_scalar('val_loss', loss, self.current_epoch)
         logs = {'train_loss': loss.detach()}
         return {'loss': loss, 'log': logs}
 
@@ -124,20 +125,21 @@ class Learner(pl.LightningModule):
         with torch.no_grad():
             if self.method == "Autoencoder":
                 z_hat, x_hat = self.forward(batch)
-                loss, loss1, loss2 = self.model.loss(batch, x_hat, z_hat)
+                loss, _, _ = self.model.loss(self.method, batch, x_hat, z_hat)
             elif self.method == "T":
                 z = batch[:, self.model.dim_x:]
                 z_hat = self.forward(batch)
                 # mse = torch.nn.MSELoss()
                 # loss = mse(z, z_hat)
-                loss = self.model.loss(z, z_hat)
+                loss = self.model.loss(self.method, z, z_hat)
             elif self.method == "T_star":
                 x = batch[:, :self.model.dim_x]
                 x_hat = self.forward(batch)
                 # mse = torch.nn.MSELoss()
                 # loss = mse(x, x_hat)
-                loss = self.model.loss(x, x_hat)
-            self.log('val_loss', loss, on_step=True, prog_bar=True)
+                loss = self.model.loss(self.method, x, x_hat)
+            self.log('val_loss', loss, on_step=True, prog_bar=True, logger=True)
+            self.logger.add_scalar('val_loss', loss, self.current_epoch)
             logs = {'val_loss': loss.detach()}
             return {'loss': loss, 'log': logs}
 
@@ -147,7 +149,7 @@ class Learner(pl.LightningModule):
                 checkpoint_model = torch.load(checkpoint_path)
                 self.load_state_dict(checkpoint_model['state_dict'])
 
-
+            # TODO
 
             with open(self.results_folder + '/model.pkl', 'wb') as f:
                 pkl.dump(self.model, f, protocol=4)

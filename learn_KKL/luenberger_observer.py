@@ -21,11 +21,22 @@ implemented the sytem class from this package, you can use the
 set_dynamics(system) method. Alternatively, you can set the functions
 in usual procedural style.
 
-Next, we need to train the autoencoder model. The learner class in this
-package gives a simple interface to learn the model. However, you might
-want to overwrite some learning parameters with your own.
-With the trained model we are now able to estimate the state vectors
-given the measurement y of our system.
+Next, we need to train the autoencoder model from a dataset of system states
+(x_i). The  learner class in this package gives a simple interface to learn
+the model based on pytorch-lightning. However, you might want to overwrite
+some learning parameters with your own. With the trained model we are now
+able to estimate the state vectors given the measurement y of our system.
+
+This module can also be used to learn the forward and inverse transformations
+(encoder and decoder) separately, using supervised learning instead of an
+autoencoder. In that case, the user generate_data_svl to generate both the
+system states dataset (x_i) and the corresponding observer states dataset (
+z_i). Then, the forward transformation T and its inverse T_star are trained
+separately using two learner objects. To train the autoencoder,
+use method='Autoencoder' when creating the observer, the learner and when
+making predictions. To train with supervised learning,
+use method='Supervised' when creating the observer, then either 'T' and
+'T_star' for each of the learners and when making predictions.
 
 This module expects torch tensor for all attributes with shape greater
 one. All other numerical types are either integer or float.
@@ -61,7 +72,7 @@ system, and plots the results of the estimation.
     tq, simulation = system.simulate(torch.tensor([[1.],[1.]]), tsim, dt)
     measurement = simulation[:, 0]
 
-    # Predict from measurment
+    # Predict from measurement
     estimation = observer.predict(measurement, tsim, dt)
 
     # Plot truth ground data and estimation
@@ -159,7 +170,7 @@ class LuenbergerObserver(nn.Module):
         Default: dim_z = dim_y * (dim_x + 1)
 
     method : str
-        Method used to compute the forward pass of the observer. Either "Autoencoder", "T" or "T_star".
+        Method for the observer object. Either "Autoencoder" or "Supervised".
 
     wc : float
         Cut-off frequency of the Bessel filter used to define D. By default,
@@ -307,12 +318,12 @@ class LuenbergerObserver(nn.Module):
             'decoder' + str(self.decoder_layers),
         ])
 
-    def __call__(self, *input):
-        if self.method == "T":
+    def __call__(self, method='Autoencoder', *input):
+        if method == "T":
             return self.forward_T(*input)
-        elif self.method == "T_star":
+        elif method == "T_star":
             return self.forward_T_star(*input)
-        elif self.method == "Autoencoder":
+        elif method == "Autoencoder":
             return self.forward_autoencoder(*input)
 
     def set_dynamics(self, system):
@@ -763,12 +774,12 @@ class LuenbergerObserver(nn.Module):
         return loss
 
 
-    def loss(self, *input):
-        if self.method == "T":
+    def loss(self, method='Autoencoder', *input):
+        if method == "T":
             return self.loss_T(*input)
-        elif self.method == "T_star":
+        elif method == "T_star":
             return self.loss_T_star(*input)
-        elif self.method == "Autoencoder":
+        elif method == "Autoencoder":
             return self.loss_autoencoder(*input)
 
     def forward_autoencoder(self, x: torch.tensor) -> torch.tensor:
