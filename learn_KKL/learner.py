@@ -1,10 +1,13 @@
 import os
-from datetime import date
 
 import dill as pkl
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 import pytorch_lightning as pl
 import torch
 import torch.optim as optim
+from smt.sampling_methods import LHS
 from torch.utils.data import DataLoader
 
 # Set double precision by default
@@ -12,16 +15,91 @@ torch.set_default_tensor_type(torch.DoubleTensor)
 torch.set_default_dtype(torch.float64)
 
 
-# TODO heritate from pytorch lightning and use it directly!
+def RMSE(x, y, dim=None):
+    """
+    Compute the root mean squared between x and y along dimension dim.
+
+    Parameters
+    ----------
+    x: torch.tensor
+    y: torch.tensor
+    dim: int
+        Dimension along which to compute the mean.
+
+    Returns
+    -------
+    error: torch.tensor
+        Computed RMSE.
+    """
+    error = torch.nn.functional.mse_loss(x, y, reduction='none')
+    if dim is None:
+        return torch.sqrt(torch.mean(error))
+    else:
+        return torch.sqrt(torch.mean(error, dim=dim))
+
 
 class Learner(pl.LightningModule):
-    def __init__(self, observer, training_data, validation_data,
+    """
+    Learner class based on pytorch-lightning
+    https://pytorch-lightning.readthedocs.io/en/stable/starter/new-project.html
+
+
+    Params
+    ----------
+    observer:
+        KKL observer model.
+
+    system:
+        Dynamical system studied. Needed for simulation of test trajectories,
+        so needs a simulate function.
+
+    training_data:
+        Training data.
+
+    validation_data :
+        Validation data.
+
+    method: str
+        Method for training the model's encoder, decoder, or both jointly.
+        Can be 'T', 'T_star', 'Autoencoder' respectively.
+
+    batch_size: int
+        Size of the minibatches.
+
+    lr: float
+        Learning rate used for optimization.
+
+    optimizer:
+        Optimizer from torch.optim.
+
+    optimizer_options:
+        Options for the optimizer.
+
+    scheduler:
+        Scheduler from torch.optim.lr_scheduler.
+
+    scheduler_options:
+        Options for the scheduler.
+
+
+
+
+    Attributes
+    ----------
+
+    results_folder : str
+        Path of the folder for saving all results.
+
+    """
+
+    def __init__(self, observer, system, training_data, validation_data,
                  method="Autoencoder", batch_size=10, lr=1e-3,
                  optimizer=optim.Adam, optimizer_options=None,
                  scheduler=optim.lr_scheduler.ReduceLROnPlateau,
                  scheduler_options=None):
         super(Learner, self).__init__()
         # General parameters
+        self.system = system
         self.method = method
         self.model = observer
         self.model.to(self.device)
@@ -40,11 +118,12 @@ class Learner(pl.LightningModule):
 
         # Folder to save results
         i = 0
-        while os.path.isdir(os.path.join(
-                os.getcwd(), 'runs', str(date.today()), f"exp_{i}")):
+        params = os.path.join(os.getcwd(), 'runs', self.model.method)
+        if self.model.method == 'Supervised':
+            params += self.method
+        while os.path.isdir(os.path.join(params, f"exp_{i}")):
             i += 1
-        self.results_folder = os.path.join(
-            os.getcwd(), 'runs', str(date.today()), f"exp_{i}")
+        self.results_folder = os.path.join(params, f"exp_{i}")
         print(f'Results saved in in {self.results_folder}')
 
     def configure_optimizers(self):
@@ -151,111 +230,134 @@ class Learner(pl.LightningModule):
             logs = {'val_loss': loss.detach()}
             return {'loss': loss, 'log': logs}
 
-    def save_results(self, checkpoint_path=None):
+    def save_results(self, limits: np.array, nb_trajs=10, tsim=(0, 60),
+                     dt=1e-2, checkpoint_path=None, verbose=False):
+        """
+        Save the model, the training and validation data. Also saving several
+        metrics used for evaluating the results: heatmap of estimation error
+        and estimation of several test trajectories.
+
+        Parameters
+        ----------
+        limits: np.array
+            Array for the limits of all axes, used for sampling the heatmap
+            and the initial conditions of the test trajectories.
+            Form np.array([[min_1, ..., min_,n], [max_1, ..., max_n]]).
+
+        nb_trajs: int
+            Number of test trajectories.
+
+        tsim: tuple
+            Length of simulations for the test trajectories.
+
+        dt: int
+            Sampling time of the simulations for the test trajectories.
+
+        checkpoint_path: str
+            Path to the checkpoint from which to retrieve the best obtained
+            model.
+
+        verbose: bool
+            Whether to show the plots or just save them.
+        """
         with torch.no_grad():
             if checkpoint_path:
                 checkpoint_model = torch.load(checkpoint_path)
                 self.load_state_dict(checkpoint_model['state_dict'])
 
-            # TODO
+            # Save training and validation data
+            idx = np.random.choice(np.arange(len(self.training_data)),
+                                   size=(10000,))  # subsampling for plots
+            filename = 'training_data.csv'
+            file = pd.DataFrame(self.training_data.cpu().numpy())
+            file.to_csv(os.path.join(self.results_folder, filename),
+                        header=False)
+            training_data = self.training_data[idx]
+            for i in range(1, training_data.shape[1]):
+                name = 'training_data' + str(i) + '.pdf'
+                plt.scatter(training_data[:, i - 1].cpu(),
+                            training_data[:, i].cpu())
+                plt.title('Training data')
+                plt.xlabel(rf'x_{{i}}')
+                plt.ylabel(rf'x_{{j}}')
+                plt.savefig(os.path.join(self.results_folder, name),
+                            bbox_inches='tight')
+                if verbose:
+                    plt.show()
+                plt.close('all')
+            filename = 'validation_data.csv'
+            file = pd.DataFrame(self.validation_data.cpu().numpy())
+            file.to_csv(os.path.join(self.results_folder, filename),
+                        header=False)
+
+            # Compute heatmap of RMSE(x, x_hat)
+            num_samples = 10000
+            sampling = LHS(xlimits=limits)
+            mesh = torch.as_tensor(sampling(num_samples))
+            # if self.method == 'Autoencoder':
+            #     _, mesh_hat = self.model(self.method, mesh)
+            # else:
+            #     mesh_hat = self.model(self.method, mesh)
+            _, mesh_hat = self.model('Autoencoder', mesh)  # T(T_star(x))
+            error = RMSE(mesh, mesh_hat, dim=1)
+            for i in range(1, mesh.shape[1]):
+                name = 'RMSE_heatmap' + str(i) + '.pdf'
+                plt.scatter(mesh[:, i - 1], mesh[:, i], cmap='jet',
+                            c=np.log(error.numpy()))
+                cbar = plt.colorbar()
+                cbar.set_label('Log estimation error')
+                plt.title('Log of RMSE between ' + r'$x$' + ' and '
+                          + r'$\hat{'r'x}$')
+                plt.xlabel(rf'$x_{i}$')
+                plt.ylabel(rf'$x_{i + 1}$')
+                plt.legend()
+                plt.savefig(os.path.join(self.results_folder, name),
+                            bbox_inches='tight')
+                if verbose:
+                    plt.show()
+                plt.close('all')
+
+            # Estimation over the test trajectories
+            sampling = LHS(xlimits=limits)
+            trajs_init = torch.as_tensor(sampling(nb_trajs)).T
+            traj_folder = os.path.join(self.results_folder, 'Test_trajectories')
+            tq, simulation = self.system.simulate(trajs_init, tsim, dt)
+            measurement = torch.transpose(
+                self.model.h(torch.transpose(simulation, 0, 1)), 0, 1)
+            # Save these test trajectories
+            os.makedirs(traj_folder, exist_ok=True)
+            for i in range(nb_trajs):
+                # TODO run predictions in parallel for all test trajectories!!!
+                # Need to figure out how to interpolate y in parallel for all
+                # trajectories!!!
+                y = torch.cat((tq.unsqueeze(1), measurement[..., i]), dim=1)
+                estimation = self.model.predict(y, tsim, dt)
+
+                current_folder = os.path.join(traj_folder, f'Traj_{i}')
+                os.makedirs(current_folder, exist_ok=True)
+                filename = f'True_traj_{i}.csv'
+                file = pd.DataFrame(simulation[..., i].cpu().numpy())
+                file.to_csv(os.path.join(current_folder, filename),
+                            header=False)
+                filename = f'Estimated_traj_{i}.csv'
+                file = pd.DataFrame(estimation.cpu().numpy())
+                file.to_csv(os.path.join(current_folder, filename),
+                            header=False)
+                for j in range(simulation.shape[1]):
+                    name = 'Traj' + str(j) + '.pdf'
+                    plt.plot(tq, simulation[:, j, i].detach().numpy(),
+                             label=rf'$x_{j + 1}$')
+                    plt.plot(tq, estimation[:, j].detach().numpy(),
+                             label=rf'$\hat{{x}}_{j + 1}$')
+                    plt.legend()
+                    plt.xlabel(rf'$t$')
+                    plt.ylabel(rf'$x_{j + 1}$')
+                    plt.savefig(os.path.join(current_folder, name),
+                                bbox_inches='tight')
+                    if verbose:
+                        plt.show()
+                    plt.close('all')
 
             with open(self.results_folder + '/model.pkl', 'wb') as f:
                 pkl.dump(self.model, f, protocol=4)
             print(f'Saved model in {self.results_folder}')
-
-# class Learner:
-#     def __init__(self, observer, training_data, tensorboard=False,
-#                  method="Autoencoder", num_epochs=50, batch_size=10, lr=1e-3,
-#                  scheduler=torch.optim.lr_scheduler.ReduceLROnPlateau,
-#                  scheduler_options=None):
-#
-#         self.method = method
-#
-#         self.model = observer
-#         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-#         self.model.to(self.device)
-#         self.tensorboard = tensorboard
-#
-#         self.num_epochs = num_epochs
-#
-#         self.set_train_loader(training_data, batch_size=batch_size)
-#         self.set_optimizer(lr)
-#         if scheduler_options is None:
-#             self.scheduler_options = {
-#                 'mode': 'min', 'factor': 0.5, 'patience': 10, 'threshold': 1e-2,
-#                 'verbose': True}
-#         else:
-#             self.scheduler_options = scheduler_options
-#         self.scheduler = scheduler(self.optimizer, **self.scheduler_options)
-#         # self.stopper = pl.callbacks.early_stopping.EarlyStopping(
-#         #     monitor='val_loss', min_delta=0.5, patience=100,
-#         #     verbose=False, mode='min')
-#
-#         if tensorboard:
-#             self.set_tensorboard()
-#
-#     def set_train_loader(self, data, batch_size) -> None:
-#         self.trainloader = utils.data.DataLoader(data, batch_size=batch_size,
-#                                                  drop_last=True)
-#
-#     def set_optimizer(self, learning_rate) -> None:
-#         self.optimizer = optim.Adam(self.model.parameters(), lr=learning_rate)
-#
-#     def set_tensorboard(self) -> None:
-#         self.writer = SummaryWriter()
-#
-#     def forward(self, batch, step):
-#
-#         # Zero gradients
-#         self.optimizer.zero_grad()
-#
-#         if self.method == "Autoencoder":
-#             x = batch.to(self.device)
-#         else:
-#             x = batch[:, :self.model.dim_x].to(self.device)
-#             z = batch[:, self.model.dim_x:].to(self.device)
-#
-#         if self.method == "Autoencoder":
-#             # Predict
-#             z_hat, x_hat = self.model(x)
-#
-#             # loss, loss1, loss2 = self.model.loss(x, x_hat, z_hat)  #???!!!
-#             loss1, loss2, loss3 = self.model.loss(x, x_hat, z_hat)
-#             loss = loss1 + loss2 + loss3
-#         elif self.method == "T":
-#             z_hat = self.model(x)
-#
-#             mse = torch.nn.MSELoss()
-#             loss = mse(z, z_hat)
-#         elif self.method == "T_star":
-#             x_hat = self.model(z)
-#             mse = torch.nn.MSELoss()
-#             loss = mse(x, x_hat)
-#
-#         # Write loss to tensorboard
-#         if self.tensorboard:
-#             self.writer.add_scalars("Loss/train", {
-#                 'loss': loss,
-#             }, step)
-#             self.writer.flush()
-#
-#         # Gradient step and optimize
-#         loss.backward()
-#         self.train_loss = loss
-#         self.optimizer.step()
-#
-#     def train(self):
-#         for epoch in range(self.num_epochs):
-#
-#             for i, batch in enumerate(self.trainloader, 0):
-#
-#                 step = i + (epoch*len(self.trainloader))
-#
-#                 self.forward(batch, step)
-#
-#             print('====> Epoch {}: LR {}, train_loss {}'.format(
-#                 epoch + 1, self.optimizer.param_groups[0]["lr"]),
-#                 self.train_loss)
-#
-#             # Adjust learning rate
-#             self.scheduler.step(self.train_loss)

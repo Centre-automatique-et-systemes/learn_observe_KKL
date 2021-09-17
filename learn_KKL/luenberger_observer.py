@@ -38,10 +38,9 @@ making predictions. To train with supervised learning,
 use method='Supervised' when creating the observer, then either 'T' and
 'T_star' for each of the learners and when making predictions.
 
-This module expects torch tensor for all attributes with shape greater
+This module expects torch tensor for all attributes with shape greater than
 one. All other numerical types are either integer or float.
 Exceptions for different method inputs are documented in the method.
-
 
 Examples
 --------
@@ -418,23 +417,22 @@ class LuenbergerObserver(nn.Module):
         sol: torch.tensor
             Solution of the simulation.
         """
-
-        def dydt(t, z: torch.tensor):
-            if self.u_1 == self.u:
-                z_dot = torch.matmul(self.D, z) + self.F * self.measurement(t)
-            else:
-                z_dot = torch.matmul(self.D, z) + self.F * self.measurement(t) + \
-                        torch.mul(self.phi(z), self.u_1(t) - self.u(t))
-            return z_dot
-
         # Output timestemps of solver
         tq = torch.arange(tsim[0], tsim[1], dt)
 
         # 1D interpolation of y
-        self.measurement = self.interpolate_func(y)
+        measurement = self.interpolate_func(y)
 
         # Zero initial value
         z_0 = torch.zeros((self.dim_z, 1))
+
+        def dydt(t, z: torch.tensor):
+            if self.u_1 == self.u:
+                z_dot = torch.matmul(self.D, z) + self.F * measurement(t)
+            else:
+                z_dot = torch.matmul(self.D, z) + self.F * measurement(t) \
+                        + torch.mul(self.phi(z), self.u_1(t) - self.u(t))
+            return z_dot
 
         # Solve
         z = odeint(dydt, z_0, tq)
@@ -495,8 +493,9 @@ class LuenbergerObserver(nn.Module):
 
         Parameters
         ----------
-        limits: tuple
-            Limits in x and y direction sampled from LHS.
+        limits: np.array
+            Array for the limits of all axes, used for sampling with LHS.
+            Form np.array([[min_1, max_1], ..., [min_n, max_n]]).
 
         num_samples: int
             Number of samples in compact set.
@@ -512,11 +511,11 @@ class LuenbergerObserver(nn.Module):
         data: torch.tensor
             Pairs of (x, z) data points.
         """
-        if limits[1] < limits[0]:
-            raise ValueError(
-                'limits[0] must be strictly smaller than limits[1]')
+        # if limits[1] < limits[0]:
+        #     raise ValueError(
+        #         'limits[0] must be strictly smaller than limits[1]')
 
-        limits = np.array([limits, limits])
+        # limits = np.array([limits, limits])
         sampling = LHS(xlimits=limits)
         mesh = torch.as_tensor(sampling(num_samples))
 
@@ -757,7 +756,6 @@ class LuenbergerObserver(nn.Module):
         loss = mse(z, z_hat)
         return loss
 
-
     def loss_T_star(
             self, x: torch.tensor, x_hat: torch.tensor) -> torch.tensor:
         """
@@ -779,7 +777,6 @@ class LuenbergerObserver(nn.Module):
         mse = torch.nn.MSELoss()
         loss = mse(x, x_hat)
         return loss
-
 
     def loss(self, method='Autoencoder', *input):
         if method == "T":

@@ -158,15 +158,16 @@ class System():
         elif controller == 'lin_chirp_controller':
             self.u = self.lin_chirp_controller
 
-    def generate_mesh(self, limits: tuple, num_samples: int, method: str = 'lhs') -> torch.tensor:
+    def generate_mesh(self, limits: np.array, num_samples: int, method: str = 'lhs') -> torch.tensor:
         """
         Generates 2D mesh either from a uniform distribution or uses latin hypercube
         sampling.
 
         Parameters
         ----------
-        limits: 
-            Tuple of start and end value for both x and y axes.
+        limits: np.array
+            Array for the limits of all axes, used for sampling.
+            Form np.array([[min_1, max_1], ..., [min_n, max_n]]).
 
         num_sample: int
             Number of samples in this space.
@@ -179,16 +180,13 @@ class System():
         mesh: torch.tensor
             Mesh in shape (num_samples, 2).
         """
-        if limits[1] < limits[0]:
-            raise ValueError('limits[0] must be strictly smaller than limits[0]')
 
         # Sample either a uniformly grid or use latin hypercube sampling
         if method == 'uniform':
-            grid_step = (limits[1]-limits[0]) / np.sqrt(num_samples)
-            axes = np.arange(limits[0], limits[1], grid_step)
-            mesh = np.array(np.meshgrid(axes, axes)).T.reshape(-1, 2)
+            axes = np.linspace(limits[:, 0], limits[:, 1], num_samples)
+            mesh = \
+                np.array(np.meshgrid(axes, axes)).T.reshape(-1, axes.shape[1])
         elif method == 'lhs':
-            limits = np.array([limits, limits])
             sampling = LHS(xlimits=limits)
             mesh = sampling(num_samples)
 
@@ -355,7 +353,8 @@ class RevDuffing(System):
         return torch.cat((x_0, x_1), 0)
 
     def h(self, x):
-        return torch.reshape(x[0, :], (1, -1))
+        # return torch.reshape(x[0, :], (1, -1))
+        return torch.unsqueeze(x[0, :], dim=0)
 
     def g(self, x):
         return torch.zeros(x.shape[0], x.shape[1])
