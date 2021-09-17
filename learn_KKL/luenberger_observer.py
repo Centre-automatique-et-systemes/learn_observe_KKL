@@ -193,6 +193,12 @@ class LuenbergerObserver(nn.Module):
     recon_lambda : float
         Default set to 1.01. Multiplicator on reconstruction loss.
 
+    scaler_x :
+        Scaler for x in the NN model.
+
+    scaler_z :
+        Scaler for z in the NN model.
+
 
     Methods
     ----------
@@ -253,7 +259,8 @@ class LuenbergerObserver(nn.Module):
     """
 
     def __init__(self, dim_x: int, dim_y: int, method: str = "Autoencoder",
-                 dim_z: int = None, wc: float = 1.):
+                 dim_z: int = None, wc: float = 1., num_hl: int = 5,
+                 size_hl: int = 50, activation=nn.ReLU()):
         super(LuenbergerObserver, self).__init__()
 
         self.method = method
@@ -272,8 +279,9 @@ class LuenbergerObserver(nn.Module):
             raise ValueError('dim_y must be 1 or greater')
 
         # Set observer matrices D and F
+        self.wc = wc
         self.F = torch.ones((self.dim_z, 1))
-        self.D = self.bessel_D(wc=wc)
+        self.D = self.bessel_D(wc=self.wc)
 
         # Model params
         self.device = torch.device(
@@ -281,14 +289,18 @@ class LuenbergerObserver(nn.Module):
         self.recon_lambda = 1.01
 
         # Define encoder and decoder architecture
-        num_hl = 5
-        size_hl = 40
-        act = nn.Tanh()
-
-        self.encoder_layers = self.create_layers(num_hl, size_hl, act,
-                                                 self.dim_x, self.dim_z)
-        self.decoder_layers = self.create_layers(num_hl, size_hl, act,
-                                                 self.dim_z, self.dim_x)
+        # num_hl = 5
+        # size_hl = 40
+        # act = nn.Tanh()
+        self.num_hl = num_hl
+        self.size_hl = size_hl
+        self.activation = activation
+        self.encoder_layers = self.create_layers(
+            self.num_hl, self.size_hl, self.activation, self.dim_x, self.dim_z)
+        self.decoder_layers = self.create_layers(
+            self.num_hl, self.size_hl, self.activation, self.dim_z, self.dim_x)
+        self.scaler_x = None
+        self.scaler_z = None
 
     def f(self, x: torch.tensor):
         return 0
@@ -311,10 +323,12 @@ class LuenbergerObserver(nn.Module):
             'dim_x ' + str(self.dim_x),
             'dim_y ' + str(self.dim_y),
             'dim_z ' + str(self.dim_z),
+            'wc' + str(self.wc),
             'D ' + str(self.D),
             'F ' + str(self.F),
             'encoder' + str(self.encoder_layers),
             'decoder' + str(self.decoder_layers),
+            'method' + self.method,
         ])
 
     def __call__(self, method='Autoencoder', *input):
@@ -344,6 +358,23 @@ class LuenbergerObserver(nn.Module):
         self.h = system.h
         self.u = system.u
         self.u_1 = system.u_1
+
+    def set_scalers(self, scaler_x, scaler_z):
+        """
+        Set the scaler objects for input and output data. Then, the internal
+        NN will normalize every input and denormalize every output.
+
+        Parameters
+        ----------
+        scaler_X :
+            Input scaler.
+
+        scaler_out :
+            Output scaler.
+        """
+
+        self.scaler_x = scaler_x
+        self.scaler_z = scaler_z
 
     def bessel_D(self, wc: float = 1.) -> torch.tensor:
         """
@@ -511,11 +542,7 @@ class LuenbergerObserver(nn.Module):
         data: torch.tensor
             Pairs of (x, z) data points.
         """
-        # if limits[1] < limits[0]:
-        #     raise ValueError(
-        #         'limits[0] must be strictly smaller than limits[1]')
 
-        # limits = np.array([limits, limits])
         sampling = LHS(xlimits=limits)
         mesh = torch.as_tensor(sampling(num_samples))
 
@@ -535,7 +562,8 @@ class LuenbergerObserver(nn.Module):
         y_1[:self.dim_x, :] = data_bw[-1, :self.dim_x, :]
         tq, data_fw = self.simulate_system(y_1, tsim, dt)
 
-        # Data contains (x_i, z_i) pairs in shape [dim_z, number_simulations]
+        # Data contains (x_i, z_i) pairs in shape [dim_x + dim_z,
+        # number_simulations]
         data = torch.transpose(data_fw[-1, :, :], 0, 1)
 
         return data
@@ -643,9 +671,13 @@ class LuenbergerObserver(nn.Module):
         z: torch.tensor
             Computation of observer state vector.
         """
-        # Iterate over encoder layers and compute next input
+        # Normalize input, iterate over encoder layers, denormalize output
+        if self.scaler_x is not None:
+            x = self.scaler_x.transform(x)
         for layer in self.encoder_layers:
             x = layer(x)
+        if self.scaler_z is not None:
+            x = self.scaler_z.inverse_transform(x)
 
         return x
 
@@ -664,9 +696,13 @@ class LuenbergerObserver(nn.Module):
             Computation of state vector estimation driving the
             observer.
         """
-        # Iterate over decoder layers and compute next input
+        # Normalize input, iterate over decoder layers, denormalize output
+        if self.scaler_z is not None:
+            z = self.scaler_z.transform(z)
         for layer in self.decoder_layers:
             z = layer(z)
+        if self.scaler_x is not None:
+            z = self.scaler_x.inverse_transform(z)
 
         return z
 

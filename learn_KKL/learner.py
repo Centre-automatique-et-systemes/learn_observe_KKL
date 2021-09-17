@@ -1,4 +1,5 @@
-import os, sys
+import os
+import sys
 
 import dill as pkl
 import matplotlib.pyplot as plt
@@ -9,33 +10,14 @@ import torch
 import torch.optim as optim
 from smt.sampling_methods import LHS
 from torch.utils.data import DataLoader
+from scipy.interpolate import interp2d
+
+
+from .utils import RMSE, StandardScaler
 
 # Set double precision by default
 torch.set_default_tensor_type(torch.DoubleTensor)
 torch.set_default_dtype(torch.float64)
-
-
-def RMSE(x, y, dim=None):
-    """
-    Compute the root mean squared between x and y along dimension dim.
-
-    Parameters
-    ----------
-    x: torch.tensor
-    y: torch.tensor
-    dim: int
-        Dimension along which to compute the mean.
-
-    Returns
-    -------
-    error: torch.tensor
-        Computed RMSE.
-    """
-    error = torch.nn.functional.mse_loss(x, y, reduction='none')
-    if dim is None:
-        return torch.sqrt(torch.mean(error))
-    else:
-        return torch.sqrt(torch.mean(error, dim=dim))
 
 
 class Learner(pl.LightningModule):
@@ -87,8 +69,14 @@ class Learner(pl.LightningModule):
     Attributes
     ----------
 
-    results_folder : str
+    results_folder: str
         Path of the folder for saving all results.
+
+    scaler_x:
+        Scaler object for x.
+
+    scaler_z:
+        Scaler object for z.
 
     """
 
@@ -107,6 +95,15 @@ class Learner(pl.LightningModule):
         # Data handling
         self.training_data = training_data
         self.validation_data = validation_data
+        if self.method == 'Autoencoder':
+            self.scaler_x = StandardScaler(self.training_data)
+            self.scaler_z = None
+        else:
+            self.scaler_x = StandardScaler(
+                self.training_data[:, :self.model.dim_x])
+            self.scaler_z = StandardScaler(
+                self.training_data[:, self.model.dim_x:])
+        self.model.set_scalers(scaler_x=self.scaler_x, scaler_z=self.scaler_z)
 
         # Optimization
         self.batch_size = batch_size
@@ -120,7 +117,7 @@ class Learner(pl.LightningModule):
         i = 0
         params = os.path.join(os.getcwd(), 'runs', self.model.method)
         if self.model.method == 'Supervised':
-            params += self.method
+            params += '/' + self.method
         while os.path.isdir(os.path.join(params, f"exp_{i}")):
             i += 1
         self.results_folder = os.path.join(params, f"exp_{i}")
@@ -301,21 +298,33 @@ class Learner(pl.LightningModule):
                 pkl.dump(self.model, f, protocol=4)
             print(f'Saved model in {self.results_folder}')
 
-            # Compute heatmap of RMSE(x, x_hat) or RMSE (z, z_hat) if method=T
-            num_samples = 10000
-            sampling = LHS(xlimits=limits)
-            mesh = torch.as_tensor(sampling(num_samples))
-            if self.method == 'Autoencoder':
-                _, mesh_hat = self.model(self.method, mesh)
-            else:
-                mesh_hat = self.model(self.method, mesh)
-            # _, mesh_hat = self.model('Autoencoder', mesh)  # T(T_star(x))
-            error = RMSE(mesh, mesh_hat, dim=1)
-            for i in range(1, mesh.shape[1]):
+            # No control theoretic evaluation of the observer with only T
+            if self.method == 'T':
+                return 0
+
+            # Heatmap of RMSE(x, x_hat) with T_star
+            num_samples = 50000
+            heatmap_data = self.model.generate_data_svl(limits, num_samples)
+            x = heatmap_data[:, :self.model.dim_x]
+            z = heatmap_data[:, self.model.dim_x:]
+            x_hat = self.model('T_star', z)
+            error = RMSE(x, x_hat, dim=1)
+            print(x.shape, error.shape)
+            for i in range(1, x.shape[1]):
+                # https://stackoverflow.com/questions/37822925/how-to-smooth-by-interpolation-when-using-pcolormesh
                 name = 'RMSE_heatmap' + str(i) + '.pdf'
-                plt.scatter(mesh[:, i - 1], mesh[:, i], cmap='jet',
+                plt.scatter(x[:, i - 1], x[:, i], cmap='jet',
                             c=np.log(error.numpy()))
                 cbar = plt.colorbar()
+                cbar.set_label('Log estimation error')
+                # print(x[:, i - 1:i + 1].shape)
+                # plt.imshow(x[:, i - 1:i + 1], cmap='jet',
+                #            c=np.log(error.numpy()))
+                # plt.pcolormesh(x[:, i - 1], x[:, i], np.log(error),
+                #                cmap='jet', shading='gouraud')
+                # cbar = plt.colorbar()
+                # cbar.set_label('Log estimation error')
+                # cbar = plt.colorbar()
                 cbar.set_label('Log estimation error')
                 plt.title('Log of RMSE between ' + r'$x$' + ' and '
                           + r'$\hat{'r'x}$')
@@ -328,9 +337,7 @@ class Learner(pl.LightningModule):
                     plt.show()
                 plt.close('all')
 
-            # Estimation over the test trajectories
-            if self.method == 'T':
-                return 0
+            # Estimation over the test trajectories with T_star
             sampling = LHS(xlimits=limits)
             trajs_init = torch.as_tensor(sampling(nb_trajs)).T
             traj_folder = os.path.join(self.results_folder, 'Test_trajectories')
