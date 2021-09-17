@@ -64,12 +64,13 @@ for more information.
 Copyright 2021 Lukas Bahr.
 """
 
+from math import pi
+
 import numpy as np
 import torch
-from torchdiffeq import odeint
-from math import pi
-from smt.sampling_methods import LHS
 from scipy import signal
+from smt.sampling_methods import LHS
+from torchdiffeq import odeint
 
 # Set double precision by default
 torch.set_default_tensor_type(torch.DoubleTensor)
@@ -144,11 +145,20 @@ class System():
     def __init__(self):
         self.u = self.null_controller
 
-    def f(self, x: torch.tensor): return 0
-    def h(self, x: torch.tensor): return 0
-    def g(self, x: torch.tensor): return 0
-    def u(self, x: torch.tensor): return 0
-    def u_1(self, x: torch.tensor): return 0
+    def f(self, x: torch.tensor):
+        return 0
+
+    def h(self, x: torch.tensor):
+        return 0
+
+    def g(self, x: torch.tensor):
+        return 0
+
+    def u(self, x: torch.tensor):
+        return 0
+
+    def u_1(self, x: torch.tensor):
+        return 0
 
     def set_controller(self, controller) -> None:
         if controller == 'null_controller':
@@ -158,7 +168,8 @@ class System():
         elif controller == 'lin_chirp_controller':
             self.u = self.lin_chirp_controller
 
-    def generate_mesh(self, limits: np.array, num_samples: int, method: str = 'lhs') -> torch.tensor:
+    def generate_mesh(self, limits: np.array, num_samples: int,
+                      method: str = 'lhs') -> torch.tensor:
         """
         Generates 2D mesh either from a uniform distribution or uses latin hypercube
         sampling.
@@ -215,6 +226,7 @@ class System():
         sol: torch.tensor
             Solution of the simulation.
         """
+
         def dxdt(t, x):
             x_dot = self.f(x) + self.g(x) * self.u(t)
             return x_dot
@@ -227,7 +239,8 @@ class System():
 
         return tq, sol
 
-    def lin_chirp_controller(self, t: float, t_0: float = 0.0, a: float = 0.001, b: float = 9.99e-05) -> torch.tensor:
+    def lin_chirp_controller(self, t: float, t_0: float = 0.0, a: float = 0.001,
+                             b: float = 9.99e-05) -> torch.tensor:
         """
         Linear chirp controller function.
 
@@ -256,7 +269,8 @@ class System():
             u = torch.sin(2 * pi * t * (a + b * t))
         return u
 
-    def sin_controller(self, t: float, t_0: float = 0.0, gamma: float = 0.4, omega: float = 1.2) -> torch.tensor:
+    def sin_controller(self, t: float, t_0: float = 0.0, gamma: float = 0.4,
+                       omega: float = 1.2) -> torch.tensor:
         """
         Harmonic oscillator controller function.
 
@@ -285,7 +299,9 @@ class System():
             u = gamma * torch.cos(omega * t)
         return u
 
-    def chirp_controller(self, t: float, t_0: float = 0, f_0: float = 6.0, f_1: float = 1.0, t_1: float = 10.0, gamma: float = 1.0) -> torch.tensor:
+    def chirp_controller(self, t: float, t_0: float = 0, f_0: float = 6.0,
+                         f_1: float = 1.0, t_1: float = 10.0,
+                         gamma: float = 1.0) -> torch.tensor:
         """
         Linear chirp controller function.
 
@@ -377,11 +393,13 @@ class VanDerPol(System):
 
     def f(self, x):
         x_0 = torch.reshape(x[1, :], (1, -1))
-        x_1 = torch.reshape(self.eps*(1-torch.pow(x[0, :], 2))*x[1, :]-x[0, :], (1, -1))
+        x_1 = torch.reshape(
+            self.eps * (1 - torch.pow(x[0, :], 2)) * x[1, :] - x[0, :], (1, -1))
         return torch.cat((x_0, x_1))
 
     def h(self, x):
-        return torch.reshape(x[0, :], (1, -1))
+        # return torch.reshape(x[0, :], (1, -1))
+        return torch.unsqueeze(x[0, :], dim=0)
 
     def g(self, x):
         zeros = torch.reshape(torch.zeros_like(x[1, :]), (1, -1))

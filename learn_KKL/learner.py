@@ -1,4 +1,4 @@
-import os
+import os, sys
 
 import dill as pkl
 import matplotlib.pyplot as plt
@@ -290,15 +290,26 @@ class Learner(pl.LightningModule):
             file.to_csv(os.path.join(self.results_folder, filename),
                         header=False)
 
-            # Compute heatmap of RMSE(x, x_hat)
+            # Save specifications and model
+            specs_file = os.path.join(self.results_folder, 'Specifications.txt')
+            with open(specs_file, 'w') as f:
+                print(sys.argv[0], file=f)
+                for key, val in vars(self).items():
+                    print(key, ': ', val, file=f)
+
+            with open(self.results_folder + '/model.pkl', 'wb') as f:
+                pkl.dump(self.model, f, protocol=4)
+            print(f'Saved model in {self.results_folder}')
+
+            # Compute heatmap of RMSE(x, x_hat) or RMSE (z, z_hat) if method=T
             num_samples = 10000
             sampling = LHS(xlimits=limits)
             mesh = torch.as_tensor(sampling(num_samples))
-            # if self.method == 'Autoencoder':
-            #     _, mesh_hat = self.model(self.method, mesh)
-            # else:
-            #     mesh_hat = self.model(self.method, mesh)
-            _, mesh_hat = self.model('Autoencoder', mesh)  # T(T_star(x))
+            if self.method == 'Autoencoder':
+                _, mesh_hat = self.model(self.method, mesh)
+            else:
+                mesh_hat = self.model(self.method, mesh)
+            # _, mesh_hat = self.model('Autoencoder', mesh)  # T(T_star(x))
             error = RMSE(mesh, mesh_hat, dim=1)
             for i in range(1, mesh.shape[1]):
                 name = 'RMSE_heatmap' + str(i) + '.pdf'
@@ -318,6 +329,8 @@ class Learner(pl.LightningModule):
                 plt.close('all')
 
             # Estimation over the test trajectories
+            if self.method == 'T':
+                return 0
             sampling = LHS(xlimits=limits)
             trajs_init = torch.as_tensor(sampling(nb_trajs)).T
             traj_folder = os.path.join(self.results_folder, 'Test_trajectories')
@@ -326,22 +339,24 @@ class Learner(pl.LightningModule):
                 self.model.h(torch.transpose(simulation, 0, 1)), 0, 1)
             # Save these test trajectories
             os.makedirs(traj_folder, exist_ok=True)
+            traj_error = 0.
             for i in range(nb_trajs):
                 # TODO run predictions in parallel for all test trajectories!!!
                 # Need to figure out how to interpolate y in parallel for all
                 # trajectories!!!
                 y = torch.cat((tq.unsqueeze(1), measurement[..., i]), dim=1)
                 estimation = self.model.predict(y, tsim, dt)
+                traj_error += RMSE(simulation[..., i], estimation)
 
-                current_folder = os.path.join(traj_folder, f'Traj_{i}')
-                os.makedirs(current_folder, exist_ok=True)
+                current_traj_folder = os.path.join(traj_folder, f'Traj_{i}')
+                os.makedirs(current_traj_folder, exist_ok=True)
                 filename = f'True_traj_{i}.csv'
                 file = pd.DataFrame(simulation[..., i].cpu().numpy())
-                file.to_csv(os.path.join(current_folder, filename),
+                file.to_csv(os.path.join(current_traj_folder, filename),
                             header=False)
                 filename = f'Estimated_traj_{i}.csv'
                 file = pd.DataFrame(estimation.cpu().numpy())
-                file.to_csv(os.path.join(current_folder, filename),
+                file.to_csv(os.path.join(current_traj_folder, filename),
                             header=False)
                 for j in range(simulation.shape[1]):
                     name = 'Traj' + str(j) + '.pdf'
@@ -352,12 +367,11 @@ class Learner(pl.LightningModule):
                     plt.legend()
                     plt.xlabel(rf'$t$')
                     plt.ylabel(rf'$x_{j + 1}$')
-                    plt.savefig(os.path.join(current_folder, name),
+                    plt.savefig(os.path.join(current_traj_folder, name),
                                 bbox_inches='tight')
                     if verbose:
                         plt.show()
                     plt.close('all')
-
-            with open(self.results_folder + '/model.pkl', 'wb') as f:
-                pkl.dump(self.model, f, protocol=4)
-            print(f'Saved model in {self.results_folder}')
+            filename = 'RMSE_traj.txt'
+            with open(os.path.join(traj_folder, filename), 'w') as f:
+                print(traj_error, file=f)
