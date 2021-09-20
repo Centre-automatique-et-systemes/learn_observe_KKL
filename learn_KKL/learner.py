@@ -10,8 +10,6 @@ import torch
 import torch.optim as optim
 from smt.sampling_methods import LHS
 from torch.utils.data import DataLoader
-from scipy.interpolate import interp2d
-
 
 from .utils import RMSE, StandardScaler
 
@@ -115,7 +113,8 @@ class Learner(pl.LightningModule):
 
         # Folder to save results
         i = 0
-        params = os.path.join(os.getcwd(), 'runs', self.model.method)
+        params = os.path.join(os.getcwd(), 'runs', str(self.system),
+                              self.model.method)
         if self.model.method == 'Supervised':
             params += '/' + self.method
         while os.path.isdir(os.path.join(params, f"exp_{i}")):
@@ -291,6 +290,8 @@ class Learner(pl.LightningModule):
             specs_file = os.path.join(self.results_folder, 'Specifications.txt')
             with open(specs_file, 'w') as f:
                 print(sys.argv[0], file=f)
+                for key, val in vars(self.system).items():
+                    print(key, ': ', val, file=f)
                 for key, val in vars(self).items():
                     print(key, ': ', val, file=f)
 
@@ -303,7 +304,7 @@ class Learner(pl.LightningModule):
                 return 0
 
             # Heatmap of RMSE(x, x_hat) with T_star
-            num_samples = 50000
+            num_samples = 10000
             heatmap_data = self.model.generate_data_svl(limits, num_samples)
             x = heatmap_data[:, :self.model.dim_x]
             z = heatmap_data[:, self.model.dim_x:]
@@ -382,3 +383,26 @@ class Learner(pl.LightningModule):
             filename = 'RMSE_traj.txt'
             with open(os.path.join(traj_folder, filename), 'w') as f:
                 print(traj_error, file=f)
+
+            # Invertibility heatmap
+            num_samples = 10000
+            sampling = LHS(xlimits=limits)
+            mesh = torch.as_tensor(sampling(num_samples))
+            _, mesh_hat = self.model('Autoencoder', mesh)
+            error = RMSE(mesh, mesh_hat, dim=1)
+            for i in range(1, mesh.shape[1]):
+                name = 'Invertibility_heatmap' + str(i) + '.pdf'
+                plt.scatter(mesh[:, i - 1], mesh[:, i], cmap='jet',
+                            c=np.log(error.numpy()))
+                cbar = plt.colorbar()
+                cbar.set_label('Log estimation error')
+                plt.title('Log of RMSE between ' + r'$x$' + ' and '
+                          + r'$\hat{'r'x}$')
+                plt.xlabel(rf'$x_{i}$')
+                plt.ylabel(rf'$x_{i + 1}$')
+                plt.legend()
+                plt.savefig(os.path.join(self.results_folder, name),
+                            bbox_inches='tight')
+                if verbose:
+                    plt.show()
+                plt.close('all')

@@ -349,6 +349,9 @@ class System():
         """
         return torch.tensor(0.0)
 
+    def __repr__(self):
+        raise NotImplementedError
+
 
 class RevDuffing(System):
     """ See https://en.wikipedia.org/wiki/Duffing_equation for detailed 
@@ -375,18 +378,21 @@ class RevDuffing(System):
     def g(self, x):
         return torch.zeros(x.shape[0], x.shape[1])
 
+    def __repr__(self):
+        return 'RevDuffing'
+
 
 class VanDerPol(System):
     """ See https://en.wikipedia.org/wiki/Van_der_Pol_oscillator for detailed 
     reference for this system. 
     """
 
-    def __init__(self):
+    def __init__(self, eps: float = 1.):
         super().__init__()
         self.dim_x = 2
         self.dim_y = 1
 
-        self.eps = 1
+        self.eps = eps
 
         self.u = self.null_controller
         self.u_1 = self.null_controller
@@ -405,3 +411,6 @@ class VanDerPol(System):
         zeros = torch.reshape(torch.zeros_like(x[1, :]), (1, -1))
         ones = torch.reshape(torch.ones_like(x[0, :]), (1, -1))
         return torch.cat((zeros, ones))
+
+    def __repr__(self):
+        return 'VanDerPol'
