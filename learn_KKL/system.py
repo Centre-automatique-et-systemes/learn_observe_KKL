@@ -10,6 +10,10 @@ This module also contains two non-linear example systems. The Reversed Duffing
 class implements the classic Duffing oscillator in a reversed form.
 Van der Pol implements the system with default parameters.
 
+All tensors representing states of dynamical systems for simulation are
+expected to have shape (number of time steps, number of different simulations,
+dimension of the state).
+
 
 Examples
 --------
@@ -237,7 +241,7 @@ class System():
         # Solve
         sol = odeint(dxdt, x_0, tq)
 
-        return tq, sol
+        return tq, torch.squeeze(sol)
 
     def lin_chirp_controller(self, t: float, t_0: float = 0.0, a: float = 0.001,
                              b: float = 9.99e-05) -> torch.tensor:
@@ -367,16 +371,21 @@ class RevDuffing(System):
         self.u_1 = self.null_controller
 
     def f(self, x):
-        x_0 = torch.reshape(torch.pow(x[1, :], 3), (1, -1))
-        x_1 = torch.reshape(-x[0, :], (1, -1))
-        return torch.cat((x_0, x_1), 0)
+        # x_0 = torch.reshape(torch.pow(x[1, :], 3), (1, -1))
+        # x_1 = torch.reshape(-x[0, :], (1, -1))
+        # return torch.cat((x_0, x_1), 0)
+        xdot = torch.zeros_like(x)
+        xdot[..., 0] = torch.pow(x[..., 1], 3)
+        xdot[..., 1] = -x[..., 0]
+        return xdot
 
     def h(self, x):
         # return torch.reshape(x[0, :], (1, -1))
-        return torch.unsqueeze(x[0, :], dim=0)
+        return torch.unsqueeze(x[..., 0], dim=-1)
 
     def g(self, x):
-        return torch.zeros(x.shape[0], x.shape[1])
+        # return torch.zeros(x.shape[0], x.shape[1])
+        return torch.zeros_like(x)
 
     def __repr__(self):
         return 'RevDuffing'
@@ -398,19 +407,27 @@ class VanDerPol(System):
         self.u_1 = self.null_controller
 
     def f(self, x):
-        x_0 = torch.reshape(x[1, :], (1, -1))
-        x_1 = torch.reshape(
-            self.eps * (1 - torch.pow(x[0, :], 2)) * x[1, :] - x[0, :], (1, -1))
-        return torch.cat((x_0, x_1))
+        # x_0 = torch.reshape(x[1, :], (1, -1))
+        # x_1 = torch.reshape(
+        #     self.eps * (1 - torch.pow(x[0, :], 2)) * x[1, :] - x[0, :], (1, -1))
+        # return torch.cat((x_0, x_1))
+        xdot = torch.zeros_like(x)
+        xdot[..., 0] = x[..., 1]
+        xdot[..., 1] = self.eps * (1 - torch.pow(x[..., 0], 2)) * \
+                       x[..., 1] - x[..., 0]
+        return xdot
 
     def h(self, x):
         # return torch.reshape(x[0, :], (1, -1))
-        return torch.unsqueeze(x[0, :], dim=0)
+        return torch.unsqueeze(x[..., 0], dim=-1)
 
     def g(self, x):
-        zeros = torch.reshape(torch.zeros_like(x[1, :]), (1, -1))
-        ones = torch.reshape(torch.ones_like(x[0, :]), (1, -1))
-        return torch.cat((zeros, ones))
+        # zeros = torch.reshape(torch.zeros_like(x[1, :]), (1, -1))
+        # ones = torch.reshape(torch.ones_like(x[0, :]), (1, -1))
+        # return torch.cat((zeros, ones))
+        xdot = torch.zeros_like(x)
+        xdot[..., 1] = torch.ones_like(x[..., 1])
+        return xdot
 
     def __repr__(self):
         return 'VanDerPol'

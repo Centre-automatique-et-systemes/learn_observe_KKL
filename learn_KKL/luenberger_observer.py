@@ -41,6 +41,9 @@ use method='Supervised' when creating the observer, then either 'T' and
 This module expects torch tensor for all attributes with shape greater than
 one. All other numerical types are either integer or float.
 Exceptions for different method inputs are documented in the method.
+All tensors representing states of dynamical systems for simulation are
+expected to have shape (number of time steps, number of different simulations,
+dimension of the state).
 
 Examples
 --------
@@ -98,6 +101,8 @@ from smt.sampling_methods import LHS
 from torch import nn
 from torchdiffeq import odeint
 from torchinterp1d import Interp1d
+
+from .utils import MSE
 
 # Set double precision by default
 torch.set_default_tensor_type(torch.DoubleTensor)
@@ -260,7 +265,8 @@ class LuenbergerObserver(nn.Module):
 
     def __init__(self, dim_x: int, dim_y: int, method: str = "Autoencoder",
                  dim_z: int = None, wc: float = 1., num_hl: int = 5,
-                 size_hl: int = 50, activation=nn.ReLU()):
+                 size_hl: int = 50, activation=nn.ReLU(),
+                 recon_lambda: float = 1.):
         super(LuenbergerObserver, self).__init__()
 
         self.method = method
@@ -286,7 +292,7 @@ class LuenbergerObserver(nn.Module):
         # Model params
         self.device = torch.device(
             "cuda:0" if torch.cuda.is_available() else "cpu")
-        self.recon_lambda = 1.01
+        self.recon_lambda = recon_lambda
 
         # Define encoder and decoder architecture
         # num_hl = 5
@@ -323,12 +329,12 @@ class LuenbergerObserver(nn.Module):
             'dim_x ' + str(self.dim_x),
             'dim_y ' + str(self.dim_y),
             'dim_z ' + str(self.dim_z),
-            'wc' + str(self.wc),
+            'wc ' + str(self.wc),
             'D ' + str(self.D),
             'F ' + str(self.F),
-            'encoder' + str(self.encoder_layers),
-            'decoder' + str(self.decoder_layers),
-            'method' + self.method,
+            'encoder ' + str(self.encoder_layers),
+            'decoder ' + str(self.decoder_layers),
+            'method ' + self.method,
         ])
 
     def __call__(self, method='Autoencoder', *input):
@@ -499,14 +505,18 @@ class LuenbergerObserver(nn.Module):
         """
 
         def dydt(t, y):
-            x = y[0:self.dim_x]
-            z = y[self.dim_x:len(y)]
+            # x = y[:self.dim_x]
+            # z = y[self.dim_x:]
+            x = y[..., :self.dim_x]
+            z = y[..., self.dim_x:]
             x_dot = self.f(x) + self.g(x) * self.u(t)
             if only_x:
                 z_dot = torch.zeros_like(z)
             else:
-                z_dot = torch.matmul(self.D, z) + self.F * self.h(x)
-            return torch.cat((x_dot, z_dot))
+                # z_dot = torch.matmul(self.D, z) + self.F * self.h(x)
+                z_dot = torch.matmul(z, self.D.t()) + torch.matmul(
+                    self.h(x), self.F.t())
+            return torch.cat((x_dot, z_dot), dim=-1)
 
         # Output timestemps of solver
         tq = torch.arange(tsim[0], tsim[1], dt)
@@ -545,27 +555,35 @@ class LuenbergerObserver(nn.Module):
 
         sampling = LHS(xlimits=limits)
         mesh = torch.as_tensor(sampling(num_samples))
+        self.k = k
+        self.t_c = self.k / min(abs(linalg.eig(self.D)[0].real))
 
-        t_c = k / min(abs(linalg.eig(self.D)[0].real))
-
-        y_0 = torch.zeros((self.dim_x + self.dim_z, num_samples))
+        # y_0 = torch.zeros((self.dim_x + self.dim_z, num_samples))  # TODO
+        y_0 = torch.zeros((num_samples, self.dim_x + self.dim_z))
+        # limits_xz = np.array([[-1., 1.] * (self.dim_x + self.dim_z)])
+        # print(limits_xz)
+        # sampling = LHS(xlimits=limits_xz)
+        # y_0 = torch.as_tensor(sampling(num_samples))
+        # print(y_0.shape)
         y_1 = y_0.clone()
 
         # Simulate only x system backward in time
-        tsim = (0, -t_c)
-        y_0[:self.dim_x, :] = torch.transpose(mesh, 0, 1)
+        tsim = (0, -self.t_c)
+        # y_0[:self.dim_x, :] = torch.transpose(mesh, 0, 1)
+        y_0[:, :self.dim_x] = mesh
         tq_bw, data_bw = self.simulate_system(y_0, tsim, -dt, only_x=True)
 
         # Simulate both x and z forward in time starting from the last point
         # from previous simulation
-        tsim = (-t_c, 0)
-        y_1[:self.dim_x, :] = data_bw[-1, :self.dim_x, :]
+        tsim = (-self.t_c, 0)
+        # y_1[:self.dim_x, :] = data_bw[-1, :self.dim_x, :]
+        y_1[:, :self.dim_x] = data_bw[-1, :, :self.dim_x]
         tq, data_fw = self.simulate_system(y_1, tsim, dt)
 
         # Data contains (x_i, z_i) pairs in shape [dim_x + dim_z,
         # number_simulations]
-        data = torch.transpose(data_fw[-1, :, :], 0, 1)
-
+        # data = torch.transpose(data_fw[-1, :, :], 0, 1)
+        data = data_fw[-1]
         return data
 
     @staticmethod
@@ -708,7 +726,7 @@ class LuenbergerObserver(nn.Module):
 
     def loss_autoencoder(
             self, x: torch.tensor, x_hat: torch.tensor,
-            z_hat: torch.tensor) -> torch.tensor:
+            z_hat: torch.tensor, dim=None) -> torch.tensor:
         """
         Loss function for training the observer model with the autoencoder
         method. See reference for detailed information.
@@ -724,6 +742,10 @@ class LuenbergerObserver(nn.Module):
         z_hat: torch.tensor
             Estimation of the state vector of the observer.
 
+        dim: int
+            Dimension along which to take the loss (if None, mean over all
+            dimensions).
+
         Returns
         ----------
         loss: torch.tensor
@@ -738,40 +760,54 @@ class LuenbergerObserver(nn.Module):
         # Init mean squared error
         batch_size = x.shape[0]
 
-        mse = nn.MSELoss()
-
         # Reconstruction loss MSE(x,x_hat)
-        loss_1 = self.recon_lambda * mse(x, x_hat)
+        # mse = nn.MSELoss()
+        # loss_1_old = self.recon_lambda * mse(x, x_hat)
+        loss_1 = self.recon_lambda * MSE(x, x_hat, dim=dim)
 
         # Compute gradients of T_u with respect to inputs
         dTdh = torch.autograd.functional.jacobian(
             self.encoder, x, create_graph=False, strict=False, vectorize=False)
         dTdx = torch.zeros((batch_size, self.dim_z, self.dim_x))
+        # print(x.shape, dTdh.shape, dTdx.shape)
 
-        # dTdx = dTdx[dTdx != 0].reshape((batch_size, self.dim_z, self.dim_x))
-
+        # dTdx reshape (batch_size, self.dim_z, self.dim_x)
         for i in range(dTdh.shape[0]):
             for j in range(dTdh.shape[1]):
                 dTdx[i, j, :] = dTdh[i, j, i, :]
 
-        # lhs = dTdx * f(x)
-        lhs = torch.zeros((self.dim_z, batch_size)).to(self.device)
-        for i in range(batch_size):
-            lhs[:, i] = torch.matmul(dTdx[i], self.f(x.T).T[i]).T
+        # lhs = dTdx * f(x) of shape (batch_sze, self.dim_z)
+        # lhs = torch.zeros((self.dim_z, batch_size)).to(self.device)
+        # for i in range(batch_size):
+        #     lhs[:, i] = torch.matmul(dTdx[i], self.f(x.T).T[i]).T
+        dTdxt = torch.transpose(dTdx, 1, 2)
+        lhs = torch.tensordot(self.f(x), dTdxt, dims=([1], [1]))[:, 0]
 
         # rhs = D * z + F * h(x)
+        # print(x.shape, z_hat.shape, self.D.shape, self.F.shape)
+        # print(self.h(x).shape, self.f(x).shape)
         D = self.D.to(self.device)
         F = self.F.to(self.device)
-        h_x = self.h(x.T).to(self.device)
-        rhs = torch.matmul(D, z_hat.T) + torch.matmul(F, h_x)
+        # h_x = self.h(x.T).to(self.device)
+        # rhs = torch.matmul(D, z_hat.T) + torch.matmul(F, h_x)
+        rhs = torch.matmul(z_hat, D.t()) + torch.matmul(self.h(x), F.t())
+        # print(rhs.shape, lhs.shape)
 
         # PDE loss MSE(lhs, rhs)
-        loss_2 = mse(lhs, rhs)
+        # loss_2_old = mse(lhs, rhs)
+        # loss_2 = MSE(torch.transpose(lhs, 0, 1), torch.transpose(rhs, 0, 1),
+        #              dim=dim)
+        loss_2 = MSE(lhs, rhs, dim=dim)
+        # if dim is None:
+        #     loss_2 = MSE(lhs, rhs)
+        # else:
+        #     loss_2 = MSE(torch.transpose(lhs, 0, 1), torch.transpose(rhs, 0, 1),
+        #                  dim=dim)
 
         return loss_1 + loss_2, loss_1, loss_2
 
-    def loss_T(
-            self, z: torch.tensor, z_hat: torch.tensor) -> torch.tensor:
+    def loss_T(self, z: torch.tensor, z_hat: torch.tensor, dim=None) -> \
+            torch.tensor:
         """
         Loss function for training only the forward transformation T.
 
@@ -783,17 +819,22 @@ class LuenbergerObserver(nn.Module):
         z_hat: torch.tensor
             Estimation of the state vector of the observer.
 
+        dim: int
+            Dimension along which to take the loss (if None, mean over all
+            dimensions).
+
         Returns
         ----------
         loss: torch.tensor
             Reconstruction loss MSE(z, z_hat).
         """
-        mse = torch.nn.MSELoss()
-        loss = mse(z, z_hat)
+        # mse = torch.nn.MSELoss()
+        # loss_old = mse(z, z_hat)
+        loss = MSE(z, z_hat, dim=dim)
         return loss
 
-    def loss_T_star(
-            self, x: torch.tensor, x_hat: torch.tensor) -> torch.tensor:
+    def loss_T_star(self, x: torch.tensor, x_hat: torch.tensor, dim=None) -> \
+            torch.tensor:
         """
         Loss function for training only the forward transformation T.
 
@@ -805,13 +846,18 @@ class LuenbergerObserver(nn.Module):
         x_hat: torch.tensor
             Estimation of the state vector of the system.
 
+        dim: int
+            Dimension along which to take the loss (if None, mean over all
+            dimensions).
+
         Returns
         ----------
         loss: torch.tensor
             Reconstruction loss MSE(x, x_hat).
         """
-        mse = torch.nn.MSELoss()
-        loss = mse(x, x_hat)
+        # mse = torch.nn.MSELoss()
+        # loss = mse(x, x_hat)
+        loss = MSE(x, x_hat, dim=dim)
         return loss
 
     def loss(self, method='Autoencoder', *input):

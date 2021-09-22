@@ -5,6 +5,28 @@ torch.set_default_tensor_type(torch.DoubleTensor)
 torch.set_default_dtype(torch.float64)
 
 
+def MSE(x, y, dim=None):
+    """
+    Compute the mean squared between x and y along dimension dim.
+
+    Parameters
+    ----------
+    x: torch.tensor
+    y: torch.tensor
+    dim: int
+        Dimension along which to compute the mean.
+
+    Returns
+    -------
+    error: torch.tensor
+        Computed RMSE.
+    """
+    error = torch.nn.functional.mse_loss(x, y, reduction='none')
+    if dim is None:
+        return torch.mean(error)
+    else:
+        return torch.mean(error, dim=dim)
+
 def RMSE(x, y, dim=None):
     """
     Compute the root mean squared between x and y along dimension dim.
@@ -21,11 +43,7 @@ def RMSE(x, y, dim=None):
     error: torch.tensor
         Computed RMSE.
     """
-    error = torch.nn.functional.mse_loss(x, y, reduction='none')
-    if dim is None:
-        return torch.sqrt(torch.mean(error))
-    else:
-        return torch.sqrt(torch.mean(error, dim=dim))
+    return torch.sqrt(MSE(x=x, y=y, dim=dim))
 
 
 # Replaces sklearn StandardScaler()

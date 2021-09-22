@@ -8,7 +8,6 @@ import pandas as pd
 import pytorch_lightning as pl
 import torch
 import torch.optim as optim
-from smt.sampling_methods import LHS
 from torch.utils.data import DataLoader
 
 from .utils import RMSE, StandardScaler
@@ -93,6 +92,8 @@ class Learner(pl.LightningModule):
         # Data handling
         self.training_data = training_data
         self.validation_data = validation_data
+        self.num_train = len(self.training_data)
+        self.num_val = len(self.validation_data)
         if self.method == 'Autoencoder':
             self.scaler_x = StandardScaler(self.training_data)
             self.scaler_z = None
@@ -236,9 +237,9 @@ class Learner(pl.LightningModule):
         Parameters
         ----------
         limits: np.array
-            Array for the limits of all axes, used for sampling the heatmap
-            and the initial conditions of the test trajectories.
-            Form np.array([[min_1, ..., min_,n], [max_1, ..., max_n]]).
+            Array for the limits of all axes of x, used for sampling the
+            heatmap and the initial conditions of the test trajectories.
+            Form np.array([[min_1, max_1], ..., [min_n, max_n]]).
 
         nb_trajs: int
             Number of test trajectories.
@@ -274,8 +275,8 @@ class Learner(pl.LightningModule):
                 plt.scatter(training_data[:, i - 1].cpu(),
                             training_data[:, i].cpu())
                 plt.title('Training data')
-                plt.xlabel(rf'x_{{i}}')
-                plt.ylabel(rf'x_{{j}}')
+                plt.xlabel(rf'$x_{i}$')
+                plt.ylabel(rf'$x_{i + 1}$')
                 plt.savefig(os.path.join(self.results_folder, name),
                             bbox_inches='tight')
                 if verbose:
@@ -305,30 +306,29 @@ class Learner(pl.LightningModule):
 
             # Heatmap of RMSE(x, x_hat) with T_star
             num_samples = 10000
-            heatmap_data = self.model.generate_data_svl(limits, num_samples)
-            x = heatmap_data[:, :self.model.dim_x]
-            z = heatmap_data[:, self.model.dim_x:]
-            x_hat = self.model('T_star', z)
-            error = RMSE(x, x_hat, dim=1)
-            print(x.shape, error.shape)
-            for i in range(1, x.shape[1]):
+            mesh = self.model.generate_data_svl(limits, num_samples)
+            x_mesh = mesh[:, :self.model.dim_x]
+            z_mesh = mesh[:, self.model.dim_x:]
+            x_hat_star = self.model('T_star', z_mesh)
+            error = RMSE(x_mesh, x_hat_star, dim=1)
+            print(x_mesh.shape, error.shape)
+            for i in range(1, x_mesh.shape[1]):
                 # https://stackoverflow.com/questions/37822925/how-to-smooth-by-interpolation-when-using-pcolormesh
                 name = 'RMSE_heatmap' + str(i) + '.pdf'
-                plt.scatter(x[:, i - 1], x[:, i], cmap='jet',
-                            c=np.log(error.numpy()))
+                plt.scatter(x_mesh[:, i - 1], x_mesh[:, i], cmap='jet',
+                            c=np.log(error.detach().numpy()))
                 cbar = plt.colorbar()
                 cbar.set_label('Log estimation error')
                 # print(x[:, i - 1:i + 1].shape)
                 # plt.imshow(x[:, i - 1:i + 1], cmap='jet',
-                #            c=np.log(error.numpy()))
+                #            c=np.log(error.detach().numpy()))
                 # plt.pcolormesh(x[:, i - 1], x[:, i], np.log(error),
                 #                cmap='jet', shading='gouraud')
                 # cbar = plt.colorbar()
                 # cbar.set_label('Log estimation error')
                 # cbar = plt.colorbar()
                 cbar.set_label('Log estimation error')
-                plt.title('Log of RMSE between ' + r'$x$' + ' and '
-                          + r'$\hat{'r'x}$')
+                plt.title(r'RMSE between $x$ and $\hat{x}$')
                 plt.xlabel(rf'$x_{i}$')
                 plt.ylabel(rf'$x_{i + 1}$')
                 plt.legend()
@@ -339,12 +339,11 @@ class Learner(pl.LightningModule):
                 plt.close('all')
 
             # Estimation over the test trajectories with T_star
-            sampling = LHS(xlimits=limits)
-            trajs_init = torch.as_tensor(sampling(nb_trajs)).T
+            # trajs_init = torch.as_tensor(sampling(nb_trajs)).T
+            trajs_init = x_mesh
             traj_folder = os.path.join(self.results_folder, 'Test_trajectories')
             tq, simulation = self.system.simulate(trajs_init, tsim, dt)
-            measurement = torch.transpose(
-                self.model.h(torch.transpose(simulation, 0, 1)), 0, 1)
+            measurement = self.model.h(simulation)
             # Save these test trajectories
             os.makedirs(traj_folder, exist_ok=True)
             traj_error = 0.
@@ -352,23 +351,23 @@ class Learner(pl.LightningModule):
                 # TODO run predictions in parallel for all test trajectories!!!
                 # Need to figure out how to interpolate y in parallel for all
                 # trajectories!!!
-                y = torch.cat((tq.unsqueeze(1), measurement[..., i]), dim=1)
+                y = torch.cat((tq.unsqueeze(1), measurement[:, i]), dim=1)
                 estimation = self.model.predict(y, tsim, dt)
-                traj_error += RMSE(simulation[..., i], estimation)
+                traj_error += RMSE(simulation[:, i], estimation)
 
                 current_traj_folder = os.path.join(traj_folder, f'Traj_{i}')
                 os.makedirs(current_traj_folder, exist_ok=True)
                 filename = f'True_traj_{i}.csv'
-                file = pd.DataFrame(simulation[..., i].cpu().numpy())
+                file = pd.DataFrame(simulation[:, i].cpu().numpy())
                 file.to_csv(os.path.join(current_traj_folder, filename),
                             header=False)
                 filename = f'Estimated_traj_{i}.csv'
                 file = pd.DataFrame(estimation.cpu().numpy())
                 file.to_csv(os.path.join(current_traj_folder, filename),
                             header=False)
-                for j in range(simulation.shape[1]):
+                for j in range(estimation.shape[1]):
                     name = 'Traj' + str(j) + '.pdf'
-                    plt.plot(tq, simulation[:, j, i].detach().numpy(),
+                    plt.plot(tq, simulation[:, i, j].detach().numpy(),
                              label=rf'$x_{j + 1}$')
                     plt.plot(tq, estimation[:, j].detach().numpy(),
                              label=rf'$\hat{{x}}_{j + 1}$')
@@ -385,19 +384,15 @@ class Learner(pl.LightningModule):
                 print(traj_error, file=f)
 
             # Invertibility heatmap
-            num_samples = 10000
-            sampling = LHS(xlimits=limits)
-            mesh = torch.as_tensor(sampling(num_samples))
-            _, mesh_hat = self.model('Autoencoder', mesh)
-            error = RMSE(mesh, mesh_hat, dim=1)
-            for i in range(1, mesh.shape[1]):
+            z_hat_T, x_hat_AE = self.model('Autoencoder', x_mesh)
+            error = RMSE(x_mesh, x_hat_AE, dim=1)
+            for i in range(1, x_mesh.shape[1]):
                 name = 'Invertibility_heatmap' + str(i) + '.pdf'
-                plt.scatter(mesh[:, i - 1], mesh[:, i], cmap='jet',
-                            c=np.log(error.numpy()))
+                plt.scatter(x_mesh[:, i - 1], x_mesh[:, i], cmap='jet',
+                            c=np.log(error.detach().numpy()))
                 cbar = plt.colorbar()
                 cbar.set_label('Log estimation error')
-                plt.title('Log of RMSE between ' + r'$x$' + ' and '
-                          + r'$\hat{'r'x}$')
+                plt.title(r'RMSE between $x$ and $T^*(T(x))$')
                 plt.xlabel(rf'$x_{i}$')
                 plt.ylabel(rf'$x_{i + 1}$')
                 plt.legend()
@@ -406,3 +401,36 @@ class Learner(pl.LightningModule):
                 if verbose:
                     plt.show()
                 plt.close('all')
+
+            # Loss heatmap
+            losses = []
+            random_idx = np.random.choice(np.arange(num_samples), size=(1000,))
+            if self.method == "Autoencoder":
+                # z_hat, x_hat = self.model(self.method, x_mesh)
+                loss, loss1, loss2 = self.model.loss_autoencoder(
+                    x_mesh[random_idx], x_hat_AE[random_idx],
+                    z_hat_T[random_idx], dim=-1)
+                losses.append(loss1)
+                losses.append(loss2)
+            elif self.method == "T_star":
+                # x_hat = self.model(self.method, z_mesh)
+                loss = self.model.loss_T_star(x_mesh[random_idx],
+                                              x_hat_star[random_idx], dim=-1)
+                losses.append(loss)
+            for j in range(len(losses)):
+                loss = losses[j]
+                for i in range(1, x_mesh.shape[1]):
+                    name = f'Loss{j+1}_{i-1}.pdf'
+                    plt.scatter(x_mesh[random_idx, i - 1], x_mesh[random_idx, i], cmap='jet',
+                                c=np.log(loss.detach().numpy()))
+                    cbar = plt.colorbar()
+                    cbar.set_label('Log loss')
+                    plt.title('Loss over grid')
+                    plt.xlabel(rf'$x_{i}$')
+                    plt.ylabel(rf'$x_{i + 1}$')
+                    plt.legend()
+                    plt.savefig(os.path.join(self.results_folder, name),
+                                bbox_inches='tight')
+                    if verbose:
+                        plt.show()
+                    plt.close('all')
