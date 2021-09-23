@@ -1,8 +1,49 @@
+import numpy as np
 import torch
+from smt.sampling_methods import LHS
 
 # Set double precision by default
 torch.set_default_tensor_type(torch.DoubleTensor)
 torch.set_default_dtype(torch.float64)
+
+
+def generate_mesh(limits: np.array, num_samples: int,
+                  method: str = 'LHS') -> torch.tensor:
+    """
+    Generates 2D mesh either from a uniform distribution or uses latin hypercube
+    sampling.
+
+    Parameters
+    ----------
+    limits: np.array
+        Array for the limits of all axes, used for sampling.
+        Form np.array([[min_1, max_1], ..., [min_n, max_n]]).
+
+    num_sample: int
+        Number of samples in this space.
+
+    method: str
+        Use 'LHS' or 'uniform'.
+
+    Returns
+    ----------
+    mesh: torch.tensor
+        Mesh in shape (num_samples, 2).
+    """
+
+    # Sample either a uniformly grid or use latin hypercube sampling
+    if method == 'uniform':
+        axes = np.linspace(limits[:, 0], limits[:, 1],
+                           num_samples // len(limits))
+        mesh = \
+            np.array(np.meshgrid(axes, axes)).T.reshape(-1, axes.shape[1])
+    elif method == 'LHS':
+        sampling = LHS(xlimits=limits)
+        mesh = sampling(num_samples)
+    else:
+        raise NotImplementedError(f'The method {method} is not implemented')
+
+    return torch.as_tensor(mesh)
 
 
 def MSE(x, y, dim=None):
@@ -26,6 +67,7 @@ def MSE(x, y, dim=None):
         return torch.mean(error)
     else:
         return torch.mean(error, dim=dim)
+
 
 def RMSE(x, y, dim=None):
     """

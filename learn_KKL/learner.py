@@ -228,7 +228,8 @@ class Learner(pl.LightningModule):
             return {'loss': loss, 'log': logs}
 
     def save_results(self, limits: np.array, nb_trajs=10, tsim=(0, 60),
-                     dt=1e-2, checkpoint_path=None, verbose=False):
+                     dt=1e-2, num_samples=100, checkpoint_path=None,
+                     verbose=False):
         """
         Save the model, the training and validation data. Also saving several
         metrics used for evaluating the results: heatmap of estimation error
@@ -298,6 +299,8 @@ class Learner(pl.LightningModule):
 
             with open(self.results_folder + '/model.pkl', 'wb') as f:
                 pkl.dump(self.model, f, protocol=4)
+            with open(self.results_folder + '/learner.pkl', 'wb') as f:
+                pkl.dump(self, f, protocol=4)
             print(f'Saved model in {self.results_folder}')
 
             # No control theoretic evaluation of the observer with only T
@@ -305,13 +308,14 @@ class Learner(pl.LightningModule):
                 return 0
 
             # Heatmap of RMSE(x, x_hat) with T_star
-            num_samples = 10000
-            mesh = self.model.generate_data_svl(limits, num_samples)
+            mesh = self.model.generate_data_svl(limits, num_samples,
+                                                method='uniform')
+            num_samples = len(mesh)  # update num_samples from uniform grid
+            print(f'Shape of mesh for evaluation: {mesh.shape}')
             x_mesh = mesh[:, :self.model.dim_x]
             z_mesh = mesh[:, self.model.dim_x:]
             x_hat_star = self.model('T_star', z_mesh)
             error = RMSE(x_mesh, x_hat_star, dim=1)
-            print(x_mesh.shape, error.shape)
             for i in range(1, x_mesh.shape[1]):
                 # https://stackoverflow.com/questions/37822925/how-to-smooth-by-interpolation-when-using-pcolormesh
                 name = 'RMSE_heatmap' + str(i) + '.pdf'
@@ -319,7 +323,6 @@ class Learner(pl.LightningModule):
                             c=np.log(error.detach().numpy()))
                 cbar = plt.colorbar()
                 cbar.set_label('Log estimation error')
-                # print(x[:, i - 1:i + 1].shape)
                 # plt.imshow(x[:, i - 1:i + 1], cmap='jet',
                 #            c=np.log(error.detach().numpy()))
                 # plt.pcolormesh(x[:, i - 1], x[:, i], np.log(error),
@@ -340,7 +343,9 @@ class Learner(pl.LightningModule):
 
             # Estimation over the test trajectories with T_star
             # trajs_init = torch.as_tensor(sampling(nb_trajs)).T
-            trajs_init = x_mesh
+            random_idx = np.random.choice(np.arange(num_samples),
+                                          size=(nb_trajs,))
+            trajs_init = x_mesh[random_idx]
             traj_folder = os.path.join(self.results_folder, 'Test_trajectories')
             tq, simulation = self.system.simulate(trajs_init, tsim, dt)
             measurement = self.model.h(simulation)
@@ -352,7 +357,7 @@ class Learner(pl.LightningModule):
                 # Need to figure out how to interpolate y in parallel for all
                 # trajectories!!!
                 y = torch.cat((tq.unsqueeze(1), measurement[:, i]), dim=1)
-                estimation = self.model.predict(y, tsim, dt)
+                estimation = self.model.predict(y, tsim, dt).detach()
                 traj_error += RMSE(simulation[:, i], estimation)
 
                 current_traj_folder = os.path.join(traj_folder, f'Traj_{i}')
@@ -404,9 +409,11 @@ class Learner(pl.LightningModule):
 
             # Loss heatmap
             losses = []
-            random_idx = np.random.choice(np.arange(num_samples), size=(1000,))
             if self.method == "Autoencoder":
                 # z_hat, x_hat = self.model(self.method, x_mesh)
+                # random_idx = np.random.choice(np.arange(num_samples),
+                #                               size=(5000,))
+                random_idx = np.arange(num_samples)
                 loss, loss1, loss2 = self.model.loss_autoencoder(
                     x_mesh[random_idx], x_hat_AE[random_idx],
                     z_hat_T[random_idx], dim=-1)
@@ -414,6 +421,7 @@ class Learner(pl.LightningModule):
                 losses.append(loss2)
             elif self.method == "T_star":
                 # x_hat = self.model(self.method, z_mesh)
+                random_idx = np.arange(num_samples)
                 loss = self.model.loss_T_star(x_mesh[random_idx],
                                               x_hat_star[random_idx], dim=-1)
                 losses.append(loss)
@@ -421,7 +429,8 @@ class Learner(pl.LightningModule):
                 loss = losses[j]
                 for i in range(1, x_mesh.shape[1]):
                     name = f'Loss{j+1}_{i-1}.pdf'
-                    plt.scatter(x_mesh[random_idx, i - 1], x_mesh[random_idx, i], cmap='jet',
+                    plt.scatter(x_mesh[random_idx, i - 1],
+                                x_mesh[random_idx, i], cmap='jet',
                                 c=np.log(loss.detach().numpy()))
                     cbar = plt.colorbar()
                     cbar.set_label('Log loss')

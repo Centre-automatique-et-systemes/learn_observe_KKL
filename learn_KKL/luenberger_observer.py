@@ -97,12 +97,11 @@ import numpy as np
 import torch
 from scipy import linalg
 from scipy import signal
-from smt.sampling_methods import LHS
 from torch import nn
 from torchdiffeq import odeint
 from torchinterp1d import Interp1d
 
-from .utils import MSE
+from .utils import MSE, generate_mesh
 
 # Set double precision by default
 torch.set_default_tensor_type(torch.DoubleTensor)
@@ -335,6 +334,7 @@ class LuenbergerObserver(nn.Module):
             'encoder ' + str(self.encoder_layers),
             'decoder ' + str(self.decoder_layers),
             'method ' + self.method,
+            'recon_lambda ' + str(self.recon_lambda),
         ])
 
     def __call__(self, method='Autoencoder', *input):
@@ -527,7 +527,7 @@ class LuenbergerObserver(nn.Module):
         return tq, sol
 
     def generate_data_svl(self, limits: tuple, num_samples: int, k: int = 10,
-                          dt: float = 1e-2):
+                          dt: float = 1e-2, method: str = 'LHS'):
         """
         Generate a grid of data points by simulating the system backward and
         forward in time.
@@ -553,8 +553,11 @@ class LuenbergerObserver(nn.Module):
             Pairs of (x, z) data points.
         """
 
-        sampling = LHS(xlimits=limits)
-        mesh = torch.as_tensor(sampling(num_samples))
+        # sampling = LHS(xlimits=limits)
+        # mesh = torch.as_tensor(sampling(num_samples))
+        mesh = generate_mesh(limits=limits, num_samples=num_samples,
+                             method=method)
+        num_samples = mesh.shape[0]  # in case regular grid: changed
         self.k = k
         self.t_c = self.k / min(abs(linalg.eig(self.D)[0].real))
 
@@ -768,41 +771,38 @@ class LuenbergerObserver(nn.Module):
         # Compute gradients of T_u with respect to inputs
         dTdh = torch.autograd.functional.jacobian(
             self.encoder, x, create_graph=False, strict=False, vectorize=False)
-        dTdx = torch.zeros((batch_size, self.dim_z, self.dim_x))
+        # dTdx_old = torch.zeros((batch_size, self.dim_z, self.dim_x))
         # print(x.shape, dTdh.shape, dTdx.shape)
 
         # dTdx reshape (batch_size, self.dim_z, self.dim_x)
-        for i in range(dTdh.shape[0]):
-            for j in range(dTdh.shape[1]):
-                dTdx[i, j, :] = dTdh[i, j, i, :]
+        # for i in range(dTdh.shape[0]):
+        #     for j in range(dTdh.shape[1]):
+        #         dTdx_old[i, j, :] = dTdh[i, j, i, :]
+        dTdx = torch.transpose(torch.transpose(
+            torch.diagonal(dTdh, dim1=0, dim2=2), 1, 2), 0, 1)
 
         # lhs = dTdx * f(x) of shape (batch_sze, self.dim_z)
-        # lhs = torch.zeros((self.dim_z, batch_size)).to(self.device)
+        # lhs_old = torch.zeros((self.dim_z, batch_size)).to(self.device)
         # for i in range(batch_size):
-        #     lhs[:, i] = torch.matmul(dTdx[i], self.f(x.T).T[i]).T
-        dTdxt = torch.transpose(dTdx, 1, 2)
-        lhs = torch.tensordot(self.f(x), dTdxt, dims=([1], [1]))[:, 0]
+        #     lhs_old[:, i] = torch.matmul(dTdx[i], self.f(x)[i]).T
+        # dTdxt = torch.transpose(dTdx, 1, 2)
+        # lhs = torch.tensordot(self.f(x), dTdxt, dims=([1], [1]))[:, 0]
+        # lhs = torch.diagonal(torch.tensordot(
+        #     dTdx, self.f(x), dims=([2], [1])), dim1=0, dim2=2).t()
+        lhs = torch.einsum('ijk,ik->ij', dTdx, self.f(x))
 
         # rhs = D * z + F * h(x)
         # print(x.shape, z_hat.shape, self.D.shape, self.F.shape)
         # print(self.h(x).shape, self.f(x).shape)
         D = self.D.to(self.device)
         F = self.F.to(self.device)
-        # h_x = self.h(x.T).to(self.device)
-        # rhs = torch.matmul(D, z_hat.T) + torch.matmul(F, h_x)
+        # h_x = self.h(x).to(self.device)
+        # rhs_old = torch.matmul(D, z_hat.T) + torch.matmul(F, h_x.T)
         rhs = torch.matmul(z_hat, D.t()) + torch.matmul(self.h(x), F.t())
-        # print(rhs.shape, lhs.shape)
 
         # PDE loss MSE(lhs, rhs)
-        # loss_2_old = mse(lhs, rhs)
-        # loss_2 = MSE(torch.transpose(lhs, 0, 1), torch.transpose(rhs, 0, 1),
-        #              dim=dim)
+        # loss_2_old = mse(lhs_old, rhs_old)
         loss_2 = MSE(lhs, rhs, dim=dim)
-        # if dim is None:
-        #     loss_2 = MSE(lhs, rhs)
-        # else:
-        #     loss_2 = MSE(torch.transpose(lhs, 0, 1), torch.transpose(rhs, 0, 1),
-        #                  dim=dim)
 
         return loss_1 + loss_2, loss_1, loss_2
 

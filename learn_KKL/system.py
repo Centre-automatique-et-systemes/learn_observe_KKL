@@ -73,7 +73,6 @@ from math import pi
 import numpy as np
 import torch
 from scipy import signal
-from smt.sampling_methods import LHS
 from torchdiffeq import odeint
 
 # Set double precision by default
@@ -171,41 +170,6 @@ class System():
             self.u = self.sin_controller
         elif controller == 'lin_chirp_controller':
             self.u = self.lin_chirp_controller
-
-    def generate_mesh(self, limits: np.array, num_samples: int,
-                      method: str = 'lhs') -> torch.tensor:
-        """
-        Generates 2D mesh either from a uniform distribution or uses latin hypercube
-        sampling.
-
-        Parameters
-        ----------
-        limits: np.array
-            Array for the limits of all axes, used for sampling.
-            Form np.array([[min_1, max_1], ..., [min_n, max_n]]).
-
-        num_sample: int
-            Number of samples in this space.
-
-        method: str
-            Use 'lhs' or 'uniform'.
-
-        Returns
-        ----------
-        mesh: torch.tensor
-            Mesh in shape (num_samples, 2).
-        """
-
-        # Sample either a uniformly grid or use latin hypercube sampling
-        if method == 'uniform':
-            axes = np.linspace(limits[:, 0], limits[:, 1], num_samples)
-            mesh = \
-                np.array(np.meshgrid(axes, axes)).T.reshape(-1, axes.shape[1])
-        elif method == 'lhs':
-            sampling = LHS(xlimits=limits)
-            mesh = sampling(num_samples)
-
-        return torch.as_tensor(mesh)
 
     def simulate(self, x_0: torch.tensor, tsim: tuple, dt) -> torch.tensor:
         """
