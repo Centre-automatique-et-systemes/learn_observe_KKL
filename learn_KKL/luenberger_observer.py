@@ -505,15 +505,12 @@ class LuenbergerObserver(nn.Module):
         """
 
         def dydt(t, y):
-            # x = y[:self.dim_x]
-            # z = y[self.dim_x:]
             x = y[..., :self.dim_x]
             z = y[..., self.dim_x:]
             x_dot = self.f(x) + self.g(x) * self.u(t)
             if only_x:
                 z_dot = torch.zeros_like(z)
             else:
-                # z_dot = torch.matmul(self.D, z) + self.F * self.h(x)
                 z_dot = torch.matmul(z, self.D.t()) + torch.matmul(
                     self.h(x), self.F.t())
             return torch.cat((x_dot, z_dot), dim=-1)
@@ -552,40 +549,33 @@ class LuenbergerObserver(nn.Module):
         data: torch.tensor
             Pairs of (x, z) data points.
         """
-
-        # sampling = LHS(xlimits=limits)
-        # mesh = torch.as_tensor(sampling(num_samples))
         mesh = generate_mesh(limits=limits, num_samples=num_samples,
                              method=method)
         num_samples = mesh.shape[0]  # in case regular grid: changed
         self.k = k
         self.t_c = self.k / min(abs(linalg.eig(self.D)[0].real))
 
-        # y_0 = torch.zeros((self.dim_x + self.dim_z, num_samples))  # TODO
-        y_0 = torch.zeros((num_samples, self.dim_x + self.dim_z))
+        y_0 = torch.zeros((num_samples, self.dim_x + self.dim_z))  # TODO
         # limits_xz = np.array([[-1., 1.] * (self.dim_x + self.dim_z)])
         # print(limits_xz)
-        # sampling = LHS(xlimits=limits_xz)
+        # sampling = LHS(limits=limits_xz)
         # y_0 = torch.as_tensor(sampling(num_samples))
         # print(y_0.shape)
         y_1 = y_0.clone()
 
         # Simulate only x system backward in time
         tsim = (0, -self.t_c)
-        # y_0[:self.dim_x, :] = torch.transpose(mesh, 0, 1)
         y_0[:, :self.dim_x] = mesh
         tq_bw, data_bw = self.simulate_system(y_0, tsim, -dt, only_x=True)
 
         # Simulate both x and z forward in time starting from the last point
         # from previous simulation
         tsim = (-self.t_c, 0)
-        # y_1[:self.dim_x, :] = data_bw[-1, :self.dim_x, :]
         y_1[:, :self.dim_x] = data_bw[-1, :, :self.dim_x]
         tq, data_fw = self.simulate_system(y_1, tsim, dt)
 
         # Data contains (x_i, z_i) pairs in shape [dim_x + dim_z,
         # number_simulations]
-        # data = torch.transpose(data_fw[-1, :, :], 0, 1)
         data = data_fw[-1]
         return data
 
@@ -764,44 +754,22 @@ class LuenbergerObserver(nn.Module):
         batch_size = x.shape[0]
 
         # Reconstruction loss MSE(x,x_hat)
-        # mse = nn.MSELoss()
-        # loss_1_old = self.recon_lambda * mse(x, x_hat)
         loss_1 = self.recon_lambda * MSE(x, x_hat, dim=dim)
 
         # Compute gradients of T_u with respect to inputs
         dTdh = torch.autograd.functional.jacobian(
             self.encoder, x, create_graph=False, strict=False, vectorize=False)
-        # dTdx_old = torch.zeros((batch_size, self.dim_z, self.dim_x))
-        # print(x.shape, dTdh.shape, dTdx.shape)
-
         # dTdx reshape (batch_size, self.dim_z, self.dim_x)
-        # for i in range(dTdh.shape[0]):
-        #     for j in range(dTdh.shape[1]):
-        #         dTdx_old[i, j, :] = dTdh[i, j, i, :]
         dTdx = torch.transpose(torch.transpose(
             torch.diagonal(dTdh, dim1=0, dim2=2), 1, 2), 0, 1)
-
-        # lhs = dTdx * f(x) of shape (batch_sze, self.dim_z)
-        # lhs_old = torch.zeros((self.dim_z, batch_size)).to(self.device)
-        # for i in range(batch_size):
-        #     lhs_old[:, i] = torch.matmul(dTdx[i], self.f(x)[i]).T
-        # dTdxt = torch.transpose(dTdx, 1, 2)
-        # lhs = torch.tensordot(self.f(x), dTdxt, dims=([1], [1]))[:, 0]
-        # lhs = torch.diagonal(torch.tensordot(
-        #     dTdx, self.f(x), dims=([2], [1])), dim1=0, dim2=2).t()
+        # lhs = dTdx * f(x) of shape (batch_size, self.dim_z)
         lhs = torch.einsum('ijk,ik->ij', dTdx, self.f(x))
 
-        # rhs = D * z + F * h(x)
-        # print(x.shape, z_hat.shape, self.D.shape, self.F.shape)
-        # print(self.h(x).shape, self.f(x).shape)
         D = self.D.to(self.device)
         F = self.F.to(self.device)
-        # h_x = self.h(x).to(self.device)
-        # rhs_old = torch.matmul(D, z_hat.T) + torch.matmul(F, h_x.T)
         rhs = torch.matmul(z_hat, D.t()) + torch.matmul(self.h(x), F.t())
 
         # PDE loss MSE(lhs, rhs)
-        # loss_2_old = mse(lhs_old, rhs_old)
         loss_2 = MSE(lhs, rhs, dim=dim)
 
         return loss_1 + loss_2, loss_1, loss_2
@@ -828,8 +796,6 @@ class LuenbergerObserver(nn.Module):
         loss: torch.tensor
             Reconstruction loss MSE(z, z_hat).
         """
-        # mse = torch.nn.MSELoss()
-        # loss_old = mse(z, z_hat)
         loss = MSE(z, z_hat, dim=dim)
         return loss
 
@@ -855,8 +821,6 @@ class LuenbergerObserver(nn.Module):
         loss: torch.tensor
             Reconstruction loss MSE(x, x_hat).
         """
-        # mse = torch.nn.MSELoss()
-        # loss = mse(x, x_hat)
         loss = MSE(x, x_hat, dim=dim)
         return loss
 

@@ -182,14 +182,10 @@ class Learner(pl.LightningModule):
         elif self.method == "T":
             z = batch[:, self.model.dim_x:]
             z_hat = self.forward(batch)
-            # mse = torch.nn.MSELoss()
-            # loss = mse(z, z_hat)
             loss = self.model.loss(self.method, z, z_hat)
         elif self.method == "T_star":
             x = batch[:, :self.model.dim_x]
             x_hat = self.forward(batch)
-            # mse = torch.nn.MSELoss()
-            # loss = mse(x, x_hat)
             loss = self.model.loss(self.method, x, x_hat)
         self.log('train_loss', loss, on_step=True, prog_bar=True, logger=True)
         logs = {'train_loss': loss.detach()}
@@ -214,14 +210,10 @@ class Learner(pl.LightningModule):
             elif self.method == "T":
                 z = batch[:, self.model.dim_x:]
                 z_hat = self.forward(batch)
-                # mse = torch.nn.MSELoss()
-                # loss = mse(z, z_hat)
                 loss = self.model.loss(self.method, z, z_hat)
             elif self.method == "T_star":
                 x = batch[:, :self.model.dim_x]
                 x_hat = self.forward(batch)
-                # mse = torch.nn.MSELoss()
-                # loss = mse(x, x_hat)
                 loss = self.model.loss(self.method, x, x_hat)
             self.log('val_loss', loss, on_step=True, prog_bar=True, logger=True)
             logs = {'val_loss': loss.detach()}
@@ -323,13 +315,6 @@ class Learner(pl.LightningModule):
                             c=np.log(error.detach().numpy()))
                 cbar = plt.colorbar()
                 cbar.set_label('Log estimation error')
-                # plt.imshow(x[:, i - 1:i + 1], cmap='jet',
-                #            c=np.log(error.detach().numpy()))
-                # plt.pcolormesh(x[:, i - 1], x[:, i], np.log(error),
-                #                cmap='jet', shading='gouraud')
-                # cbar = plt.colorbar()
-                # cbar.set_label('Log estimation error')
-                # cbar = plt.colorbar()
                 cbar.set_label('Log estimation error')
                 plt.title(r'RMSE between $x$ and $\hat{x}$')
                 plt.xlabel(rf'$x_{i}$')
@@ -342,7 +327,6 @@ class Learner(pl.LightningModule):
                 plt.close('all')
 
             # Estimation over the test trajectories with T_star
-            # trajs_init = torch.as_tensor(sampling(nb_trajs)).T
             random_idx = np.random.choice(np.arange(num_samples),
                                           size=(nb_trajs,))
             trajs_init = x_mesh[random_idx]
@@ -410,7 +394,6 @@ class Learner(pl.LightningModule):
             # Loss heatmap
             losses = []
             if self.method == "Autoencoder":
-                # z_hat, x_hat = self.model(self.method, x_mesh)
                 # random_idx = np.random.choice(np.arange(num_samples),
                 #                               size=(5000,))
                 random_idx = np.arange(num_samples)
@@ -420,7 +403,6 @@ class Learner(pl.LightningModule):
                 losses.append(loss1)
                 losses.append(loss2)
             elif self.method == "T_star":
-                # x_hat = self.model(self.method, z_mesh)
                 random_idx = np.arange(num_samples)
                 loss = self.model.loss_T_star(x_mesh[random_idx],
                                               x_hat_star[random_idx], dim=-1)
@@ -428,7 +410,7 @@ class Learner(pl.LightningModule):
             for j in range(len(losses)):
                 loss = losses[j]
                 for i in range(1, x_mesh.shape[1]):
-                    name = f'Loss{j+1}_{i-1}.pdf'
+                    name = f'Loss{j + 1}_{i - 1}.pdf'
                     plt.scatter(x_mesh[random_idx, i - 1],
                                 x_mesh[random_idx, i], cmap='jet',
                                 c=np.log(loss.detach().numpy()))
