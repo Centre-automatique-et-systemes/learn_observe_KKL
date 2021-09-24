@@ -103,6 +103,8 @@ class Learner(pl.LightningModule):
             self.scaler_z = StandardScaler(
                 self.training_data[:, self.model.dim_x:])
         self.model.set_scalers(scaler_x=self.scaler_x, scaler_z=self.scaler_z)
+        self.train_loss = torch.zeros((0, 1))
+        self.val_loss = torch.zeros((0, 1))
 
         # Optimization
         self.batch_size = batch_size
@@ -188,6 +190,7 @@ class Learner(pl.LightningModule):
             x_hat = self.forward(batch)
             loss = self.model.loss(self.method, x, x_hat)
         self.log('train_loss', loss, on_step=True, prog_bar=True, logger=True)
+        self.train_loss = torch.cat((self.train_loss, torch.tensor([[loss]])))
         logs = {'train_loss': loss.detach()}
         return {'loss': loss, 'log': logs}
 
@@ -216,6 +219,7 @@ class Learner(pl.LightningModule):
                 x_hat = self.forward(batch)
                 loss = self.model.loss(self.method, x, x_hat)
             self.log('val_loss', loss, on_step=True, prog_bar=True, logger=True)
+            self.val_loss = torch.cat((self.val_loss, torch.tensor([[loss]])))
             logs = {'val_loss': loss.detach()}
             return {'loss': loss, 'log': logs}
 
@@ -391,7 +395,25 @@ class Learner(pl.LightningModule):
                     plt.show()
                 plt.close('all')
 
-            # Loss heatmap
+            # Loss plot over time and loss heatmap over space
+            name = 'Train_loss.pdf'
+            plt.plot(self.train_loss.detach(), '+-', label='loss')
+            plt.title('Training loss over time')
+            plt.yscale('log')
+            plt.legend()
+            plt.savefig(os.path.join(self.results_folder, name),
+                        bbox_inches='tight')
+            plt.clf()
+            plt.close('all')
+            name = 'Val_loss.pdf'
+            plt.plot(self.val_loss.detach(), '+-', label='loss')
+            plt.title('Validation loss over time')
+            plt.yscale('log')
+            plt.legend()
+            plt.savefig(os.path.join(self.results_folder, name),
+                        bbox_inches='tight')
+            plt.clf()
+            plt.close('all')
             losses = []
             if self.method == "Autoencoder":
                 # random_idx = np.random.choice(np.arange(num_samples),
