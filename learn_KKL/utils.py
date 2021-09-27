@@ -34,7 +34,7 @@ def generate_mesh(limits: np.array, num_samples: int,
     # Sample either a uniformly grid or use latin hypercube sampling
     if method == 'uniform':
         axes = np.linspace(limits[:, 0], limits[:, 1],
-                           num_samples // len(limits))
+                           int(np.ceil(np.sqrt(num_samples) // len(limits))))
         mesh = \
             np.array(np.meshgrid(axes, axes)).T.reshape(-1, axes.shape[1])
     elif method == 'LHS':

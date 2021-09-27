@@ -265,7 +265,7 @@ class LuenbergerObserver(nn.Module):
     def __init__(self, dim_x: int, dim_y: int, method: str = "Autoencoder",
                  dim_z: int = None, wc: float = 1., num_hl: int = 5,
                  size_hl: int = 50, activation=nn.ReLU(),
-                 recon_lambda: float = 1.):
+                 recon_lambda: float = 1., D = 'bessel'):
         super(LuenbergerObserver, self).__init__()
 
         self.method = method
@@ -286,7 +286,11 @@ class LuenbergerObserver(nn.Module):
         # Set observer matrices D and F
         self.wc = wc
         self.F = torch.ones((self.dim_z, 1))
-        self.D = self.bessel_D(wc=self.wc)
+        if D == 'bessel':
+            self.D = self.bessel_D(wc=self.wc)
+        else:
+            self.wc = 0.
+            self.D = torch.as_tensor(D)
 
         # Model params
         self.device = torch.device(
@@ -294,9 +298,6 @@ class LuenbergerObserver(nn.Module):
         self.recon_lambda = recon_lambda
 
         # Define encoder and decoder architecture
-        # num_hl = 5
-        # size_hl = 40
-        # act = nn.Tanh()
         self.num_hl = num_hl
         self.size_hl = size_hl
         self.activation = activation
@@ -419,7 +420,7 @@ class LuenbergerObserver(nn.Module):
         # Compute jacobian for T^*(z)
         dTdy = torch.autograd.functional.jacobian(
             self.encoder, self.decoder(z.T), create_graph=False, strict=False,
-            vectorize=False)
+            vectorize=True)  # TODO vectorize is experimental but faster!
 
         # Shape jacobian
         dTdx = torch.zeros((self.dim_z, self.dim_x))

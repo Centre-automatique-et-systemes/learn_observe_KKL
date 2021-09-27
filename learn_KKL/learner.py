@@ -224,8 +224,8 @@ class Learner(pl.LightningModule):
             return {'loss': loss, 'log': logs}
 
     def save_results(self, limits: np.array, nb_trajs=10, tsim=(0, 60),
-                     dt=1e-2, num_samples=100, checkpoint_path=None,
-                     verbose=False):
+                     dt=1e-2, num_samples=10000, checkpoint_path=None,
+                     verbose=False, fast=False):
         """
         Save the model, the training and validation data. Also saving several
         metrics used for evaluating the results: heatmap of estimation error
@@ -253,6 +253,9 @@ class Learner(pl.LightningModule):
 
         verbose: bool
             Whether to show the plots or just save them.
+
+        fast: bool
+            Whether to compute the loss over a grid, which is slow.
         """
         with torch.no_grad():
             if checkpoint_path:
@@ -414,36 +417,38 @@ class Learner(pl.LightningModule):
                         bbox_inches='tight')
             plt.clf()
             plt.close('all')
-            losses = []
-            if self.method == "Autoencoder":
-                # random_idx = np.random.choice(np.arange(num_samples),
-                #                               size=(5000,))
-                random_idx = np.arange(num_samples)
-                loss, loss1, loss2 = self.model.loss_autoencoder(
-                    x_mesh[random_idx], x_hat_AE[random_idx],
-                    z_hat_T[random_idx], dim=-1)
-                losses.append(loss1)
-                losses.append(loss2)
-            elif self.method == "T_star":
-                random_idx = np.arange(num_samples)
-                loss = self.model.loss_T_star(x_mesh[random_idx],
-                                              x_hat_star[random_idx], dim=-1)
-                losses.append(loss)
-            for j in range(len(losses)):
-                loss = losses[j]
-                for i in range(1, x_mesh.shape[1]):
-                    name = f'Loss{j + 1}_{i - 1}.pdf'
-                    plt.scatter(x_mesh[random_idx, i - 1],
-                                x_mesh[random_idx, i], cmap='jet',
-                                c=np.log(loss.detach().numpy()))
-                    cbar = plt.colorbar()
-                    cbar.set_label('Log loss')
-                    plt.title('Loss over grid')
-                    plt.xlabel(rf'$x_{i}$')
-                    plt.ylabel(rf'$x_{i + 1}$')
-                    plt.legend()
-                    plt.savefig(os.path.join(self.results_folder, name),
-                                bbox_inches='tight')
-                    if verbose:
-                        plt.show()
-                    plt.close('all')
+            if not fast:  # Computing loss over grid is slow, most of all for AE
+                losses = []
+                if self.method == "Autoencoder":
+                    loss, loss1, loss2 = self.model.loss_autoencoder(
+                        x_mesh, x_hat_AE,
+                        z_hat_T, dim=-1)
+                    losses.append(loss1)
+                    losses.append(loss2)
+                elif self.method == "T_star":
+                    loss = self.model.loss_T_star(
+                        x_mesh, x_hat_star, dim=-1)
+                    losses.append(loss)
+                for j in range(len(losses)):
+                    loss = losses[j]
+                    for i in range(1, x_mesh.shape[1]):
+                        name = f'Loss{j + 1}_{i - 1}.pdf'
+                        plt.scatter(x_mesh[:, i - 1],
+                                    x_mesh[:, i], cmap='jet',
+                                    c=np.log(loss.detach().numpy()))
+                        cbar = plt.colorbar()
+                        cbar.set_label('Log loss')
+                        plt.title('Loss over grid')
+                        plt.xlabel(rf'$x_{i}$')
+                        plt.ylabel(rf'$x_{i + 1}$')
+                        plt.legend()
+                        plt.savefig(os.path.join(self.results_folder, name),
+                                    bbox_inches='tight')
+                        if verbose:
+                            plt.show()
+                        plt.close('all')
+
+            # Add t_c to specifications
+            with open(specs_file, 'a') as f:
+                print(f'k {self.model.k}', file=f)
+                print(f't_c {self.model.t_c}', file=f)
