@@ -48,7 +48,7 @@ def generate_mesh(limits: np.array, num_samples: int,
 
 def MSE(x, y, dim=None):
     """
-    Compute the mean squared between x and y along dimension dim.
+    Compute the mean squared error between x and y along dimension dim.
 
     Parameters
     ----------
@@ -71,7 +71,7 @@ def MSE(x, y, dim=None):
 
 def RMSE(x, y, dim=None):
     """
-    Compute the root mean squared between x and y along dimension dim.
+    Compute the root mean squared error between x and y along dimension dim.
 
     Parameters
     ----------
