@@ -26,3 +26,5 @@ jupyter_notebook/runs/
 
 # Build files
 *egg-info
+build/
+dist/
