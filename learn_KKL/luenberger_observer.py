@@ -505,7 +505,7 @@ class LuenbergerObserver(nn.Module):
             Solution of the simulation.
         """
 
-        def dydt(t, y):
+        def dydt(t, y):  # TODO only simulate x backward, z forward (interpol y)
             x = y[..., :self.dim_x]
             z = y[..., self.dim_x:]
             x_dot = self.f(x) + self.g(x) * self.u(t)
