@@ -265,7 +265,7 @@ class LuenbergerObserver(nn.Module):
     def __init__(self, dim_x: int, dim_y: int, method: str = "Autoencoder",
                  dim_z: int = None, wc: float = 1., num_hl: int = 5,
                  size_hl: int = 50, activation=nn.ReLU(),
-                 recon_lambda: float = 1., D = 'bessel'):
+                 recon_lambda: float = 1., D='bessel'):
         super(LuenbergerObserver, self).__init__()
 
         self.method = method
@@ -394,7 +394,7 @@ class LuenbergerObserver(nn.Module):
             Multiplicator for the cutoff frequency of the bessel filter,
             for which Wn=2*pi*wc.
         """
-        b, a = signal.bessel(N=3, Wn=wc * 2 * np.pi, analog=True)
+        b, a = signal.bessel(N=self.dim_z, Wn=wc * 2 * np.pi, analog=True)
         whole_D = signal.place_poles(
             A=np.zeros((self.dim_z, self.dim_z)),
             B=-np.eye(self.dim_z),
@@ -506,7 +506,7 @@ class LuenbergerObserver(nn.Module):
         """
 
         def dydt(t, y):  # TODO only simulate x backward, z forward (interpol y)
-            x = y[..., :self.dim_x]
+            x = y[..., :self.dim_x]  # TODO change notation y
             z = y[..., self.dim_x:]
             x_dot = self.f(x) + self.g(x) * self.u(t)
             if only_x:
@@ -605,22 +605,21 @@ class LuenbergerObserver(nn.Module):
         with torch.no_grad():
 
             # Create list of interp1d functions
-            points, values = x[:, 0].contiguous(), x[:, 1:].contiguous()
-            interp_list = [Interp1d() for i in range(values.shape[1])]
+            points, values = x[:, 0].contiguous().view(-1, 1).t(), \
+                             x[:, 1:].contiguous().view(-1, 1).t()
+            interp_function = Interp1d()
 
-            # Interpolation function
-            def interp(t):
+            def interp(t, *args, **kwargs):
                 if len(t.shape) == 0:
-                    t = t.reshape(1, ).contiguous()
+                    t = t.view(1, 1)
                 else:
-                    t = t.contiguous()
+                    t = t.contiguous().view(-1, 1).t()
                 if len(x) == 1:
                     # If only one value of x available, assume constant
-                    interpolate_x = x[0, 1:].repeat(len(t), 1)
+                    interpolate_x = x[0, 1:].repeat(len(t[0]), 1)
                 else:
-                    res = [interp_list[i](points, values[:, i], t) for i
-                           in range(values.shape[1])]
-                    interpolate_x = torch.squeeze(torch.stack(res), dim=1).t()
+                    interpolate_x = interp_function(points.expand(
+                        values.shape[0], -1), values, t).t()
                 return interpolate_x
 
         return interp
@@ -628,7 +627,7 @@ class LuenbergerObserver(nn.Module):
     def create_layers(self, num_hl: int, size_hl: int, activation: torch.nn,
                       dim_in: int, dim_out: int) -> nn.ModuleList():
         """
-        Runs and outputs the results from Luenberger observer system.
+        Creates the NN model based on number of hidden layers, sizes etc.
 
         Parameters
         ----------
