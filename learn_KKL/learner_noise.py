@@ -45,7 +45,6 @@ class LearnerNoise(Learner):
             else:
                 w_c = rd.uniform(0.5, 1.5)
 
-            print(w_c)
             estimation = self.model.predict(y, tsim, dt, w_c).detach()
             traj_error += RMSE(simulation[:, i], estimation)
 
@@ -129,6 +128,35 @@ class LearnerNoise(Learner):
         with open(os.path.join(traj_folder, filename), 'w') as f:
             print(traj_error, file=f)
 
+
+    def save_rmse_wc(self, mesh, w_c_array, verbose):
+        errors = np.zeros((len(w_c_array)))
+
+        for j in range(mesh.shape[-1]):
+            x_mesh = mesh[:, :self.model.dim_x, j]
+            z_mesh = mesh[:, self.model.dim_x:, j]
+
+            # compute x_hat for every w_c
+            x_hat_star = self.model('T_star', z_mesh)
+
+            errors[j] = RMSE(x_mesh, x_hat_star).detach().numpy()
+
+        # https://stackoverflow.com/questions/37822925/how-to-smooth-by-interpolation-when-using-pcolormesh
+        name = 'RMSE_w_c.pdf'
+        plt.plot(w_c_array, errors)
+        plt.title(r'RMSE between $x$ and $\hat{x}$')
+        plt.xlabel(rf'$w_c$')
+        plt.ylabel(r'RMSE($x$, $\hat{x}$)')
+        plt.savefig(os.path.join(self.results_folder, name),
+                    bbox_inches='tight')
+        if verbose:
+            plt.show()
+            plt.close('all')
+
+        plt.clf()
+        plt.close('all')
+
+
     def save_pdf_heatmap(self, mesh, verbose):
         for j in range(mesh.shape[-1]):
             x_mesh = mesh[:, :self.model.dim_x, j]
@@ -207,28 +235,30 @@ class LearnerNoise(Learner):
 
             specs_file = self.save_specifications()
 
-            # self.save_pkl('/model.pkl', self.model)
-            # self.save_pkl('/learner.pkl', self)
+            self.save_pkl('/model.pkl', self.model)
+            self.save_pkl('/learner.pkl', self)
 
-            # self.save_csv(self.training_data.cpu().numpy(), 'training_data.csv')
-            # self.save_csv(self.validation_data.cpu().numpy(), 'validation_data.csv')
+            self.save_csv(self.training_data.cpu().numpy(), 'training_data.csv')
+            self.save_csv(self.validation_data.cpu().numpy(), 'validation_data.csv')
 
-            # self.save_pdf_training(self.training_data[idx], verbose)
+            self.save_pdf_training(self.training_data[idx], verbose)
 
             # # No control theoretic evaluation of the observer with only T
-            # if self.method == 'T':
-            #     return 0
+            if self.method == 'T':
+                return 0
 
-            # self.save_trj(torch.tensor([1., 1.]), w_c_arr, nb_trajs, verbose, tsim, dt)
+            self.save_trj(torch.tensor([1., 1.]), w_c_arr, nb_trajs, verbose, tsim, dt)
 
             # create array of w_c from [0.1, ..., 1]
-            w_c_arr = torch.arange(0.2, 1.5, 0.4)
+            w_c_arr = torch.arange(0.2, 1.8, 0.2)
 
             # generate data
-            # mesh = self.model.generate_data_svl(limits, w_c_arr, num_samples,
-                                                # method='uniform', stack=False)
+            mesh = self.model.generate_data_svl(limits, w_c_arr, num_samples,
+                                                method='uniform', stack=False)
 
-            # self.save_pdf_heatmap(mesh, verbose)
+            self.save_rmse_wc(mesh, w_c_arr, verbose)
+
+            self.save_pdf_heatmap(mesh, verbose)
             # z_hat_T, x_hat_AE = self.model('Autoencoder', x_mesh)
 
             # print(f'Shape of mesh for evaluation: {mesh.shape}')
