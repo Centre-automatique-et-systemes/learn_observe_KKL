@@ -98,11 +98,11 @@ class LuenbergerObserverNoise(LuenbergerObserver):
         return data
 
     def generate_data_svl(self, limits: np.array, w_c: np.array, num_datapoints: int, k: int = 10,
-                          dt: float = 1e-2, method: str = 'LHS'):
+                          dt: float = 1e-2, stack: bool = True, method: str = 'LHS'):
 
         num_samples = int(np.ceil(num_datapoints / len(w_c)))
 
-        df = torch.zeros(size=(num_samples*len(w_c), self.dim_x+self.dim_z + 1))
+        df = torch.zeros(size=(num_samples, self.dim_x+self.dim_z + 1, len(w_c)))
 
         for idx, w_c_i in np.ndenumerate(w_c):
             self.D = self.bessel_D(w_c_i)
@@ -112,9 +112,12 @@ class LuenbergerObserverNoise(LuenbergerObserver):
             wc_i_tensor = torch.tensor(w_c_i).repeat(num_samples).unsqueeze(1)
             data = torch.cat((data, wc_i_tensor), 1)
 
-            df[idx[0] * num_samples: (idx[0]+1) * num_samples, ] = data
+            df[..., idx] = data.unsqueeze(-1)
 
-        return df
+        if stack:
+            return torch.cat(torch.unbind(df, dim=-1), dim=0)
+        else:
+            return df
 
     def predict(self, measurement: torch.tensor, tsim: tuple,
                 dt: int, w_c: float) -> torch.tensor:

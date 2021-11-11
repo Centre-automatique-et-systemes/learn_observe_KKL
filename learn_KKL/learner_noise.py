@@ -75,15 +75,11 @@ class LearnerNoise(Learner):
         with open(os.path.join(traj_folder, filename), 'w') as f:
             print(traj_error, file=f)
 
-    def save_trj(self, x_mesh, w_c_arr, nb_trajs, verbose, tsim, dt):
+    def save_trj(self, init_state, w_c_arr, nb_trajs, verbose, tsim, dt):
         # Estimation over the test trajectories with T_star
         nb_trajs += w_c_arr.shape[0]
-
-        random_idx = np.random.choice(np.arange(x_mesh.shape[0]),
-                                      size=(nb_trajs,))
-        # trajs_init = x_mesh[random_idx]
         traj_folder = os.path.join(self.results_folder, 'Test_trajectories')
-        tq, simulation = self.system.simulate(torch.tensor([1.,1.]), tsim, dt)
+        tq, simulation = self.system.simulate(init_state, tsim, dt)
         measurement = self.model.h(simulation)
         noise = torch.normal(0, 0.01, size=(measurement.shape[0], 1))
         measurement = measurement.add(noise)
@@ -103,7 +99,6 @@ class LearnerNoise(Learner):
             else:
                 w_c = rd.uniform(0.2, 1.5)
 
-            print(w_c)
             estimation = self.model.predict(y, tsim, dt, w_c).detach()
             traj_error += RMSE(simulation, estimation)
 
@@ -127,11 +122,44 @@ class LearnerNoise(Learner):
                             bbox_inches='tight')
                 if verbose:
                     plt.show()
+                plt.clf()
                 plt.close('all')
 
         filename = 'RMSE_traj.txt'
         with open(os.path.join(traj_folder, filename), 'w') as f:
             print(traj_error, file=f)
+
+    def save_pdf_heatmap(self, mesh, verbose):
+        for j in range(mesh.shape[-1]):
+            x_mesh = mesh[:, :self.model.dim_x, j]
+            z_mesh = mesh[:, self.model.dim_x:, j]
+            w_c = z_mesh[0, -1]
+
+            # compute x_hat for every w_c
+            x_hat_star = self.model('T_star', z_mesh)
+
+            error = RMSE(x_mesh, x_hat_star, dim=1)
+
+            for i in range(1, x_mesh.shape[1]):
+                # https://stackoverflow.com/questions/37822925/how-to-smooth-by-interpolation-when-using-pcolormesh
+                name = 'RMSE_heatmap' + str(j) + '.pdf'
+                plt.scatter(x_mesh[:, i - 1], x_mesh[:, i], cmap='jet',
+                            c=np.log(error.detach().numpy()))
+                cbar = plt.colorbar()
+                cbar.set_label('Log estimation error')
+                cbar.set_label('Log estimation error')
+                plt.title(r'RMSE between $x$ and $\hat{x}$' + rf' with $w_c =$ {round(w_c.item(), 2)}')
+                plt.xlabel(rf'$x_{i}$')
+                plt.ylabel(rf'$x_{i + 1}$')
+                plt.legend()
+                plt.savefig(os.path.join(self.results_folder, name),
+                            bbox_inches='tight')
+                if verbose:
+                    plt.show()
+                    plt.close('all')
+
+                plt.clf()
+                plt.close('all')
 
 
     def save_results(self, limits: np.array, w_c_arr, nb_trajs=10, tsim=(0, 60),
@@ -179,32 +207,31 @@ class LearnerNoise(Learner):
 
             specs_file = self.save_specifications()
 
-            self.save_pkl('/model.pkl', self.model)
-            self.save_pkl('/learner.pkl', self)
+            # self.save_pkl('/model.pkl', self.model)
+            # self.save_pkl('/learner.pkl', self)
 
-            self.save_csv(self.training_data.cpu().numpy(), 'training_data.csv')
-            self.save_csv(self.validation_data.cpu().numpy(), 'validation_data.csv')
+            # self.save_csv(self.training_data.cpu().numpy(), 'training_data.csv')
+            # self.save_csv(self.validation_data.cpu().numpy(), 'validation_data.csv')
 
-            self.save_pdf_training(self.training_data[idx], verbose)
+            # self.save_pdf_training(self.training_data[idx], verbose)
 
-            # No control theoretic evaluation of the observer with only T
-            if self.method == 'T':
-                return 0
+            # # No control theoretic evaluation of the observer with only T
+            # if self.method == 'T':
+            #     return 0
 
-            # Heatmap of RMSE(x, x_hat) with T_star
-            mesh = self.model.generate_data_svl(limits, w_c_arr, num_samples,
-                                                method='uniform')
-            x_mesh = mesh[:, :self.model.dim_x]
-            # z_mesh = mesh[:, self.model.dim_x:]
-            # x_hat_star = self.model('T_star', z_mesh)
+            # self.save_trj(torch.tensor([1., 1.]), w_c_arr, nb_trajs, verbose, tsim, dt)
 
+            # create array of w_c from [0.1, ..., 1]
+            w_c_arr = torch.arange(0.2, 1.5, 0.4)
+
+            # generate data
+            # mesh = self.model.generate_data_svl(limits, w_c_arr, num_samples,
+                                                # method='uniform', stack=False)
+
+            # self.save_pdf_heatmap(mesh, verbose)
             # z_hat_T, x_hat_AE = self.model('Autoencoder', x_mesh)
 
             # print(f'Shape of mesh for evaluation: {mesh.shape}')
-
-            self.save_trj(x_mesh, w_c_arr, nb_trajs, verbose, tsim, dt)
-
-            # self.save_pdf_heatmap(x_mesh, x_hat_star, verbose)
 
             # # # Invertibility heatmap
             # self.save_invert_heatmap(x_mesh, x_hat_AE, verbose)
