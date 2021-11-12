@@ -745,19 +745,14 @@ class LuenbergerObserver(nn.Module):
         loss_2: torch.tensor
             PDE loss MSE(dTdx*f(x), D*z+F*h(x)).
         """
-        # Init mean squared error
-        batch_size = x.shape[0]
-
         # Reconstruction loss MSE(x,x_hat)
         loss_1 = self.recon_lambda * MSE(x, x_hat, dim=dim)
 
         # Compute gradients of T_u with respect to inputs
         dTdh = torch.autograd.functional.jacobian(
             self.encoder, x, create_graph=False, strict=False, vectorize=False)
-        # dTdx reshape (batch_size, self.dim_z, self.dim_x)
         dTdx = torch.transpose(torch.transpose(
             torch.diagonal(dTdh, dim1=0, dim2=2), 1, 2), 0, 1)
-        # lhs = dTdx * f(x) of shape (batch_size, self.dim_z)
         lhs = torch.einsum('ijk,ik->ij', dTdx, self.f(x))
 
         D = self.D.to(self.device)

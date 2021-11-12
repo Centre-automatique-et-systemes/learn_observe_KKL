@@ -79,9 +79,9 @@ class LearnerNoise(Learner):
         nb_trajs += w_c_arr.shape[0]
         traj_folder = os.path.join(self.results_folder, 'Test_trajectories')
         tq, simulation = self.system.simulate(init_state, tsim, dt)
+        noise = torch.normal(0, 0.01, size=(simulation.shape[0], simulation.shape[1]))
+        simulation = simulation.add(noise)
         measurement = self.model.h(simulation)
-        noise = torch.normal(0, 0.01, size=(measurement.shape[0], 1))
-        measurement = measurement.add(noise)
 
         # Save these test trajectories
         os.makedirs(traj_folder, exist_ok=True)
@@ -128,7 +128,6 @@ class LearnerNoise(Learner):
         with open(os.path.join(traj_folder, filename), 'w') as f:
             print(traj_error, file=f)
 
-
     def save_rmse_wc(self, mesh, w_c_array, verbose):
         errors = np.zeros((len(w_c_array)))
 
@@ -155,7 +154,6 @@ class LearnerNoise(Learner):
 
         plt.clf()
         plt.close('all')
-
 
     def save_pdf_heatmap(self, mesh, verbose):
         for j in range(mesh.shape[-1]):
@@ -190,8 +188,83 @@ class LearnerNoise(Learner):
                 plt.close('all')
 
 
-    def save_results(self, limits: np.array, w_c_arr, nb_trajs=10, tsim=(0, 60),
-                     dt=1e-2, num_samples=70000, checkpoint_path=None,
+    def plot_sensitiviy_wc(self, mesh, w_c_array, verbose):
+
+        errors = np.zeros((len(w_c_array)))
+
+        for j in range(len(w_c_array)):
+            z_mesh = mesh[:, self.model.dim_x:, j]
+            errors[j] = torch.mean(torch.abs(self.model.sensitivity_norm(z_mesh)))
+
+        name = 'sensitivity_wc.pdf'
+        plt.plot(w_c_array, errors)
+        plt.title(r'$||\frac{\partial{T^*}}{\partial{z} }(z) D^{-1} F||$')
+        plt.xlabel(r'$w_c$')
+        plt.ylabel(r'$$\frac{\partial{\hat{x}}}{\partial{\epsilon}}$$')
+        plt.savefig(os.path.join(self.results_folder, name),
+                    bbox_inches='tight')
+        if verbose:
+            plt.show()
+            plt.close('all')
+
+        plt.clf()
+        plt.close('all')
+
+
+    def plot_traj_sens(self, init_state, w_c_array, t_sim, dt, verbose):
+
+        # Estimation over the test trajectories with T_star
+        traj_folder = os.path.join(self.results_folder, 'Test_trajectories_noise')
+        tq, simulation = self.system.simulate(init_state, t_sim, dt)
+        noise = torch.normal(0, 0.01, size=(simulation.shape[0], simulation.shape[1]))
+        simulation = simulation.add(noise)
+        measurement = self.model.h(simulation)
+
+        # Save these test trajectories
+        os.makedirs(traj_folder, exist_ok=True)
+        traj_error = 0.
+
+        for i in range(w_c_array.shape[0]):
+            # TODO run predictions in parallel for all test trajectories!!!
+            # Need to figure out how to interpolate y in parallel for all
+            # trajectories!!!
+            y = torch.cat((tq.unsqueeze(1), measurement), dim=1)
+
+            estimation, z_hat = self.model.predict(y, t_sim, dt, w_c_array[i], out_z=True)
+            traj_error += RMSE(simulation, estimation)
+
+            sensitivity = self.model.sensitivity(z_hat)
+
+            current_traj_folder = os.path.join(traj_folder, f'Traj_{i}')
+            os.makedirs(current_traj_folder, exist_ok=True)
+
+            self.save_csv(simulation.cpu().numpy(), os.path.join(current_traj_folder, f'True_traj_{i}.csv'))
+            self.save_csv(estimation.cpu().numpy(), os.path.join(current_traj_folder, f'Estimated_traj_{i}.csv'))
+
+            for j in range(estimation.shape[1]):
+                name = 'Traj' + str(j) + '.pdf'
+                plt.plot(tq, simulation[:, j].detach().numpy(),
+                         label=rf'$x_{j + 1}$')
+                plt.plot(tq, estimation[:, j].detach().numpy(),
+                         label=rf'$\hat{{x}}_{j + 1}$')
+                plt.plot(tq, sensitivity[:, j].detach().numpy())
+                plt.legend()
+                plt.title(rf'Trajectory for $w_c$ {w_c_array[i]}')
+                plt.xlabel(rf'$t$')
+                plt.ylabel(rf'$x_{j + 1}$')
+                plt.savefig(os.path.join(current_traj_folder, name),
+                            bbox_inches='tight')
+                if verbose:
+                    plt.show()
+                plt.clf()
+                plt.close('all')
+
+        filename = 'RMSE_traj.txt'
+        with open(os.path.join(traj_folder, filename), 'w') as f:
+            print(traj_error, file=f)
+
+    def save_results(self, limits: np.array, w_c_arr, nb_trajs=10, t_sim=(0, 60),
+                     dt=1e-2, num_samples=40000, checkpoint_path=None,
                      verbose=False, fast=False):
         """
         Save the model, the training and validation data. Also saving several
@@ -233,47 +306,50 @@ class LearnerNoise(Learner):
             idx = np.random.choice(np.arange(len(self.training_data)),
                                    size=(10000,))  # subsampling for plots
 
-            specs_file = self.save_specifications()
+            # specs_file = self.save_specifications()
 
-            self.save_pkl('/model.pkl', self.model)
-            self.save_pkl('/learner.pkl', self)
+            # self.save_pkl('/model.pkl', self.model)
+            # self.save_pkl('/learner.pkl', self)
 
-            self.save_csv(self.training_data.cpu().numpy(), 'training_data.csv')
-            self.save_csv(self.validation_data.cpu().numpy(), 'validation_data.csv')
+            # self.save_csv(self.training_data.cpu().numpy(), 'training_data.csv')
+            # self.save_csv(self.validation_data.cpu().numpy(), 'validation_data.csv')
 
-            self.save_pdf_training(self.training_data[idx], verbose)
+            # self.save_pdf_training(self.training_data[idx], verbose)
 
-            # # No control theoretic evaluation of the observer with only T
-            if self.method == 'T':
-                return 0
+            # # # No control theoretic evaluation of the observer with only T
+            # if self.method == 'T':
+            #     return 0
 
-            self.save_trj(torch.tensor([1., 1.]), w_c_arr, nb_trajs, verbose, tsim, dt)
+            # self.save_trj(torch.tensor([1., 1.]), w_c_arr, nb_trajs, verbose, t_sim, dt)
 
             # create array of w_c from [0.1, ..., 1]
-            w_c_arr = torch.arange(0.2, 1.8, 0.2)
+            w_c_array = torch.arange(0.2, 0.9, 0.2)
 
             # generate data
-            mesh = self.model.generate_data_svl(limits, w_c_arr, num_samples,
+            mesh = self.model.generate_data_svl(limits, w_c_array, 10000,
                                                 method='uniform', stack=False)
 
-            self.save_rmse_wc(mesh, w_c_arr, verbose)
+            self.plot_sensitiviy_wc(mesh, w_c_array, verbose)
+            # self.save_rmse_wc(mesh, w_c_array, verbose)
 
-            self.save_pdf_heatmap(mesh, verbose)
-            # z_hat_T, x_hat_AE = self.model('Autoencoder', x_mesh)
+            # self.save_pdf_heatmap(mesh, verbose)
 
-            # print(f'Shape of mesh for evaluation: {mesh.shape}')
+            # self.plot_traj_sens(torch.tensor([1., 1.]), torch.arange(0.2, 0.9, 0.2), t_sim, dt, verbose)
+            # # z_hat_T, x_hat_AE = self.model('Autoencoder', x_mesh)
 
-            # # # Invertibility heatmap
-            # self.save_invert_heatmap(x_mesh, x_hat_AE, verbose)
+            # # print(f'Shape of mesh for evaluation: {mesh.shape}')
 
-            # # # Loss plot over time and loss heatmap over space
-            # self.save_plot('Train_loss.pdf', 'Training loss over time', 'log', self.train_loss.detach())
-            # self.save_plot('Val_loss.pdf', 'Validation loss over time', 'log', self.val_loss.detach())
+            # # # # Invertibility heatmap
+            # # self.save_invert_heatmap(x_mesh, x_hat_AE, verbose)
 
-            # if not fast:  # Computing loss over grid is slow, most of all for AE
-            #     self.save_loss_grid(x_mesh, x_hat_AE, z_hat_T, x_hat_star, verbose)
+            # # # # Loss plot over time and loss heatmap over space
+            # # self.save_plot('Train_loss.pdf', 'Training loss over time', 'log', self.train_loss.detach())
+            # # self.save_plot('Val_loss.pdf', 'Validation loss over time', 'log', self.val_loss.detach())
 
-            # Add t_c to specifications
-            with open(specs_file, 'a') as f:
-                print(f'k {self.model.k}', file=f)
-                print(f't_c {self.model.t_c}', file=f)
+            # # if not fast:  # Computing loss over grid is slow, most of all for AE
+            # #     self.save_loss_grid(x_mesh, x_hat_AE, z_hat_T, x_hat_star, verbose)
+
+            # # Add t_c to specifications
+            # with open(specs_file, 'a') as f:
+            #     print(f'k {self.model.k}', file=f)
+            #     print(f't_c {self.model.t_c}', file=f)

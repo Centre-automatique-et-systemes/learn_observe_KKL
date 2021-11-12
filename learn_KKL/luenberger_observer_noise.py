@@ -4,10 +4,11 @@ import numpy as np
 import torch
 from scipy import linalg
 from torch import nn
+from torchdiffeq import odeint
 
 from learn_KKL.luenberger_observer import LuenbergerObserver
 
-from .utils import generate_mesh
+from .utils import RMSE, generate_mesh
 
 # Set double precision by default
 torch.set_default_tensor_type(torch.DoubleTensor)
@@ -119,8 +120,60 @@ class LuenbergerObserverNoise(LuenbergerObserver):
         else:
             return df
 
-    def predict(self, measurement: torch.tensor, tsim: tuple,
-                dt: int, w_c: float) -> torch.tensor:
+    def dTdz(self, z):
+        dTdh = torch.autograd.functional.jacobian(self.decoder, z)
+
+        dTdz = torch.zeros((dTdh.shape[0], dTdh.shape[1], dTdh.shape[3]))
+
+        # [5000, 2, 5000, 4] --> [5000, 2, 4] --> [2, 20 000]
+        for i in range(dTdz.shape[0]):
+            for j in range(dTdz.shape[1]):
+                dTdz[i, j, :] = dTdh[i, j, i, :]
+
+        return dTdz
+
+    def sensitivity_ode(self, z):
+        # TODO generalize
+        dTdh = torch.autograd.functional.jacobian(
+            self.decoder, z, create_graph=False, strict=False, vectorize=False)
+        # dTdx reshape (batch_size, self.dim_x, self.dim_z)
+        dTdz = torch.transpose(torch.transpose(
+            torch.diagonal(dTdh, dim1=0, dim2=2), 1, 2), 0, 1)
+        
+        dTdz = dTdz[:,:,:self.dim_z]
+
+        result = torch.zeros((z.shape[0], self.dim_x))
+
+        rhs = torch.matmul(torch.inverse(self.D), self.F)
+
+        for i in range(z.shape[0]):
+            z_hat_noise = torch.matmul(dTdz[i, :, :], rhs)
+            result[i, :] = z_hat_noise.T
+
+        return result
+
+    def sensitivity_norm(self, z):
+        # TODO generalize
+        dTdh = torch.autograd.functional.jacobian(
+            self.decoder, z, create_graph=False, strict=False, vectorize=False)
+
+        dTdz = torch.transpose(torch.transpose(
+            torch.diagonal(dTdh, dim1=0, dim2=2), 1, 2), 0, 1)
+        
+        dTdz = dTdz[:,:,:self.dim_z]
+
+        result = torch.zeros((z.shape[0], self.dim_x))
+
+        rhs = torch.matmul(torch.inverse(self.D), self.F)
+
+        for i in range(z.shape[0]):
+            error = RMSE(dTdz[i,:,:], rhs)
+            result[i, :] = error.T
+
+        return result
+
+    def predict(self, measurement: torch.tensor, t_sim: tuple,
+                dt: int, w_c: float, out_z: bool = False) -> torch.tensor:
         """
         Forward function for autoencoder. Used for training the model.
         Computation follows as:
@@ -145,11 +198,14 @@ class LuenbergerObserverNoise(LuenbergerObserver):
         """
         self.D = self.bessel_D(w_c)
 
-        _, sol = self.simulate(measurement, tsim, dt)
+        _, sol = self.simulate(measurement, t_sim, dt)
 
         w_c_tensor = torch.tensor(w_c).repeat(sol.shape[0]).unsqueeze(1)
 
         z_hat = torch.cat((sol[:, :, 0], w_c_tensor), 1)
         x_hat = self.decoder(z_hat)
 
-        return x_hat
+        if out_z:
+            return x_hat, z_hat
+        else:
+            return x_hat
