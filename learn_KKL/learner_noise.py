@@ -323,15 +323,17 @@ class LearnerNoise(Learner):
             # create array of w_c from [0.1, ..., 1]
             # w_c_array = torch.arange(0.2, 0.9, 0.2)
 
-
-            # generate data
-            mesh = self.model.generate_data_svl(limits, wc_arr_train, num_samples,
-                                                method='uniform', stack=False)
+            mesh = self.model.generate_data_svl(limits, wc_arr_train, 20000,
+                                                method='LHS', stack=False)
 
             self.save_rmse_wc(mesh, wc_arr_train, verbose)
             self.plot_sensitiviy_wc(mesh, wc_arr_train, verbose)
 
-            self.save_pdf_heatmap(mesh, verbose)
+            # generate data
+            mesh_1 = self.model.generate_data_svl(limits, wc_arr_train, num_samples,
+                                                method='uniform', stack=False)
+
+            self.save_pdf_heatmap(mesh_1, verbose)
 
             # Loss plot over time and loss heatmap over space
             self.save_plot('Train_loss.pdf', 'Training loss over time', 'log', self.train_loss.detach())
