@@ -428,8 +428,8 @@ class Learner(pl.LightningModule):
             self.save_pkl('/model.pkl', self.model)
             self.save_pkl('/learner.pkl', self)
 
-            self.save_csv(self.training_data.cpu().numpy(), 'training_data.csv')
-            self.save_csv(self.validation_data.cpu().numpy(), 'validation_data.csv')
+            self.save_csv(self.training_data.cpu().numpy(), os.path.join(self.results_folder, 'training_data.csv'))
+            self.save_csv(self.validation_data.cpu().numpy(), os.path.join(self.results_folder,'validation_data.csv'))
 
             self.save_pdf_training(self.training_data[idx], verbose)
 

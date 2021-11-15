@@ -153,24 +153,16 @@ class LuenbergerObserverNoise(LuenbergerObserver):
         return result
 
     def sensitivity_norm(self, z):
-        # TODO generalize
         dTdh = torch.autograd.functional.jacobian(
             self.decoder, z, create_graph=False, strict=False, vectorize=False)
-
         dTdz = torch.transpose(torch.transpose(
             torch.diagonal(dTdh, dim1=0, dim2=2), 1, 2), 0, 1)
-        
         dTdz = dTdz[:,:,:self.dim_z]
-
-        result = torch.zeros((z.shape[0], self.dim_x))
 
         rhs = torch.matmul(torch.inverse(self.D), self.F)
 
-        for i in range(z.shape[0]):
-            error = RMSE(dTdz[i,:,:], rhs)
-            result[i, :] = error.T
+        return torch.norm(torch.einsum('ijk,kl->ij',dTdz, rhs ), p='fro', dim=None, keepdim=False, out=None, dtype=None)
 
-        return result
 
     def predict(self, measurement: torch.tensor, t_sim: tuple,
                 dt: int, w_c: float, out_z: bool = False) -> torch.tensor:
