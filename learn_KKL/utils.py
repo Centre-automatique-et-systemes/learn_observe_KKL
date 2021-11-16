@@ -35,10 +35,9 @@ def generate_mesh(limits: np.array, num_samples: int,
     if method == 'uniform':
         # Linspace upper bound and cut additional samples
         # TODO Enhancement
-        axes = np.linspace(limits[:, 0], limits[:, 1],
-                           int(np.ceil(np.sqrt(num_samples) / len(limits))))
-        mesh = \
-            np.array(np.meshgrid(axes, axes)).T.reshape(-1, axes.shape[1])
+        axes = np.linspace(limits[:, 0], limits[:, 1], int(np.ceil(np.power(num_samples, 1/len(limits)))))
+        axes_list = [axes[:,i] for i in range(axes.shape[1])]
+        mesh = np.array(np.meshgrid(*axes_list)).T.reshape(-1, axes.shape[1])
         mesh = mesh[:num_samples, ]
     elif method == 'LHS':
         sampling = LHS(xlimits=limits)

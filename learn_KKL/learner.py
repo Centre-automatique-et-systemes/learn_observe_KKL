@@ -223,6 +223,7 @@ class Learner(pl.LightningModule):
             self.log('val_loss', loss, on_step=True, prog_bar=True, logger=True)
             self.val_loss = torch.cat((self.val_loss, torch.tensor([[loss]])))
             logs = {'val_loss': loss.detach()}
+
             return {'loss': loss, 'log': logs}
 
     def save_csv(self, data, path):
@@ -255,6 +256,8 @@ class Learner(pl.LightningModule):
                         bbox_inches='tight')
             if verbose:
                 plt.show()
+
+            plt.clf()
             plt.close('all')
 
     def save_pdf_heatmap(self, x_mesh, x_hat_star, verbose):
@@ -275,7 +278,9 @@ class Learner(pl.LightningModule):
                         bbox_inches='tight')
             if verbose:
                 plt.show()
-                plt.close('all')
+
+            plt.clf()
+            plt.close('all')
 
     def save_random_traj(self, x_mesh, num_samples, nb_trajs, verbose, tsim, dt):
         # Estimation over the test trajectories with T_star
@@ -315,7 +320,10 @@ class Learner(pl.LightningModule):
                             bbox_inches='tight')
                 if verbose:
                     plt.show()
+
+                plt.clf()
                 plt.close('all')
+
         filename = 'RMSE_traj.txt'
         with open(os.path.join(traj_folder, filename), 'w') as f:
             print(traj_error, file=f)
@@ -347,6 +355,8 @@ class Learner(pl.LightningModule):
                         bbox_inches='tight')
             if verbose:
                 plt.show()
+
+            plt.clf()
             plt.close('all')
 
     def save_loss_grid(self, x_mesh, x_hat_AE, z_hat_T, x_hat_star, verbose):
@@ -378,6 +388,8 @@ class Learner(pl.LightningModule):
                             bbox_inches='tight')
                 if verbose:
                     plt.show()
+
+                plt.clf()
                 plt.close('all')
 
     def save_results(self, limits: np.array, nb_trajs=10, tsim=(0, 60),
