@@ -557,23 +557,18 @@ class LuenbergerObserver(nn.Module):
         self.t_c = self.k / min(abs(linalg.eig(self.D)[0].real))
 
         y_0 = torch.zeros((num_samples, self.dim_x + self.dim_z))  # TODO
-        # limits_xz = np.array([[-1., 1.] * (self.dim_x + self.dim_z)])
-        # print(limits_xz)
-        # sampling = LHS(limits=limits_xz)
-        # y_0 = torch.as_tensor(sampling(num_samples))
-        # print(y_0.shape)
         y_1 = y_0.clone()
 
         # Simulate only x system backward in time
         tsim = (0, -self.t_c)
         y_0[:, :self.dim_x] = mesh
-        tq_bw, data_bw = self.simulate_system(y_0, tsim, -dt, only_x=True)
+        _, data_bw = self.simulate_system(y_0, tsim, -dt, only_x=True)
 
         # Simulate both x and z forward in time starting from the last point
         # from previous simulation
         tsim = (-self.t_c, 0)
         y_1[:, :self.dim_x] = data_bw[-1, :, :self.dim_x]
-        tq, data_fw = self.simulate_system(y_1, tsim, dt)
+        _, data_fw = self.simulate_system(y_1, tsim, dt)
 
         # Data contains (x_i, z_i) pairs in shape [dim_x + dim_z,
         # number_simulations]
@@ -750,19 +745,14 @@ class LuenbergerObserver(nn.Module):
         loss_2: torch.tensor
             PDE loss MSE(dTdx*f(x), D*z+F*h(x)).
         """
-        # Init mean squared error
-        batch_size = x.shape[0]
-
         # Reconstruction loss MSE(x,x_hat)
         loss_1 = self.recon_lambda * MSE(x, x_hat, dim=dim)
 
         # Compute gradients of T_u with respect to inputs
         dTdh = torch.autograd.functional.jacobian(
             self.encoder, x, create_graph=False, strict=False, vectorize=False)
-        # dTdx reshape (batch_size, self.dim_z, self.dim_x)
         dTdx = torch.transpose(torch.transpose(
             torch.diagonal(dTdh, dim1=0, dim2=2), 1, 2), 0, 1)
-        # lhs = dTdx * f(x) of shape (batch_size, self.dim_z)
         lhs = torch.einsum('ijk,ik->ij', dTdx, self.f(x))
 
         D = self.D.to(self.device)
@@ -926,7 +916,7 @@ class LuenbergerObserver(nn.Module):
         x_hat: torch.tensor
             Estimation of the observer model.
         """
-        tq, sol = self.simulate(measurement, tsim, dt)
+        _, sol = self.simulate(measurement, tsim, dt)
 
         x_hat = self.decoder(sol[:, :, 0])
 
