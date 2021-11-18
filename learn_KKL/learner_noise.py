@@ -135,6 +135,9 @@ class LearnerNoise(Learner):
             x_mesh = mesh[:, :self.model.dim_x, j]
             z_mesh = mesh[:, self.model.dim_x:, j]
 
+            noise = torch.normal(0, 0.01, size=(z_mesh.shape[0], z_mesh.shape[1]))
+            z_mesh.add(noise)
+
             # compute x_hat for every w_c
             x_hat_star = self.model('T_star', z_mesh)
 
@@ -159,6 +162,8 @@ class LearnerNoise(Learner):
         for j in range(mesh.shape[-1]):
             x_mesh = mesh[:, :self.model.dim_x, j]
             z_mesh = mesh[:, self.model.dim_x:, j]
+            # noise = torch.normal(0, 0.01, size=(z_mesh.shape[0], z_mesh.shape[1]))
+            # z_mesh.add(noise)
             w_c = z_mesh[0, -1]
 
             # compute x_hat for every w_c
@@ -192,6 +197,7 @@ class LearnerNoise(Learner):
 
         for j in range(len(w_c_array)):
             z_mesh = mesh[:, self.model.dim_x:, j]
+            self.model.D = self.model.bessel_D(w_c_array[j])
             errors[j] = self.model.sensitivity_norm(z_mesh)
 
         name = 'sensitivity_wc.pdf'
@@ -226,6 +232,7 @@ class LearnerNoise(Learner):
             # TODO run predictions in parallel for all test trajectories!!!
             # Need to figure out how to interpolate y in parallel for all
             # trajectories!!!
+            self.model.D = self.model.bessel_D(w_c_array[i])
             y = torch.cat((tq.unsqueeze(1), measurement), dim=1)
 
             estimation, z_hat = self.model.predict(y, t_sim, dt, w_c_array[i], out_z=True)
@@ -323,7 +330,7 @@ class LearnerNoise(Learner):
             # create array of w_c from [0.1, ..., 1]
             # w_c_array = torch.arange(0.2, 0.9, 0.2)
 
-            mesh = self.model.generate_data_svl(limits, wc_arr_train, 20000,
+            mesh = self.model.generate_data_svl(limits, wc_arr_train, 30000,
                                                 method='LHS', stack=False)
 
             self.save_rmse_wc(mesh, wc_arr_train, verbose)

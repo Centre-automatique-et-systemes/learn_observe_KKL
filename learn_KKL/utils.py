@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from smt.sampling_methods import LHS
+from scipy import linalg
 
 # Set double precision by default
 torch.set_default_tensor_type(torch.DoubleTensor)
@@ -36,7 +37,7 @@ def generate_mesh(limits: np.array, num_samples: int,
         # Linspace upper bound and cut additional samples
         # TODO Enhancement
         axes = np.linspace(limits[:, 0], limits[:, 1], int(np.ceil(np.power(num_samples, 1/len(limits)))))
-        axes_list = [axes[:,i] for i in range(axes.shape[1])]
+        axes_list = [axes[:, i] for i in range(axes.shape[1])]
         mesh = np.array(np.meshgrid(*axes_list)).T.reshape(-1, axes.shape[1])
         mesh = mesh[:num_samples, ]
     elif method == 'LHS':
@@ -46,6 +47,43 @@ def generate_mesh(limits: np.array, num_samples: int,
         raise NotImplementedError(f'The method {method} is not implemented')
 
     return torch.as_tensor(mesh)
+
+
+def compute_h_infinity(A: np.array, B: np.array, C: np.array, epsilon: float = 1e-5) -> int:
+    """
+    Computes the H_infinity norm from a given system A, B, C with D being zero,
+    for an given accucarcy epsilon.
+
+    Parameters
+    ----------
+    A: np.array
+    B: np.array
+    C: np.array
+    epsilon: float
+
+    Returns
+    -------
+    singular_value: int
+    """
+    C_g = linalg.solve_continuous_lyapunov(A, -B.dot(B.T))
+    O_g = linalg.solve_continuous_lyapunov(A.T, -C.T.dot(C))
+
+    r_lb = np.sqrt(np.trace(np.matmul(O_g, C_g))/A.shape[0])
+    r_ub = 2*np.sqrt(A.shape[0]*np.trace(np.matmul(C_g, O_g)))
+    r = 0
+
+    while(not r_ub - r_lb <= 2*epsilon):
+        r = (r_lb+r_ub)/2
+        r_inv = 1/r
+        M_r = np.block([[A, r_inv*B.dot(B.T)], [-r_inv*C.T.dot(C), -A.T]])
+        eigen = np.linalg.eig(M_r)[0]
+        image = np.where(eigen.imag != 0)
+        if len(*image) == 0:
+            r_ub = r
+        else:
+            r_lb = r
+
+    return r
 
 
 def MSE(x, y, dim=None):
