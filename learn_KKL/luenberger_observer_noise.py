@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import numpy as np
+from seaborn import utils
 import torch
 from scipy import linalg
 from torch import nn
@@ -140,6 +141,7 @@ class LuenbergerObserverNoise(LuenbergerObserver):
             torch.diagonal(dTdh, dim1=0, dim2=2), 1, 2), 0, 1)
         dTdz = dTdz[:,:,:self.dim_z]
 
+        rhs = utils.compute_h_infinity(self.D.numpy(), self.F.numpy(), )
         rhs = torch.matmul(torch.inverse(self.D), self.F)
 
         return torch.norm(torch.einsum('ijk,kl->ij',dTdz, rhs), p='fro', dim=None, keepdim=False, out=None, dtype=None)

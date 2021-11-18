@@ -68,16 +68,17 @@ def compute_h_infinity(A: np.array, B: np.array, C: np.array, epsilon: float = 1
     C_g = linalg.solve_continuous_lyapunov(A, -B.dot(B.T))
     O_g = linalg.solve_continuous_lyapunov(A.T, -C.T.dot(C))
 
-    r_lb = np.sqrt(np.trace(np.matmul(O_g, C_g))/A.shape[0])
-    r_ub = 2*np.sqrt(A.shape[0]*np.trace(np.matmul(C_g, O_g)))
+    dim = 3
+    r_lb = np.sqrt(np.trace(np.matmul(C_g, O_g))/dim)
+    r_ub = 2*np.sqrt(dim*np.trace(np.matmul(C_g, O_g)))
     r = 0
 
-    while(not r_ub - r_lb <= 2*epsilon):
+    while(not r_ub - r_lb <= 2*epsilon*r_lb):
         r = (r_lb+r_ub)/2
         r_inv = 1/r
         M_r = np.block([[A, r_inv*B.dot(B.T)], [-r_inv*C.T.dot(C), -A.T]])
         eigen = np.linalg.eig(M_r)[0]
-        image = np.where(eigen.imag != 0)
+        image = np.where(np.abs(eigen.real) < 1e-14)
         if len(*image) == 0:
             r_ub = r
         else:
