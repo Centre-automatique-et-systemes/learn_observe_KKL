@@ -337,16 +337,16 @@ class LearnerNoise(Learner):
             self.plot_sensitiviy_wc(mesh, wc_arr_train, verbose)
 
             # generate data
-            # mesh_1 = self.model.generate_data_svl(limits, wc_arr_train, num_samples,
-            #                                     method='uniform', stack=False)
+            mesh_1 = self.model.generate_data_svl(limits, wc_arr_train, num_samples,
+                                                method='uniform', stack=False)
 
-            # self.save_pdf_heatmap(mesh_1, verbose)
+            self.save_pdf_heatmap(mesh_1, verbose)
 
-            # # Loss plot over time and loss heatmap over space
-            # self.save_plot('Train_loss.pdf', 'Training loss over time', 'log', self.train_loss.detach())
-            # self.save_plot('Val_loss.pdf', 'Validation loss over time', 'log', self.val_loss.detach())
+            # Loss plot over time and loss heatmap over space
+            self.save_plot('Train_loss.pdf', 'Training loss over time', 'log', self.train_loss.detach())
+            self.save_plot('Val_loss.pdf', 'Validation loss over time', 'log', self.val_loss.detach())
 
-            # # Add t_c to specifications
-            # with open(specs_file, 'a') as f:
-            #     print(f'k {self.model.k}', file=f)
-            #     print(f't_c {self.model.t_c}', file=f)
+            # Add t_c to specifications
+            with open(specs_file, 'a') as f:
+                print(f'k {self.model.k}', file=f)
+                print(f't_c {self.model.t_c}', file=f)
