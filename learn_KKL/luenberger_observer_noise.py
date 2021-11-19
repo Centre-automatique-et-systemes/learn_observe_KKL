@@ -9,7 +9,7 @@ from torchdiffeq import odeint
 
 from learn_KKL.luenberger_observer import LuenbergerObserver
 
-from .utils import RMSE, generate_mesh
+from .utils import RMSE, generate_mesh, compute_h_infinity
 
 # Set double precision by default
 torch.set_default_tensor_type(torch.DoubleTensor)
@@ -141,10 +141,10 @@ class LuenbergerObserverNoise(LuenbergerObserver):
             torch.diagonal(dTdh, dim1=0, dim2=2), 1, 2), 0, 1)
         dTdz = dTdz[:,:,:self.dim_z]
 
-        rhs = utils.compute_h_infinity(self.D.numpy(), self.F.numpy(), )
-        rhs = torch.matmul(torch.inverse(self.D), self.F)
+        C = np.eye(self.D.shape[0])
+        sv = compute_h_infinity(self.D.numpy(), self.F.numpy(), C, 1e-10)
 
-        return torch.norm(torch.einsum('ijk,kl->ij',dTdz, rhs), p='fro', dim=None, keepdim=False, out=None, dtype=None)
+        return torch.cat((torch.norm(dTdz).unsqueeze(0), torch.tensor(sv).unsqueeze(0)), dim=0)
 
 
     def predict(self, measurement: torch.tensor, t_sim: tuple,

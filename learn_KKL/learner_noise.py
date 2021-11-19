@@ -193,7 +193,7 @@ class LearnerNoise(Learner):
                 plt.close('all')
 
     def plot_sensitiviy_wc(self, mesh, w_c_array, verbose):
-        errors = np.zeros((len(w_c_array)))
+        errors = np.zeros((len(w_c_array), 2))
 
         for j in range(len(w_c_array)):
             z_mesh = mesh[:, self.model.dim_x:, j]
@@ -325,7 +325,7 @@ class LearnerNoise(Learner):
             if self.method == 'T':
                 return 0
 
-            self.save_trj(torch.tensor([1., 1.]), wc_arr_train, nb_trajs, verbose, t_sim, dt)
+            # self.save_trj(torch.tensor([1., 1.]), wc_arr_train, nb_trajs, verbose, t_sim, dt)
 
             # create array of w_c from [0.1, ..., 1]
             # w_c_array = torch.arange(0.2, 0.9, 0.2)
@@ -333,20 +333,20 @@ class LearnerNoise(Learner):
             mesh = self.model.generate_data_svl(limits, wc_arr_train, 30000,
                                                 method='LHS', stack=False)
 
-            self.save_rmse_wc(mesh, wc_arr_train, verbose)
+            # self.save_rmse_wc(mesh, wc_arr_train, verbose)
             self.plot_sensitiviy_wc(mesh, wc_arr_train, verbose)
 
             # generate data
-            mesh_1 = self.model.generate_data_svl(limits, wc_arr_train, num_samples,
-                                                method='uniform', stack=False)
+            # mesh_1 = self.model.generate_data_svl(limits, wc_arr_train, num_samples,
+            #                                     method='uniform', stack=False)
 
-            self.save_pdf_heatmap(mesh_1, verbose)
+            # self.save_pdf_heatmap(mesh_1, verbose)
 
-            # Loss plot over time and loss heatmap over space
-            self.save_plot('Train_loss.pdf', 'Training loss over time', 'log', self.train_loss.detach())
-            self.save_plot('Val_loss.pdf', 'Validation loss over time', 'log', self.val_loss.detach())
+            # # Loss plot over time and loss heatmap over space
+            # self.save_plot('Train_loss.pdf', 'Training loss over time', 'log', self.train_loss.detach())
+            # self.save_plot('Val_loss.pdf', 'Validation loss over time', 'log', self.val_loss.detach())
 
-            # Add t_c to specifications
-            with open(specs_file, 'a') as f:
-                print(f'k {self.model.k}', file=f)
-                print(f't_c {self.model.t_c}', file=f)
+            # # Add t_c to specifications
+            # with open(specs_file, 'a') as f:
+            #     print(f'k {self.model.k}', file=f)
+            #     print(f't_c {self.model.t_c}', file=f)
