@@ -325,7 +325,7 @@ class LearnerNoise(Learner):
             if self.method == 'T':
                 return 0
 
-            # self.save_trj(torch.tensor([1., 1.]), wc_arr_train, nb_trajs, verbose, t_sim, dt)
+            self.save_trj(torch.tensor([1., 1.]), wc_arr_train, nb_trajs, verbose, t_sim, dt)
 
             # create array of w_c from [0.1, ..., 1]
             # w_c_array = torch.arange(0.2, 0.9, 0.2)
