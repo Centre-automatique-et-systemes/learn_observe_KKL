@@ -197,7 +197,7 @@ class LearnerNoise(Learner):
 
         for j in range(len(w_c_array)):
             z_mesh = mesh[:, self.model.dim_x:, j]
-            self.model.D = self.model.bessel_D(w_c_array[j])
+            self.model.D = self.model.place_poles(w_c_array[j])
             errors[j] = self.model.sensitivity_norm(z_mesh)
 
         name = 'sensitivity_wc.pdf'
@@ -232,7 +232,7 @@ class LearnerNoise(Learner):
             # TODO run predictions in parallel for all test trajectories!!!
             # Need to figure out how to interpolate y in parallel for all
             # trajectories!!!
-            self.model.D = self.model.bessel_D(w_c_array[i])
+            self.model.D = self.model.place_poles(w_c_array[i])
             y = torch.cat((tq.unsqueeze(1), measurement), dim=1)
 
             estimation, z_hat = self.model.predict(y, t_sim, dt, w_c_array[i], out_z=True)

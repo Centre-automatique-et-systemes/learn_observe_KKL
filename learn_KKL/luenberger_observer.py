@@ -287,7 +287,7 @@ class LuenbergerObserver(nn.Module):
         self.wc = wc
         self.F = torch.ones((self.dim_z, 1))
         if D == 'bessel':
-            self.D = self.bessel_D(wc=self.wc)
+            self.D = self.place_poles(wc=self.wc)
         else:
             self.wc = 0.
             self.D = torch.as_tensor(D)
@@ -383,9 +383,30 @@ class LuenbergerObserver(nn.Module):
         self.scaler_x = scaler_x
         self.scaler_z = scaler_z
 
+    def place_poles(self, wc: float = 1.) -> torch.tensor:
+        """
+        Returns a matrix from the eigenvalues of a dim_z order
+        bessel filter with a given cutoff frequency such that,
+        D = A-BK has the same eigenvalues as the bessel filter.
+
+        Parameters
+        ----------
+        wc : float
+            Multiplicator for the cutoff frequency of the bessel filter,
+            for which Wn=2*pi*wc.
+        """
+        zO, pO, kO = signal.bessel(N=self.dim_z, Wn=wc * 2 * np.pi, analog=True, output='zpk')
+        A = -np.array([[i] for i in range(1, self.dim_z+1)]) * np.eye(self.dim_z)
+        B = np.ones((self.dim_z, 1))
+        whole_D = signal.place_poles(A, B, pO)
+        K = whole_D.gain_matrix
+        D = torch.as_tensor(A - np.dot(B, K))
+        
+        return D
+
     def bessel_D(self, wc: float = 1.) -> torch.tensor:
         """
-        Returns a matrix from the eigenvalues of a third order
+        Returns a matrix from the eigenvalues of a dim_z order
         bessel filter with a given cutoff frequency.
 
         Parameters
@@ -399,6 +420,7 @@ class LuenbergerObserver(nn.Module):
             A=np.zeros((self.dim_z, self.dim_z)),
             B=-np.eye(self.dim_z),
             poles=np.roots(a))
+
         return torch.Tensor(whole_D.gain_matrix)
 
     def phi(self, z: torch.tensor) -> torch.tensor:
