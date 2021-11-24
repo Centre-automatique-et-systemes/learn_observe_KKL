@@ -133,7 +133,6 @@ class LuenbergerObserverNoise(LuenbergerObserver):
 
         return dTdz
 
-
     def sensitivity_norm(self, z):
         dTdh = torch.autograd.functional.jacobian(
             self.decoder, z, create_graph=False, strict=False, vectorize=False)

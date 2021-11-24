@@ -162,8 +162,6 @@ class LearnerNoise(Learner):
         for j in range(mesh.shape[-1]):
             x_mesh = mesh[:, :self.model.dim_x, j]
             z_mesh = mesh[:, self.model.dim_x:, j]
-            # noise = torch.normal(0, 0.01, size=(z_mesh.shape[0], z_mesh.shape[1]))
-            # z_mesh.add(noise)
             w_c = z_mesh[0, -1]
 
             # compute x_hat for every w_c
