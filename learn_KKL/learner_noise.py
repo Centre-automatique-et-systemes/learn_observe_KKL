@@ -145,7 +145,7 @@ class LearnerNoise(Learner):
 
         # https://stackoverflow.com/questions/37822925/how-to-smooth-by-interpolation-when-using-pcolormesh
         name = 'RMSE_w_c.pdf'
-        plt.plot(w_c_array, errors)
+        plt.plot(w_c_array, errors[:,-1])
         plt.title(r'RMSE between $x$ and $\hat{x}$')
         plt.xlabel(rf'$w_c$')
         plt.ylabel(r'RMSE($x$, $\hat{x}$)')
@@ -191,15 +191,16 @@ class LearnerNoise(Learner):
                 plt.close('all')
 
     def plot_sensitiviy_wc(self, mesh, w_c_array, verbose):
-        errors = np.zeros((len(w_c_array), 2))
+        errors = np.zeros((len(w_c_array), 3))
 
         for j in range(len(w_c_array)):
             z_mesh = mesh[:, self.model.dim_x:, j]
             self.model.D = self.model.place_poles(w_c_array[j])
             errors[j] = self.model.sensitivity_norm(z_mesh)
-            print('||dTdz||/N, h-infinity')
+            print('||dTdz||/N, h-infinity, product')
             print(errors[j])
 
+        self.save_csv(errors.numpy(), os.path.join(self.results_folder, 'sensitivity.csv'))
         name = 'sensitivity_wc.pdf'
         plt.plot(w_c_array, errors)
         plt.title('Sensitivity')
