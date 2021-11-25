@@ -197,6 +197,7 @@ class LearnerNoise(Learner):
             z_mesh = mesh[:, self.model.dim_x:, j]
             self.model.D = self.model.place_poles(w_c_array[j])
             errors[j] = self.model.sensitivity_norm(z_mesh)
+            print(errors[j])
 
         name = 'sensitivity_wc.pdf'
         plt.plot(w_c_array, errors)
