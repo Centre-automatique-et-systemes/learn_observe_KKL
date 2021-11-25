@@ -144,7 +144,7 @@ class LuenbergerObserverNoise(LuenbergerObserver):
         sv = compute_h_infinity(self.D.numpy(), self.F.numpy(), C, 1e-10)
         sv_norm = torch.tensor(sv)/z.shape[0]
 
-        return torch.cat((dTdz.unsqueeze(0), sv_norm.unsqueeze(0)), dim=0)
+        return torch.cat((torch.mean(dTdz).unsqueeze(0), sv_norm.unsqueeze(0)), dim=0)
 
 
     def predict(self, measurement: torch.tensor, t_sim: tuple,

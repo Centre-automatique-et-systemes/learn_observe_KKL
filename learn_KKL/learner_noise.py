@@ -319,13 +319,13 @@ class LearnerNoise(Learner):
             self.save_csv(self.training_data.cpu().numpy(), os.path.join(self.results_folder, 'training_data.csv'))
             self.save_csv(self.validation_data.cpu().numpy(), os.path.join(self.results_folder, 'validation_data.csv'))
 
-            self.save_pdf_training(self.training_data[idx], verbose)
+            # self.save_pdf_training(self.training_data[idx], verbose)
 
             # No control theoretic evaluation of the observer with only T
             if self.method == 'T':
                 return 0
 
-            self.save_trj(torch.tensor([1., 1.]), wc_arr_train, nb_trajs, verbose, t_sim, dt)
+            # self.save_trj(torch.tensor([1., 1.]), wc_arr_train, nb_trajs, verbose, t_sim, dt)
 
             # create array of w_c from [0.1, ..., 1]
             # w_c_array = torch.arange(0.2, 0.9, 0.2)
