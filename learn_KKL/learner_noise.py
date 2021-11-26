@@ -200,7 +200,7 @@ class LearnerNoise(Learner):
             print('||dTdz||/N, h-infinity, product')
             print(errors[j])
 
-        self.save_csv(errors.numpy(), os.path.join(self.results_folder, 'sensitivity.csv'))
+        self.save_csv(errors, os.path.join(self.results_folder, 'sensitivity.csv'))
         name = 'sensitivity_wc.pdf'
         plt.plot(w_c_array, errors)
         plt.title('Sensitivity')
