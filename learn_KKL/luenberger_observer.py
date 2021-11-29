@@ -413,7 +413,7 @@ class LuenbergerObserver(nn.Module):
             A = -np.array([[i] for i in range(1, self.dim_z + 1)]) * np.eye(self.dim_z)
             B = np.ones((self.dim_z, 1))
             whole_D = signal.place_poles(A, B, pO)
-            if whole_D.rtol == 0:
+            if whole_D.rtol == 0 and not B.shape[1] == 1:
                 raise Exception('Pole placing failed')
             K = whole_D.gain_matrix
             D = torch.as_tensor(A - np.dot(B, K))
@@ -423,7 +423,7 @@ class LuenbergerObserver(nn.Module):
             A = np.zeros((self.dim_z, self.dim_z))
             B = - np.eye(self.dim_z)
             whole_D = signal.place_poles(A, B, pO)
-            if whole_D.rtol == 0:
+            if whole_D.rtol == 0 and not B.shape[1] == 1:
                 raise Exception('Pole placing failed')
             D = torch.as_tensor(whole_D.gain_matrix)
 
