@@ -190,22 +190,24 @@ class LearnerNoise(Learner):
                 plt.clf()
                 plt.close('all')
 
-    def plot_sensitiviy_wc(self, mesh, w_c_array, verbose):
+    def plot_sensitiviy_wc(self, mesh, w_c_array, verbose, y_lim=[None, None]):
         errors = np.zeros((len(w_c_array), 3))
 
         for j in range(len(w_c_array)):
             z_mesh = mesh[:, self.model.dim_x:, j]
             self.model.D = self.model.set_D(w_c_array[j])
             errors[j] = self.model.sensitivity_norm(z_mesh)
-            print('||dTdz||/N, h-infinity, product')
-            print(errors[j])
 
         self.save_csv(errors, os.path.join(self.results_folder, 'sensitivity.csv'))
         name = 'sensitivity_wc.pdf'
-        plt.plot(w_c_array, errors)
+        plt.plot(w_c_array, errors[:, 0], label=r'$\frac{1}{N}||\frac{\partial{T^*}}{\partial{z}}(z)||$')
+        plt.plot(w_c_array, errors[:, 1], label=r'$\mathcal{H}_\infty$')
+        plt.plot(w_c_array, errors[:, 2], label=r'$\frac{1}{N}||\frac{\partial{T^*}}{\partial{z}}(z)||\mathcal{H}_\infty$')
         plt.title('Sensitivity')
+        plt.legend()
         plt.xlabel(r'$w_c$')
-        plt.ylabel(r'$||\frac{\partial{T^*}}{\partial{z} }(z) D^{-1} F||$')
+        ax = plt.gca()
+        ax.set_ylim(y_lim)
         plt.savefig(os.path.join(self.results_folder, name),
                     bbox_inches='tight')
 
