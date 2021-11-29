@@ -287,7 +287,7 @@ class LuenbergerObserver(nn.Module):
         self.wc = wc
         self.F = torch.ones((self.dim_z, 1))
         if D == 'bessel':
-            self.D = self.place_poles(wc=self.wc)
+            self.D = self.set_D(wc=self.wc)
         else:
             self.wc = 0.
             self.D = torch.as_tensor(D)
@@ -379,49 +379,60 @@ class LuenbergerObserver(nn.Module):
         scaler_out :
             Output scaler.
         """
-
         self.scaler_x = scaler_x
         self.scaler_z = scaler_z
 
-    def place_poles(self, wc: float = 1.) -> torch.tensor:
+
+    def set_D(self, wc: float =1. , method: str ="indirect") -> torch.tensor:
         """
         Returns a matrix from the eigenvalues of a dim_z order
-        bessel filter with a given cutoff frequency such that,
+        bessel filter with a given cutoff frequency for a given
+        method.
+        Indirect:
         D = A-BK has the same eigenvalues as the bessel filter.
+        Direct:
+
+        Diag:
 
         Parameters
         ----------
         wc : float
             Multiplicator for the cutoff frequency of the bessel filter,
             for which Wn=2*pi*wc.
+        method : string
+            Method used to calculate D. Choose betweeen 'indirect', 'direct'
+            and 'diag'.
         """
-        zO, pO, kO = signal.bessel(N=self.dim_z, Wn=wc * 2 * np.pi, analog=True, output='zpk')
-        A = -np.array([[i] for i in range(1, self.dim_z+1)]) * np.eye(self.dim_z)
-        B = np.ones((self.dim_z, 1))
-        whole_D = signal.place_poles(A, B, pO)
-        K = whole_D.gain_matrix
-        D = torch.as_tensor(A - np.dot(B, K))
+        if method not in ['indirect', 'direct', 'diag']:
+            raise NameError('{} not defined.'.format(method))
+
+        _, pO, _ = signal.bessel(N=self.dim_z, Wn=wc * 2 * np.pi, analog=True, output='zpk')
+
+        if method == 'indirect':
+            # Author: Florent Di Meglio
+            A = -np.array([[i] for i in range(1, self.dim_z + 1)]) * np.eye(self.dim_z)
+            B = np.ones((self.dim_z, 1))
+            whole_D = signal.place_poles(A, B, pO)
+            if whole_D.rtol == 0:
+                raise Exception('Pole placing failed')
+            K = whole_D.gain_matrix
+            D = torch.as_tensor(A - np.dot(B, K))
+
+        elif method == 'direct':
+            # Author: Mona Buisson-Fenet
+            A = np.zeros((self.dim_z, self.dim_z))
+            B = - np.eye(self.dim_z)
+            whole_D = signal.place_poles(A, B, pO)
+            if whole_D.rtol == 0:
+                raise Exception('Pole placing failed')
+            D = torch.as_tensor(whole_D.gain_matrix)
+
+        elif method == 'diag':
+            # Diagonal method
+            D = -torch.tensor([[i] for i in range(1, self.dim_z + 1)]) * \
+                torch.eye(self.dim_z)
         
         return D
-
-    def bessel_D(self, wc: float = 1.) -> torch.tensor:
-        """
-        Returns a matrix from the eigenvalues of a dim_z order
-        bessel filter with a given cutoff frequency.
-
-        Parameters
-        ----------
-        wc : float
-            Multiplicator for the cutoff frequency of the bessel filter,
-            for which Wn=2*pi*wc.
-        """
-        b, a = signal.bessel(N=self.dim_z, Wn=wc * 2 * np.pi, analog=True)
-        whole_D = signal.place_poles(
-            A=np.zeros((self.dim_z, self.dim_z)),
-            B=-np.eye(self.dim_z),
-            poles=np.roots(a))
-
-        return torch.Tensor(whole_D.gain_matrix)
 
     def phi(self, z: torch.tensor) -> torch.tensor:
         """
@@ -526,7 +537,6 @@ class LuenbergerObserver(nn.Module):
         sol: torch.tensor
             Solution of the simulation.
         """
-
         def dydt(t, y):  # TODO only simulate x backward, z forward (interpol y)
             x = y[..., :self.dim_x]  # TODO change notation y
             z = y[..., self.dim_x:]
@@ -669,7 +679,6 @@ class LuenbergerObserver(nn.Module):
         module_list: tensor.nn.ModuleList()
             List of nn layers.
         """
-
         # Create ModuleList and add first layer with input dimension
         layers = nn.ModuleList()
         layers.append(nn.Linear(dim_in, size_hl))
