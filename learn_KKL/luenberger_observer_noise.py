@@ -142,9 +142,8 @@ class LuenbergerObserverNoise(LuenbergerObserver):
 
         C = np.eye(self.D.shape[0])
         sv = torch.tensor(compute_h_infinity(self.D.numpy(), self.F.numpy(), C, 1e-10))
-        # sv_norm = torch.tensor(sv)/z.shape[0]
 
-        dTdz_norm = torch.norm(dTdz)/(z.shape[0]*z.shape[1])
+        dTdz_norm = max(torch.linalg.matrix_norm(dTdz, ord=2))
 
         product = dTdz_norm * sv
 

@@ -145,7 +145,7 @@ class LearnerNoise(Learner):
 
         # https://stackoverflow.com/questions/37822925/how-to-smooth-by-interpolation-when-using-pcolormesh
         name = 'RMSE_w_c.pdf'
-        plt.plot(w_c_array, errors[:,-1])
+        plt.plot(w_c_array, errors)
         plt.title(r'RMSE between $x$ and $\hat{x}$')
         plt.xlabel(rf'$w_c$')
         plt.ylabel(r'RMSE($x$, $\hat{x}$)')
@@ -310,10 +310,6 @@ class LearnerNoise(Learner):
                 checkpoint_model = torch.load(checkpoint_path)
                 self.load_state_dict(checkpoint_model['state_dict'])
 
-            # Save training and validation data
-            idx = np.random.choice(np.arange(len(self.training_data)),
-                                   size=(10000,))  # subsampling for plots
-
             specs_file = self.save_specifications()
 
             self.save_pkl('/model.pkl', self.model)
@@ -322,32 +318,9 @@ class LearnerNoise(Learner):
             self.save_csv(self.training_data.cpu().numpy(), os.path.join(self.results_folder, 'training_data.csv'))
             self.save_csv(self.validation_data.cpu().numpy(), os.path.join(self.results_folder, 'validation_data.csv'))
 
-            # self.save_pdf_training(self.training_data[idx], verbose)
-
             # No control theoretic evaluation of the observer with only T
             if self.method == 'T':
                 return 0
-
-            # self.save_trj(torch.tensor([1., 1.]), wc_arr_train, nb_trajs, verbose, t_sim, dt)
-
-            # create array of w_c from [0.1, ..., 1]
-            # w_c_array = torch.arange(0.2, 0.9, 0.2)
-
-            mesh = self.model.generate_data_svl(limits, wc_arr_train, 30000,
-                                                method='LHS', stack=False)
-
-            # self.save_rmse_wc(mesh, wc_arr_train, verbose)
-            self.plot_sensitiviy_wc(mesh, wc_arr_train, verbose)
-
-            # generate data
-            mesh_1 = self.model.generate_data_svl(limits, wc_arr_train, num_samples,
-                                                method='uniform', stack=False)
-
-            self.save_pdf_heatmap(mesh_1, verbose)
-
-            # Loss plot over time and loss heatmap over space
-            self.save_plot('Train_loss.pdf', 'Training loss over time', 'log', self.train_loss.detach())
-            self.save_plot('Val_loss.pdf', 'Validation loss over time', 'log', self.val_loss.detach())
 
             # Add t_c to specifications
             with open(specs_file, 'a') as f:
