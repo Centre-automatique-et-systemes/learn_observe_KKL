@@ -132,8 +132,7 @@ def RMSE(x, y, dim=None):
 # Replaces sklearn StandardScaler()
 # https://discuss.pytorch.org/t/pytorch-tensor-scaling/38576
 class StandardScaler:
-    def __init__(self, X):
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    def __init__(self, X, device):
         self._mean = torch.mean(X, dim=0).to(device)
         self._var = torch.var(X, dim=0, unbiased=False).to(device)
         # If var = 0., i.e. values all same, make it 1 so unchanged!
