@@ -17,39 +17,66 @@ torch.set_default_dtype(torch.float64)
 
 
 class LuenbergerObserverNoise(LuenbergerObserver):
+    def __init__(
+        self,
+        dim_x: int,
+        dim_y: int,
+        method: str = "Autoencoder",
+        dim_z: int = None,
+        wc: float = 1.0,
+        num_hl: int = 5,
+        size_hl: int = 50,
+        activation=nn.ReLU(),
+        recon_lambda: float = 1.0,
+        D="block_diag",
+    ):
 
-    def __init__(self, dim_x: int, dim_y: int, method: str = "Autoencoder",
-                 dim_z: int = None, wc: float = 1., num_hl: int = 5,
-                 size_hl: int = 50, activation=nn.ReLU(),
-                 recon_lambda: float = 1., D='bessel'):
-
-        LuenbergerObserver.__init__(self, dim_x, dim_y, method,
-                                    dim_z, wc, num_hl,
-                                    size_hl, activation,
-                                    recon_lambda, D)
+        LuenbergerObserver.__init__(
+            self,
+            dim_x,
+            dim_y,
+            method,
+            dim_z,
+            wc,
+            num_hl,
+            size_hl,
+            activation,
+            recon_lambda,
+            D,
+        )
 
         self.encoder_layers = self.create_layers(
-            self.num_hl, self.size_hl, self.activation, self.dim_x, self.dim_z + 1)
+            self.num_hl, self.size_hl, self.activation, self.dim_x, self.dim_z + 1
+        )
         self.decoder_layers = self.create_layers(
-            self.num_hl, self.size_hl, self.activation, self.dim_z + 1, self.dim_x)
+            self.num_hl, self.size_hl, self.activation, self.dim_z + 1, self.dim_x
+        )
 
     def __repr__(self):
-        return '\n'.join([
-            'Luenberger Observer Noise object',
-            'dim_x ' + str(self.dim_x),
-            'dim_y ' + str(self.dim_y),
-            'dim_z ' + str(self.dim_z),
-            'wc ' + str(self.wc),
-            'D ' + str(self.D),
-            'F ' + str(self.F),
-            'encoder ' + str(self.encoder_layers),
-            'decoder ' + str(self.decoder_layers),
-            'method ' + self.method,
-            'recon_lambda ' + str(self.recon_lambda),
-        ])
+        return "\n".join(
+            [
+                "Luenberger Observer Noise object",
+                "dim_x " + str(self.dim_x),
+                "dim_y " + str(self.dim_y),
+                "dim_z " + str(self.dim_z),
+                "wc " + str(self.wc),
+                "D " + str(self.D),
+                "F " + str(self.F),
+                "encoder " + str(self.encoder_layers),
+                "decoder " + str(self.decoder_layers),
+                "method " + self.method,
+                "recon_lambda " + str(self.recon_lambda),
+            ]
+        )
 
-    def generate_data_mesh(self, limits: tuple, num_samples: int, k: int = 10,
-                           dt: float = 1e-2, method: str = 'LHS'):
+    def generate_data_mesh(
+        self,
+        limits: tuple,
+        num_samples: int,
+        k: int = 10,
+        dt: float = 1e-2,
+        method: str = "LHS",
+    ):
         """
         Generate a grid of data points by simulating the system backward and
         forward in time.
@@ -74,8 +101,7 @@ class LuenbergerObserverNoise(LuenbergerObserver):
         data: torch.tensor
             Pairs of (x, z) data points.
         """
-        mesh = generate_mesh(limits=limits, num_samples=num_samples,
-                             method=method)
+        mesh = generate_mesh(limits=limits, num_samples=num_samples, method=method)
         num_samples = mesh.shape[0]  # in case regular grid: changed
         self.k = k
         self.t_c = self.k / min(abs(linalg.eig(self.D)[0].real))
@@ -85,13 +111,13 @@ class LuenbergerObserverNoise(LuenbergerObserver):
 
         # Simulate only x system backward in time
         tsim = (0, -self.t_c)
-        y_0[:, :self.dim_x] = mesh
+        y_0[:, : self.dim_x] = mesh
         _, data_bw = self.simulate_system(y_0, tsim, -dt, only_x=True)
 
         # Simulate both x and z forward in time starting from the last point
         # from previous simulation
         tsim = (-self.t_c, 0)
-        y_1[:, :self.dim_x] = data_bw[-1, :, :self.dim_x]
+        y_1[:, : self.dim_x] = data_bw[-1, :, : self.dim_x]
         _, data_fw = self.simulate_system(y_1, tsim, dt)
 
         # Data contains (x_i, z_i) pairs in shape [dim_x + dim_z,
@@ -99,15 +125,23 @@ class LuenbergerObserverNoise(LuenbergerObserver):
         data = data_fw[-1]
         return data
 
-    def generate_data_svl(self, limits: np.array, w_c: np.array, num_datapoints: int, k: int = 10,
-                          dt: float = 1e-2, stack: bool = True, method: str = 'LHS'):
+    def generate_data_svl(
+        self,
+        limits: np.array,
+        w_c: np.array,
+        num_datapoints: int,
+        k: int = 10,
+        dt: float = 1e-2,
+        stack: bool = True,
+        method: str = "LHS",
+    ):
 
         num_samples = int(np.ceil(num_datapoints / len(w_c)))
 
-        df = torch.zeros(size=(num_samples, self.dim_x+self.dim_z + 1, len(w_c)))
+        df = torch.zeros(size=(num_samples, self.dim_x + self.dim_z + 1, len(w_c)))
 
         for idx, w_c_i in np.ndenumerate(w_c):
-            self.D = self.set_D(w_c_i)
+            self.D, self.F = self.set_DF(w_c_i)
 
             data = self.generate_data_mesh(limits, num_samples, k, dt, method)
 
@@ -135,23 +169,33 @@ class LuenbergerObserverNoise(LuenbergerObserver):
 
     def sensitivity_norm(self, z):
         dTdh = torch.autograd.functional.jacobian(
-            self.decoder, z, create_graph=False, strict=False, vectorize=False)
-        dTdz = torch.transpose(torch.transpose(
-            torch.diagonal(dTdh, dim1=0, dim2=2), 1, 2), 0, 1)
-        dTdz = dTdz[:,:,:self.dim_z]
+            self.decoder, z, create_graph=False, strict=False, vectorize=False
+        )
+        dTdz = torch.transpose(
+            torch.transpose(torch.diagonal(dTdh, dim1=0, dim2=2), 1, 2), 0, 1
+        )
+        dTdz = dTdz[:, :, : self.dim_z]
 
         C = np.eye(self.D.shape[0])
-        sv = torch.tensor(compute_h_infinity(self.D.numpy(), self.F.numpy(), C, 1e-10))
+        sv = torch.tensor(compute_h_infinity(self.D.numpy(), self.F.numpy(), C, 1e-3))
 
-        dTdz_norm = max(torch.linalg.matrix_norm(dTdz, ord=2))
+        dTdz_norm = max(torch.linalg.matrix_norm(dTdz, ord=2))/(z.shape[0]*z.shape[1])
+        # dTdz_norm = max(torch.linalg.matrix_norm(dTdz)/(z.shape[0]*z.shape[1]))
 
         product = dTdz_norm * sv
 
-        return torch.cat((dTdz_norm.unsqueeze(0), sv.unsqueeze(0), product.unsqueeze(0)), dim=0)
+        return torch.cat(
+            (dTdz_norm.unsqueeze(0), sv.unsqueeze(0), product.unsqueeze(0)), dim=0
+        )
 
-
-    def predict(self, measurement: torch.tensor, t_sim: tuple,
-                dt: int, w_c: float, out_z: bool = False) -> torch.tensor:
+    def predict(
+        self,
+        measurement: torch.tensor,
+        t_sim: tuple,
+        dt: int,
+        w_c: float,
+        out_z: bool = False,
+    ) -> torch.tensor:
         """
         Forward function for autoencoder. Used for training the model.
         Computation follows as:
@@ -174,7 +218,7 @@ class LuenbergerObserverNoise(LuenbergerObserver):
         x_hat: torch.tensor
             Estimation of the observer model.
         """
-        self.D = self.set_D(w_c)
+        self.D, _ = self.set_DF(w_c)
 
         _, sol = self.simulate(measurement, t_sim, dt)
 
