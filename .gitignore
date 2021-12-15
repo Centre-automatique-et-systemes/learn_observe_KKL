@@ -8,6 +8,7 @@ __pycache__/
 */__pycache__/
 __init__.pyc
 main.py
+replot.py
 model.py
 ho_debug.py
 

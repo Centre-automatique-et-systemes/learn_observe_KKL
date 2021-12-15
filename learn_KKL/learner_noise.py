@@ -234,7 +234,7 @@ class LearnerNoise(Learner):
 
         for j in range(len(w_c_array)):
             z_mesh = mesh[:, self.model.dim_x :, j]
-            self.model.D, _ = self.model.set_DF(w_c_array[j])
+            self.model.D, _ = self.model.set_DF(w_c_array[j], method='direct')
             print(j)
             errors[j] = self.model.sensitivity_norm(z_mesh)
 

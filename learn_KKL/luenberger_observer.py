@@ -295,7 +295,7 @@ class LuenbergerObserver(nn.Module):
         # Set observer matrices D and F
         self.wc = wc
         if type(D) == str:
-            self.D, self.F = self.set_DF(wc=self.wc, method=D)
+            self.D, self.F = self.set_DF(wc=self.wc, method='direct')
         else:
             self.wc = 0.0
             self.D = torch.as_tensor(D)

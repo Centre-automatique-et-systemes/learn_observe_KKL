@@ -8,18 +8,18 @@ if __name__ == "__main__":
     # path = ['0.1', '0.14677993', '0.21544347', '0.31622777', '0.46415888', '0.68129207', '1.']
 
     # for i in path:
-    learner_path = 'runs/RevDuffing/Supervised/T_star/exp_2/learner.pkl'
+    learner_path = 'runs/VanDerPol/Supervised/T_star/0.01930698/learner.pkl'
     
     with open(learner_path, 'rb') as rb_file:
         learner = pkl.load(rb_file)
 
-    learner.results_folder = 'runs/RevDuffing/Supervised/T_star/exp_2/'
+    learner.results_folder = 'runs/VanDerPol/Supervised/T_star/0.01930698/'
 
 
 
     limits = np.array([[-1, 1.], [-1., 1.]])
     num_samples = 70000
-    wc_arr = np.array([0.03])
+    wc_arr = np.array([0.01930698])
     # wc_arr = np.array([float(i)])
     mesh = learner.model.generate_data_svl(limits, wc_arr, num_samples,
                                                 method='uniform', stack=False)
