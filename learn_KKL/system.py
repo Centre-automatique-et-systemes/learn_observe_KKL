@@ -417,3 +417,38 @@ class HO_unknown_freq(System):
 
     def __repr__(self):
         return 'HO_unknown_freq'
+
+class pendulum(System):
+    """
+    Harmonic oscillator with unknown frequency.
+    Extended state-space where x1 is the angle, x2 is the angular velocity,
+    and x3 is the constant but unknown frequency.
+
+    See Example 8.1.1 in "Observer Design for Nonlinear Systems" by Pauline
+    Bernard for more information.
+    """
+
+    def __init__(self,mu: float = 0.1):
+        super().__init__()
+        self.dim_x = 2
+        self.dim_y = 1
+
+        self.u = self.null_controller
+        self.u_1 = self.null_controller
+        self.mu = mu
+    def f(self, x):
+        xdot = torch.zeros_like(x)
+        xdot[..., 0] = x[..., 1]
+        xdot[..., 1] = - np.sin(x[..., 0]) - self.mu * x[..., 1]
+        return xdot
+
+    def h(self, x):
+        return torch.unsqueeze(x[..., 0], dim=-1)
+
+    def g(self, x):
+        xdot = torch.zeros_like(x)
+        xdot[..., 1] = torch.ones_like(x[..., 1])
+        return xdot
+
+    def __repr__(self):
+        return 'pendulum'
