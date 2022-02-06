@@ -101,7 +101,7 @@ class Learner(pl.LightningModule):
             self.scaler_x = StandardScaler(
                 self.training_data[:, :self.model.dim_x], self.device)
             self.scaler_z = StandardScaler(
-                self.training_data[:, self.model.dim_x: self.model.dim_z], self.device)
+                self.training_data[:, self.model.dim_x: ], self.device)
         self.model.set_scalers(scaler_x=self.scaler_x, scaler_z=self.scaler_z)
         self.train_loss = torch.zeros((0, 1))
         self.val_loss = torch.zeros((0, 1))

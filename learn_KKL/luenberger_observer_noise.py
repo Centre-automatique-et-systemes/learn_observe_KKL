@@ -141,7 +141,7 @@ class LuenbergerObserverNoise(LuenbergerObserver):
         df = torch.zeros(size=(num_samples, self.dim_x + self.dim_z + 1, len(w_c)))
 
         for idx, w_c_i in np.ndenumerate(w_c):
-            self.D, self.F = self.set_DF(w_c_i, method='direct')
+            self.D, self.F = self.set_DF(w_c_i)
 
             data = self.generate_data_mesh(limits, num_samples, k, dt, method)
 
@@ -217,7 +217,7 @@ class LuenbergerObserverNoise(LuenbergerObserver):
         x_hat: torch.tensor
             Estimation of the observer model.
         """
-        self.D, _ = self.set_DF(w_c, method='direct')
+        self.D, _ = self.set_DF(w_c)
 
         _, sol = self.simulate(measurement, t_sim, dt)
 

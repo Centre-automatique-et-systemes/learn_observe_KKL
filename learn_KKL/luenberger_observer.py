@@ -295,7 +295,7 @@ class LuenbergerObserver(nn.Module):
         # Set observer matrices D and F
         self.wc = wc
         if type(D) == str:
-            self.D, self.F = self.set_DF(wc=self.wc, method='direct')
+            self.D, self.F = self.set_DF(wc=self.wc)
         else:
             self.wc = 0.0
             self.D = torch.as_tensor(D)
@@ -394,7 +394,7 @@ class LuenbergerObserver(nn.Module):
         self.scaler_x = scaler_x
         self.scaler_z = scaler_z
 
-    def set_DF(self, wc: float = 1.0, method: str = "block_diag") -> torch.tensor:
+    def set_DF(self, wc: float = 1.0, method: str = "direct") -> torch.tensor:
         """
         Returns a matrix from the eigenvalues of a dim_z order
         bessel filter with a given cutoff frequency for a given
@@ -426,6 +426,7 @@ class LuenbergerObserver(nn.Module):
 
         wc = wc * 2 * np.pi
 
+        print(method)
         # Set the KKL matrix D with different methods
         if method == "indirect":
             # Indirect method to place poles of D with Bessel filter

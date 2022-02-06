@@ -8,9 +8,12 @@ __pycache__/
 */__pycache__/
 __init__.pyc
 main.py
+scripts/
+
 replot.py
 model.py
 ho_debug.py
+main_copy.py
 
 # Log files
 runs/
