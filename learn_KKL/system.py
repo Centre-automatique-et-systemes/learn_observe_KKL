@@ -80,7 +80,7 @@ torch.set_default_tensor_type(torch.DoubleTensor)
 torch.set_default_dtype(torch.float64)
 
 
-class System():
+class System:
     """ Implements a Luenberger observer. You are responsible for setting the
     state variables and functions to reasonable values; the defaults  will
     not give you a functional observer.
@@ -164,11 +164,11 @@ class System():
         return 0
 
     def set_controller(self, controller) -> None:
-        if controller == 'null_controller':
+        if controller == "null_controller":
             self.u = self.null_controller
-        elif controller == 'sin_controller':
+        elif controller == "sin_controller":
             self.u = self.sin_controller
-        elif controller == 'lin_chirp_controller':
+        elif controller == "lin_chirp_controller":
             self.u = self.lin_chirp_controller
 
     def simulate(self, x_0: torch.tensor, tsim: tuple, dt) -> torch.tensor:
@@ -207,8 +207,9 @@ class System():
 
         return tq, torch.squeeze(sol)
 
-    def lin_chirp_controller(self, t: float, t_0: float = 0.0, a: float = 0.001,
-                             b: float = 9.99e-05) -> torch.tensor:
+    def lin_chirp_controller(
+        self, t: float, t_0: float = 0.0, a: float = 0.001, b: float = 9.99e-05
+    ) -> torch.tensor:
         """
         Linear chirp controller function.
 
@@ -237,8 +238,9 @@ class System():
             u = torch.sin(2 * pi * t * (a + b * t))
         return u
 
-    def sin_controller(self, t: float, t_0: float = 0.0, gamma: float = 0.4,
-                       omega: float = 1.2) -> torch.tensor:
+    def sin_controller(
+        self, t: float, t_0: float = 0.0, gamma: float = 0.4, omega: float = 1.2
+    ) -> torch.tensor:
         """
         Harmonic oscillator controller function.
 
@@ -267,9 +269,15 @@ class System():
             u = gamma * torch.cos(omega * t)
         return u
 
-    def chirp_controller(self, t: float, t_0: float = 0, f_0: float = 6.0,
-                         f_1: float = 1.0, t_1: float = 10.0,
-                         gamma: float = 1.0) -> torch.tensor:
+    def chirp_controller(
+        self,
+        t: float,
+        t_0: float = 0,
+        f_0: float = 6.0,
+        f_1: float = 1.0,
+        t_1: float = 10.0,
+        gamma: float = 1.0,
+    ) -> torch.tensor:
         """
         Linear chirp controller function.
 
@@ -298,7 +306,7 @@ class System():
         if t <= t_0:
             u = 0.0
         else:
-            u = signal.chirp(t, f0=f_0, f1=f_1, t1=t_1, method='linear')
+            u = signal.chirp(t, f0=f_0, f1=f_1, t1=t_1, method="linear")
         return torch.tensor(gamma * u)
 
     def null_controller(self, t: float) -> torch.tensor:
@@ -347,7 +355,7 @@ class RevDuffing(System):
         return torch.zeros_like(x)
 
     def __repr__(self):
-        return 'RevDuffing'
+        return "RevDuffing"
 
 
 class VanDerPol(System):
@@ -355,7 +363,7 @@ class VanDerPol(System):
     reference for this system. 
     """
 
-    def __init__(self, eps: float = 1.):
+    def __init__(self, eps: float = 1.0):
         super().__init__()
         self.dim_x = 2
         self.dim_y = 1
@@ -368,8 +376,7 @@ class VanDerPol(System):
     def f(self, x):
         xdot = torch.zeros_like(x)
         xdot[..., 0] = x[..., 1]
-        xdot[..., 1] = self.eps * (1 - torch.pow(x[..., 0], 2)) * \
-                       x[..., 1] - x[..., 0]
+        xdot[..., 1] = self.eps * (1 - torch.pow(x[..., 0], 2)) * x[..., 1] - x[..., 0]
         return xdot
 
     def h(self, x):
@@ -381,16 +388,17 @@ class VanDerPol(System):
         return xdot
 
     def __repr__(self):
-        return 'VanDerPol'
+        return "VanDerPol"
+
 
 class HO_unknown_freq(System):
     """
-    Harmonic oscillator with unknown frequency.
-    Extended state-space where x1 is the angle, x2 is the angular velocity,
+    harmonic oscillator with unknown frequency.
+    extended state-space where x1 is the angle, x2 is the angular velocity,
     and x3 is the constant but unknown frequency.
 
-    See Example 8.1.1 in "Observer Design for Nonlinear Systems" by Pauline
-    Bernard for more information.
+    see example 8.1.1 in "observer design for nonlinear systems" by pauline
+    bernard for more information.
     """
 
     def __init__(self,):
@@ -404,7 +412,7 @@ class HO_unknown_freq(System):
     def f(self, x):
         xdot = torch.zeros_like(x)
         xdot[..., 0] = x[..., 1]
-        xdot[..., 1] = - x[..., 2] * x[..., 0]
+        xdot[..., 1] = -x[..., 2] * x[..., 0]
         return xdot
 
     def h(self, x):
@@ -416,4 +424,124 @@ class HO_unknown_freq(System):
         return xdot
 
     def __repr__(self):
-        return 'HO_unknown_freq'
+        return "ho_unknown_freq"
+
+
+class QuanserQubeServo2(System):
+    """ See https://www.quanser.com/products/qube-servo-2/ QUBE SERVO 2 and for a detailed 
+    reference for this system 
+    https://github.com/BlueRiverTech/quanser-openai-driver/blob/main/gym_brt/quanser/qube_simulator.py. 
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.dim_x = 4
+        self.dim_y = 1
+
+        # Motor
+        self.Rm = 8.4  # Resistance
+        self.kt = 0.042  # Current-torque (N-m/A)
+        self.km = 0.042  # Back-emf constant (V-s/rad)
+
+        # Rotary Arm
+        self.mr = 0.095  # Mass (kg)
+        self.Lr = 0.085  # Total length (m)
+        self.Jr = self.mr * self.Lr ** 2 / 12  # Moment of inertia about pivot (kg-m^2)
+        self.Dr = 0.00027  # Equivalent viscous damping coefficient (N-m-s/rad)
+
+        # Pendulum Link
+        self.mp = 0.024  # Mass (kg)
+        self.Lp = 0.129  # Total length (m)
+        self.Jp = self.mp * self.Lp ** 2 / 12  # Moment of inertia about pivot (kg-m^2)
+        self.Dp = 0.00005  # Equivalent viscous damping coefficient (N-m-s/rad)
+
+        self.gravity = 9.81  # Gravity constant
+
+        self.u = self.null_controller
+        self.u_1 = self.null_controller
+
+    def f(self, x, action=0):
+        theta = x[..., 0]
+        alpha = x[..., 1]
+        theta_dot = x[..., 2]
+        alpha_dot = x[..., 3]
+
+        Vm = action
+        tau = -(self.km * (Vm - self.km * theta_dot)) / self.Rm
+
+        xdot = torch.zeros_like(x)
+        xdot[..., 0] = theta_dot
+        xdot[..., 1] = alpha_dot
+        xdot[..., 2] = (
+            -self.Lp
+            * self.Lr
+            * self.mp
+            * (
+                -8.0 * self.Dp * alpha_dot
+                + self.Lp ** 2 * self.mp * theta_dot ** 2 * np.sin(2.0 * alpha)
+                + 4.0 * self.Lp * self.gravity * self.mp * np.sin(alpha)
+            )
+            * np.cos(alpha)
+            + (4.0 * self.Jp + self.Lp ** 2 * self.mp)
+            * (
+                4.0 * self.Dr * theta_dot
+                + self.Lp ** 2 * alpha_dot * self.mp * theta_dot * np.sin(2.0 * alpha)
+                + 2.0 * self.Lp * self.Lr * alpha_dot ** 2 * self.mp * np.sin(alpha)
+                - 4.0 * tau
+            )
+        ) / (
+            4.0 * self.Lp ** 2 * self.Lr ** 2 * self.mp ** 2 * np.cos(alpha) ** 2
+            - (4.0 * self.Jp + self.Lp ** 2 * self.mp)
+            * (
+                4.0 * self.Jr
+                + self.Lp ** 2 * self.mp * np.sin(alpha) ** 2
+                + 4.0 * self.Lr ** 2 * self.mp
+            )
+        )
+
+        xdot[..., 3] = (
+            2.0
+            * self.Lp
+            * self.Lr
+            * self.mp
+            * (
+                4.0 * self.Dr * theta_dot
+                + self.Lp ** 2 * alpha_dot * self.mp * theta_dot * np.sin(2.0 * alpha)
+                + 2.0 * self.Lp * self.Lr * alpha_dot ** 2 * self.mp * np.sin(alpha)
+                - 4.0 * tau
+            )
+            * np.cos(alpha)
+            - 0.5
+            * (
+                4.0 * self.Jr
+                + self.Lp ** 2 * self.mp * np.sin(alpha) ** 2
+                + 4.0 * self.Lr ** 2 * self.mp
+            )
+            * (
+                -8.0 * self.Dp * alpha_dot
+                + self.Lp ** 2 * self.mp * theta_dot ** 2 * np.sin(2.0 * alpha)
+                + 4.0 * self.Lp * self.gravity * self.mp * np.sin(alpha)
+            )
+        ) / (
+            4.0 * self.Lp ** 2 * self.Lr ** 2 * self.mp ** 2 * np.cos(alpha) ** 2
+            - (4.0 * self.Jp + self.Lp ** 2 * self.mp)
+            * (
+                4.0 * self.Jr
+                + self.Lp ** 2 * self.mp * np.sin(alpha) ** 2
+                + 4.0 * self.Lr ** 2 * self.mp
+            )
+        )
+
+        return xdot
+
+    def h(self, x):
+        return torch.unsqueeze(x[..., 0], dim=-1)
+
+    def g(self, x):
+        xdot = torch.zeros_like(x)
+        xdot[..., 1] = torch.ones_like(x[..., 1])
+        return xdot
+
+    def __repr__(self):
+        return "VanDerPol"
+
