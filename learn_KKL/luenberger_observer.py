@@ -643,25 +643,34 @@ class LuenbergerObserver(nn.Module):
             Solution of the simulation.
         """
 
-        def dydt(t, y):  # TODO only simulate x backward, z forward (interpol y)
-            x = y[..., : self.dim_x]  # TODO change notation y
-            z = y[..., self.dim_x :]
-            x_dot = self.f(x) + self.g(x) * self.u(t)
-            if only_x:
-                z_dot = torch.zeros_like(z)
-            else:
-                z_dot = torch.matmul(z, self.D.t()) + torch.matmul(
-                    self.h(x), self.F.t()
-                )
-            return torch.cat((x_dot, z_dot), dim=-1)
+        if not only_x : 
+            def dydt(t, y):  # TODO only simulate x backward, z forward (interpol y)
+                x = y[..., : self.dim_x]  # TODO change notation y
+                z = y[..., self.dim_x :]
+                y_dot = torch.zeros_like(y)
+                y_dot[..., : self.dim_x] = self.f(x) + self.g(x) * self.u(t)
+                y_dot[..., self.dim_x: ] = torch.matmul(z, self.D.t()) + torch.matmul(
+                        self.h(x), self.F.t())
+                return y_dot
+            # Output timestemps of solver
+            tq = torch.arange(tsim[0], tsim[1], dt)
 
-        # Output timestemps of solver
-        tq = torch.arange(tsim[0], tsim[1], dt)
+            # Solve
+            sol = odeint(dydt, y_0, tq)
+            return tq, sol
+        
+        else:
+            def dydt(t, y):  # TODO only simulate x backward, z forward (interpol y)
+                x = y[..., : self.dim_x]  # TODO change notation y
+                y_dot = torch.zeros_like(y)
+                y_dot[..., : self.dim_x] = self.f(x) + self.g(x) * self.u(t)
+                return y_dot
+            # Output timestemps of solver
+            tq = torch.arange(tsim[0], tsim[1], dt)
 
-        # Solve
-        sol = odeint(dydt, y_0, tq)
-
-        return tq, sol
+            # Solve
+            sol = odeint(dydt, y_0, tq)
+            return tq, sol
 
     def generate_data_svl(
         self,
