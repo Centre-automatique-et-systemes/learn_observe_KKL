@@ -124,7 +124,7 @@ class LuenbergerObserver(nn.Module):
     After construction the observer will have default matrices D and F created for you,
     but you must specify the values for each. Matrix D, with shape dim_z X dim_z, is set by
     the eigenvalue roots of a third order bessel filter with the cutoff frequency of one.
-    Matrix F is set to ones with dimension dim_z X 1. It’s usually easiest to just
+    Matrix F is set to ones with dimension dim_z X dim_y. It’s usually easiest to just
     overwrite them rather than assign to each element yourself. This will be
     clearer in the example below. All are of type torch.tensor.
 
@@ -299,7 +299,7 @@ class LuenbergerObserver(nn.Module):
         else:
             self.wc = 0.0
             self.D = torch.as_tensor(D)
-            self.F = torch.ones((self.dim_z, 1))
+            self.F = torch.ones((self.dim_z, self.dim_y))    #
 
         # Model params
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -393,6 +393,11 @@ class LuenbergerObserver(nn.Module):
         """
         self.scaler_x = scaler_x
         self.scaler_z = scaler_z
+    
+    def set_F(self, F):
+        """ set custom F 
+        (in order to avoid information loss you should strive for rankF = dim_y"""
+        self.F = F
 
     def set_DF(self, wc: float = 1.0, method: str = "direct") -> torch.tensor:
         """
@@ -569,6 +574,9 @@ class LuenbergerObserver(nn.Module):
     def simulate(self, y: torch.tensor, tsim: tuple, dt: float) -> torch.tensor:
         """
         Runs and outputs the results from Luenberger observer system.
+        
+        Warning : Might not behave as intended because of interpolation_method
+        Prefer self.simulate_system
 
         Parameters
         ----------
@@ -600,11 +608,11 @@ class LuenbergerObserver(nn.Module):
 
         def dydt(t, z: torch.tensor):
             if self.u_1 == self.u:
-                z_dot = torch.matmul(self.D, z) + self.F * measurement(t)
+                z_dot = torch.matmul(self.D, z) + torch.matmul(self.F ,measurement(t).t())
             else:
                 z_dot = (
                     torch.matmul(self.D, z)
-                    + self.F * measurement(t)
+                    + torch.matmul(self.F ,measurement(t).t())
                     + torch.mul(self.phi(z), self.u_1(t) - self.u(t))
                 )
             return z_dot
@@ -746,7 +754,7 @@ class LuenbergerObserver(nn.Module):
             # Create list of interp1d functions
             points, values = (
                 x[:, 0].contiguous().view(-1, 1).t(),
-                x[:, 1:].contiguous().view(-1, 1).t(),
+                x[:, 1:].contiguous().view(-1, x.shape[1]-1).t(),
             )
             interp_function = Interp1d()
 
