@@ -712,6 +712,8 @@ class LuenbergerObserver(nn.Module):
         # from previous simulation
         tsim = (-self.t_c, 0)
         y_1[:, : self.dim_x] = data_bw[-1, :, : self.dim_x]
+        # initialize z with it value at t = - infinity
+        y_1[:, self.dim_x:] = - torch.matmul(torch.linalg.inv(self.D), torch.matmul(self.F,self.h(data_bw[-1, :, : self.dim_x].t()))).t()
         _, data_fw = self.simulate_system(y_1, tsim, dt)
 
         # Data contains (x_i, z_i) pairs in shape [dim_x + dim_z,
