@@ -101,7 +101,7 @@ from torch import nn
 from torchdiffeq import odeint
 from torchinterp1d import Interp1d
 
-from .utils import MSE, generate_mesh
+from .utils import MSE, generate_mesh, MLPn
 
 # Set double precision by default
 torch.set_default_tensor_type(torch.DoubleTensor)
@@ -231,14 +231,11 @@ class LuenbergerObserver(nn.Module):
     simulate(y: torch.tensor, tsim: tuple, dt: float) : [torch.tensor, torch.tensor]
         Simulate Luenberger Observer with dynamics and D, F matrices in time.
 
-    create_layers(num_hl: int, size_hl: int, activation: torch.nn, dim_in: int, dim_out: int) : nn.ModuleList()
-        Helper function that creates a list containing the network architecture.
-
     encoder(x: torch.tensor) -> torch.tensor:
-        Compute latent space for a given input.
+        MLPn object. When called, computes latent state z for a given input x.
 
     decoder(z: torch.tensor) -> torch.tensor:
-        Estimates x_hat vector given the simulated data from the Luenberger Observer.
+        MLPn object. When called, estimates x_hat vector given z simulated by the Luenberger Observer.
 
     loss(x: torch.tensor, x_hat: torch.tensor, z_hat: torch.tensor) :
         [torch.tensor, torch.tensor, torch.tensor]
@@ -263,17 +260,17 @@ class LuenbergerObserver(nn.Module):
     """
 
     def __init__(
-        self,
-        dim_x: int,
-        dim_y: int,
-        method: str = "Autoencoder",
-        dim_z: int = None,
-        wc: float = 1.0,
-        num_hl: int = 5,
-        size_hl: int = 50,
-        activation=nn.ReLU(),
-        recon_lambda: float = 1.0,
-        D="block_diag",
+            self,
+            dim_x: int,
+            dim_y: int,
+            method: str = "Autoencoder",
+            dim_z: int = None,
+            wc: float = 1.0,
+            num_hl: int = 5,
+            size_hl: int = 50,
+            activation=nn.ReLU(),
+            recon_lambda: float = 1.0,
+            D="block_diag",
     ):
         super(LuenbergerObserver, self).__init__()
 
@@ -302,19 +299,20 @@ class LuenbergerObserver(nn.Module):
             self.F = torch.ones((self.dim_z, 1))
 
         # Model params
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device(
+            "cuda:0" if torch.cuda.is_available() else "cpu")
         self.recon_lambda = recon_lambda
 
         # Define encoder and decoder architecture
         self.num_hl = num_hl
         self.size_hl = size_hl
         self.activation = activation
-        self.encoder_layers = self.create_layers(
-            self.num_hl, self.size_hl, self.activation, self.dim_x, self.dim_z
-        )
-        self.decoder_layers = self.create_layers(
-            self.num_hl, self.size_hl, self.activation, self.dim_z, self.dim_x
-        )
+        self.encoder = MLPn(num_hl=self.num_hl, n_in=self.dim_x,
+                            n_hl=self.size_hl, n_out=self.dim_z,
+                            activation=self.activation)
+        self.decoder = MLPn(num_hl=self.num_hl, n_in=self.dim_z,
+                            n_hl=self.size_hl, n_out=self.dim_x,
+                            activation=self.activation)
         self.scaler_x = None
         self.scaler_z = None
 
@@ -343,8 +341,8 @@ class LuenbergerObserver(nn.Module):
                 "wc " + str(self.wc),
                 "D " + str(self.D),
                 "F " + str(self.F),
-                "encoder " + str(self.encoder_layers),
-                "decoder " + str(self.decoder_layers),
+                "encoder " + str(self.encoder),
+                "decoder " + str(self.decoder),
                 "method " + self.method,
                 "recon_lambda " + str(self.recon_lambda),
             ]
@@ -393,6 +391,8 @@ class LuenbergerObserver(nn.Module):
         """
         self.scaler_x = scaler_x
         self.scaler_z = scaler_z
+        self.encoder.set_scalers(scaler_X=self.scaler_x, scaler_Y=self.scaler_z)
+        self.decoder.set_scalers(scaler_X=self.scaler_z, scaler_Y=self.scaler_x)
 
     def set_DF(self, wc: float = 1.0, method: str = "direct") -> torch.tensor:
         """
@@ -432,7 +432,8 @@ class LuenbergerObserver(nn.Module):
             # Indirect method to place poles of D with Bessel filter
             _, pO, _ = signal.bessel(self.dim_z, wc, analog=True, output="zpk")
             pO = np.sort(pO)
-            A = -np.array([[i] for i in range(1, self.dim_z + 1)]) * np.eye(self.dim_z)
+            A = -np.array([[i] for i in range(1, self.dim_z + 1)]) * np.eye(
+                self.dim_z)
             B = np.ones((self.dim_z, 1))
             whole_D = signal.place_poles(A, B, pO)
             if whole_D.rtol == 0 and B.shape[1] != 1:
@@ -456,7 +457,8 @@ class LuenbergerObserver(nn.Module):
         elif method == "companion":
             # D in companion form of Bessel filter denominator
             _, a = signal.bessel(self.dim_z, wc, analog=True, output="ba")
-            D = torch.as_tensor(np.polynomial.polynomial.polycompanion(np.flip(a)))
+            D = torch.as_tensor(
+                np.polynomial.polynomial.polycompanion(np.flip(a)))
             F = torch.zeros(self.dim_z, self.dim_y)
             F[-1] = torch.ones(self.dim_y)
 
@@ -510,7 +512,8 @@ class LuenbergerObserver(nn.Module):
                     ignore_next = False
                 else:
                     D[complex_idx - 1, complex_idx - 1] = 0.0
-                    D[complex_idx - 1, complex_idx] = -(v.real ** 2 + v.imag ** 2)
+                    D[complex_idx - 1, complex_idx] = -(
+                                v.real ** 2 + v.imag ** 2)
                     D[complex_idx, complex_idx - 1] = 1.0
                     D[complex_idx, complex_idx] = 2 * v.real
                     F[complex_idx] = torch.ones(self.dim_y)
@@ -521,7 +524,8 @@ class LuenbergerObserver(nn.Module):
 
         elif method == "diag":
             # Diagonal method
-            D = -torch.tensor([[i] for i in range(1, self.dim_z + 1)]) * torch.eye(
+            D = -torch.tensor(
+                [[i] for i in range(1, self.dim_z + 1)]) * torch.eye(
                 self.dim_z
             )
             F = torch.ones(self.dim_z, self.dim_y)
@@ -603,9 +607,9 @@ class LuenbergerObserver(nn.Module):
                 z_dot = torch.matmul(self.D, z) + self.F * measurement(t)
             else:
                 z_dot = (
-                    torch.matmul(self.D, z)
-                    + self.F * measurement(t)
-                    + torch.mul(self.phi(z), self.u_1(t) - self.u(t))
+                        torch.matmul(self.D, z)
+                        + self.F * measurement(t)
+                        + torch.mul(self.phi(z), self.u_1(t) - self.u(t))
                 )
             return z_dot
 
@@ -615,7 +619,7 @@ class LuenbergerObserver(nn.Module):
         return tq, z
 
     def simulate_system(
-        self, y_0: torch.tensor, tsim: tuple, dt, only_x: bool = False
+            self, y_0: torch.tensor, tsim: tuple, dt, only_x: bool = False
     ) -> torch.tensor:
         """
         Simulate Luenberger observer driven by a dynamical system.
@@ -645,7 +649,7 @@ class LuenbergerObserver(nn.Module):
 
         def dydt(t, y):  # TODO only simulate x backward, z forward (interpol y)
             x = y[..., : self.dim_x]  # TODO change notation y
-            z = y[..., self.dim_x :]
+            z = y[..., self.dim_x:]
             x_dot = self.f(x) + self.g(x) * self.u(t)
             if only_x:
                 z_dot = torch.zeros_like(z)
@@ -664,12 +668,12 @@ class LuenbergerObserver(nn.Module):
         return tq, sol
 
     def generate_data_svl(
-        self,
-        limits: tuple,
-        num_samples: int,
-        k: int = 10,
-        dt: float = 1e-2,
-        method: str = "LHS",
+            self,
+            limits: tuple,
+            num_samples: int,
+            k: int = 10,
+            dt: float = 1e-2,
+            method: str = "LHS",
     ):
         """
         Generate a grid of data points by simulating the system backward and
@@ -695,7 +699,8 @@ class LuenbergerObserver(nn.Module):
         data: torch.tensor
             Pairs of (x, z) data points.
         """
-        mesh = generate_mesh(limits=limits, num_samples=num_samples, method=method)
+        mesh = generate_mesh(limits=limits, num_samples=num_samples,
+                             method=method)
         num_samples = mesh.shape[0]  # in case regular grid: changed
         self.k = k
         self.t_c = self.k / min(abs(linalg.eig(self.D)[0].real))
@@ -766,101 +771,9 @@ class LuenbergerObserver(nn.Module):
 
         return interp
 
-    def create_layers(
-        self, num_hl: int, size_hl: int, activation: torch.nn, dim_in: int, dim_out: int
-    ) -> nn.ModuleList():
-        """
-        Creates the NN model based on number of hidden layers, sizes etc.
-
-        Parameters
-        ----------
-        num_hl: int
-            Number of the hidden layers.
-
-        size_hl: tuple
-            Size of the hidden layers.
-
-        activation: torch.nn
-            Activation function for layers.
-            Example: torch.nn.ReLu()
-
-        dim_in: int
-            Dimension of the input vector.
-
-        dim_out: int
-            Dimension of the output vector.
-
-        Returns
-        ----------
-        module_list: tensor.nn.ModuleList()
-            List of nn layers.
-        """
-        # Create ModuleList and add first layer with input dimension
-        layers = nn.ModuleList()
-        layers.append(nn.Linear(dim_in, size_hl))
-
-        # Add layers of number hidden layers with size hidden layers
-        # and activation
-        for i in range(num_hl):
-            layers.append(activation)
-            layers.append(nn.Linear(size_hl, size_hl))
-
-        # Append last layer with output dimension
-        layers.append(nn.Linear(size_hl, dim_out))
-
-        return layers
-
-    def encoder(self, x: torch.tensor) -> torch.tensor:
-        """
-        Encodes input data and returns latent space data.
-
-        Parameters
-        ----------
-        x: torch.tensor
-            State vector of the driving system.
-
-        Returns
-        ----------
-        z: torch.tensor
-            Computation of observer state vector.
-        """
-        # Normalize input, iterate over encoder layers, denormalize output
-        if self.scaler_x is not None:
-            x = self.scaler_x.transform(x)
-        for layer in self.encoder_layers:
-            x = layer(x)
-        if self.scaler_z is not None:
-            x = self.scaler_z.inverse_transform(x)
-
-        return x
-
-    def decoder(self, z: torch.tensor) -> torch.tensor:
-        """
-        Estimates x_hat from a given obser state vector.
-
-        Parameters
-        ----------
-        z: torch.tensor
-            State vector of the observer.
-
-        Returns
-        ----------
-        x_hat: torch.tensor
-            Computation of state vector estimation driving the
-            observer.
-        """
-        # Normalize input, iterate over decoder layers, denormalize output
-        if self.scaler_z is not None:
-            z = self.scaler_z.transform(z)
-        for layer in self.decoder_layers:
-            z = layer(z)
-        if self.scaler_x is not None:
-            z = self.scaler_x.inverse_transform(z)
-
-        return z
-
     def loss_autoencoder(
-        self, x: torch.tensor, x_hat: torch.tensor, z_hat: torch.tensor, dim=None
+            self, x: torch.tensor, x_hat: torch.tensor, z_hat: torch.tensor,
+            dim=None
     ) -> torch.tensor:
         """
         Loss function for training the observer model with the autoencoder
@@ -913,7 +826,8 @@ class LuenbergerObserver(nn.Module):
 
         return loss_1 + loss_2, loss_1, loss_2
 
-    def loss_T(self, z: torch.tensor, z_hat: torch.tensor, dim=None) -> torch.tensor:
+    def loss_T(self, z: torch.tensor, z_hat: torch.tensor,
+               dim=None) -> torch.tensor:
         """
         Loss function for training only the forward transformation T.
 
@@ -938,8 +852,8 @@ class LuenbergerObserver(nn.Module):
         return loss
 
     def loss_T_star(
-        self, x: torch.tensor, x_hat: torch.tensor, dim=None
-    ) -> torch.tensor:
+            self, x: torch.tensor, x_hat: torch.tensor,
+            dim=None) -> torch.tensor:
         """
         Loss function for training only the forward transformation T.
 
@@ -1041,7 +955,8 @@ class LuenbergerObserver(nn.Module):
 
         return x_hat
 
-    def predict(self, measurement: torch.tensor, tsim: tuple, dt: int) -> torch.tensor:
+    def predict(self, measurement: torch.tensor, tsim: tuple,
+                dt: int) -> torch.tensor:
         """
         Forward function for autoencoder. Used for training the model.
         Computation follows as:

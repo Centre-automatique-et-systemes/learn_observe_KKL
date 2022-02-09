@@ -101,7 +101,7 @@ class Learner(pl.LightningModule):
             self.scaler_x = StandardScaler(
                 self.training_data[:, :self.model.dim_x], self.device)
             self.scaler_z = StandardScaler(
-                self.training_data[:, self.model.dim_x: ], self.device)
+                self.training_data[:, self.model.dim_x:], self.device)
         self.model.set_scalers(scaler_x=self.scaler_x, scaler_z=self.scaler_z)
         self.train_loss = torch.zeros((0, 1))
         self.val_loss = torch.zeros((0, 1))
@@ -113,6 +113,14 @@ class Learner(pl.LightningModule):
         self.optimizer_options = optimizer_options
         self.scheduler = scheduler
         self.scheduler_options = scheduler_options
+
+        # If method == 'T', freeze T_star and vice versa
+        if self.method == 'T':
+            self.model.encoder.unfreeze()
+            self.model.decoder.freeze()
+        elif self.method == 'T_star':
+            self.model.encoder.freeze()
+            self.model.decoder.unfreeze()
 
         # Folder to save results
         i = 0
@@ -133,6 +141,18 @@ class Learner(pl.LightningModule):
         else:
             optimizer_options = {}
         parameters = self.model.parameters()
+        # If method == 'T', ignore parameters of T_star for optim and vice versa
+        if self.method == 'T':
+            parameters_to_optim = set(parameters)
+            for param in self.model.decoder.parameters():
+                parameters_to_optim -= {param}
+            parameters = list(parameters_to_optim)
+        elif self.method == 'T_star':
+            parameters_to_optim = set(parameters)
+            for param in self.model.encoder.parameters():
+                parameters_to_optim -= {param}
+            parameters = list(parameters_to_optim)
+
         optimizer = self.optimizer(parameters, self.optim_lr,
                                    **optimizer_options)
         if self.scheduler:
@@ -168,7 +188,8 @@ class Learner(pl.LightningModule):
 
     def train_dataloader(self):
         train_loader = DataLoader(
-            self.training_data, batch_size=self.batch_size, shuffle=True, num_workers=4)
+            self.training_data, batch_size=self.batch_size, shuffle=True,
+            num_workers=0)
         return train_loader
 
     def training_step(self, batch, batch_idx):
@@ -197,14 +218,14 @@ class Learner(pl.LightningModule):
 
     def val_dataloader(self):
         val_dataloader = DataLoader(
-            self.validation_data, batch_size=self.batch_size, shuffle=True, num_workers=4)
+            self.validation_data, batch_size=self.batch_size, shuffle=True,
+            num_workers=0)
         return val_dataloader
 
     def validation_step(self, batch, batch_idx):
         # Compute transformation and loss depending on the method
         with torch.no_grad():
             if self.method == "Autoencoder":
-                print(batch.shape)
                 z_hat, x_hat = self.forward(batch)
                 loss, loss1, loss2 = self.model.loss(self.method, batch,
                                                      x_hat, z_hat)
@@ -282,7 +303,8 @@ class Learner(pl.LightningModule):
             plt.clf()
             plt.close('all')
 
-    def save_random_traj(self, x_mesh, num_samples, nb_trajs, verbose, tsim, dt):
+    def save_random_traj(self, x_mesh, num_samples, nb_trajs, verbose, tsim,
+                         dt):
         # Estimation over the test trajectories with T_star
         random_idx = np.random.choice(np.arange(num_samples),
                                       size=(nb_trajs,))
@@ -304,8 +326,12 @@ class Learner(pl.LightningModule):
             current_traj_folder = os.path.join(traj_folder, f'Traj_{i}')
             os.makedirs(current_traj_folder, exist_ok=True)
 
-            self.save_csv(simulation[:, i].cpu().numpy(), os.path.join(current_traj_folder, f'True_traj_{i}.csv'))
-            self.save_csv(estimation.cpu().numpy(), os.path.join(current_traj_folder, f'Estimated_traj_{i}.csv'))
+            self.save_csv(simulation[:, i].cpu().numpy(),
+                          os.path.join(current_traj_folder,
+                                       f'True_traj_{i}.csv'))
+            self.save_csv(estimation.cpu().numpy(),
+                          os.path.join(current_traj_folder,
+                                       f'Estimated_traj_{i}.csv'))
 
             for j in range(estimation.shape[1]):
                 name = 'Traj' + str(j) + '.pdf'
@@ -437,13 +463,28 @@ class Learner(pl.LightningModule):
 
             specs_file = self.save_specifications()
 
-            self.save_pkl('/model.pkl', self.model)
+            # self.save_pkl('/model.pkl', self.model)  # no need for both
             self.save_pkl('/learner.pkl', self)
 
-            self.save_csv(self.training_data.cpu().numpy(), os.path.join(self.results_folder, 'training_data.csv'))
-            self.save_csv(self.validation_data.cpu().numpy(), os.path.join(self.results_folder,'validation_data.csv'))
+            self.save_csv(self.training_data.cpu().numpy(),
+                          os.path.join(self.results_folder,
+                                       'training_data.csv'))
+            self.save_csv(self.validation_data.cpu().numpy(),
+                          os.path.join(self.results_folder,
+                                       'validation_data.csv'))
 
             self.save_pdf_training(self.training_data[idx], verbose)
+
+            # Loss plot over time
+            self.save_plot('Train_loss.pdf', 'Training loss over time', 'log',
+                           self.train_loss.detach())
+            self.save_plot('Val_loss.pdf', 'Validation loss over time', 'log',
+                           self.val_loss.detach())
+
+            # Add t_c to specifications
+            with open(specs_file, 'a') as f:
+                print(f'k {self.model.k}', file=f)
+                print(f't_c {self.model.t_c}', file=f)
 
             # No control theoretic evaluation of the observer with only T
             if self.method == 'T':
@@ -462,19 +503,13 @@ class Learner(pl.LightningModule):
             print(f'Shape of mesh for evaluation: {mesh.shape}')
 
             self.save_pdf_heatmap(x_mesh, x_hat_star, verbose)
-            self.save_random_traj(x_mesh, num_samples, nb_trajs, verbose, tsim, dt)
+            self.save_random_traj(x_mesh, num_samples, nb_trajs, verbose, tsim,
+                                  dt)
 
             # Invertibility heatmap
             self.save_invert_heatmap(x_mesh, x_hat_AE, verbose)
 
-            # Loss plot over time and loss heatmap over space
-            self.save_plot('Train_loss.pdf', 'Training loss over time', 'log', self.train_loss.detach())
-            self.save_plot('Val_loss.pdf', 'Validation loss over time', 'log', self.val_loss.detach())
-
+            # Loss heatmap over space
             if not fast:  # Computing loss over grid is slow, most of all for AE
-                self.save_loss_grid(x_mesh, x_hat_AE, z_hat_T, x_hat_star, verbose)
-
-            # Add t_c to specifications
-            with open(specs_file, 'a') as f:
-                print(f'k {self.model.k}', file=f)
-                print(f't_c {self.model.t_c}', file=f)
+                self.save_loss_grid(x_mesh, x_hat_AE, z_hat_T, x_hat_star,
+                                    verbose)
