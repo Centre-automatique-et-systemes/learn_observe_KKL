@@ -352,7 +352,7 @@ class Learner(pl.LightningModule):
 
         filename = 'RMSE_traj.txt'
         with open(os.path.join(traj_folder, filename), 'w') as f:
-            print(traj_error, file=f)
+            print(traj_error / nb_trajs, file=f)
 
     def save_plot(self, name, title, y_scale, data):
         plt.plot(data, '+-', label='loss')

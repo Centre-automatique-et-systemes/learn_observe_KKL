@@ -46,10 +46,10 @@ class LuenbergerObserverNoise(LuenbergerObserver):
         )
 
         self.encoder = MLPn(num_hl=self.num_hl, n_in=self.dim_x,
-                            n_hl=self.size_hl, n_out=self.dim_z,
+                            n_hl=self.size_hl, n_out=self.dim_z + 1,
                             activation=self.activation)
         self.decoder = MLPn(num_hl=self.num_hl, n_in=self.dim_z,
-                            n_hl=self.size_hl, n_out=self.dim_x,
+                            n_hl=self.size_hl, n_out=self.dim_x + 1,
                             activation=self.activation)
 
     def __repr__(self):
@@ -126,16 +126,9 @@ class LuenbergerObserverNoise(LuenbergerObserver):
         data = data_fw[-1]
         return data
 
-    def generate_data_svl(
-        self,
-        limits: np.array,
-        w_c: np.array,
-        num_datapoints: int,
-        k: int = 10,
-        dt: float = 1e-2,
-        stack: bool = True,
-        method: str = "LHS",
-    ):
+    def generate_data_svl(self, limits: np.array, w_c: np.array,
+                          num_datapoints: int, k: int = 10, dt: float = 1e-2,
+                          stack: bool = True, method: str = "LHS"):
 
         num_samples = int(np.ceil(num_datapoints / len(w_c)))
 
