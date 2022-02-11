@@ -292,11 +292,12 @@ class LuenbergerObserver(nn.Module):
         # Set observer matrices D and F
         self.wc = wc
         if type(D) == str:
-            self.D, self.F = self.set_DF(wc=self.wc)
+            self.method_setD = D
+            self.D, self.F = self.set_DF(wc=self.wc, method=self.method_setD)
         else:
             self.wc = 0.0
             self.D = torch.as_tensor(D)
-            self.F = torch.ones((self.dim_z, 1))
+            self.F = torch.ones((self.dim_z, self.dim_y))
 
         # Model params
         self.device = torch.device(
@@ -426,7 +427,6 @@ class LuenbergerObserver(nn.Module):
 
         wc = wc * 2 * np.pi
 
-        print(method)
         # Set the KKL matrix D with different methods
         if method == "indirect":
             # Indirect method to place poles of D with Bessel filter
