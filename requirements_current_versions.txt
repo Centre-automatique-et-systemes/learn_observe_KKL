@@ -33,8 +33,8 @@ jupyterlab-widgets==1.0.1
 kiwisolver==1.3.2
 -e git+https://github.com/Centre-automatique-et-systemes/learn_observe_KKL.git@2c873a51748e1178dbdc4d08ef4cf1649b4a3480#egg=learn_observe_KKL
 MarkupSafe==2.0.1
-matplotlib==3.4.3
-matplotlib-inline==0.1.3
+matplotlib==3.5.1
+matplotlib-inline 
 mistune==0.8.4
 nbclient==0.5.4
 nbconvert==6.1.0
