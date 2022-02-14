@@ -7,7 +7,7 @@ setup(
     url='https://github.com/Centre-automatique-et-systemes/learn_observe_KKL.git',
     author='Lukas Bahr',
     packages=['learn_KKL'],
-    install_requires=['numpy', 'torch', 'scipy', 'matplotlib==3.1.1', 'torchdiffeq',
+    install_requires=['numpy', 'torch', 'scipy', 'matplotlib==3.5.1', 'torchdiffeq',
                       'smt', 'jupyter', 'tensorboard', 'seaborn',
                       'pytorch-lightning', 'dill'],
     version='0.1.0',

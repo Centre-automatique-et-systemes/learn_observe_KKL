@@ -85,7 +85,7 @@ class LearnerNoise(Learner):
 
         filename = "RMSE_traj.txt"
         with open(os.path.join(traj_folder, filename), "w") as f:
-            print(traj_error, file=f)
+            print(traj_error / nb_trajs, file=f)
 
     def save_trj(self, init_state, w_c_arr, nb_trajs, verbose, tsim, dt, var=0.0):
         # Estimation over the test trajectories with T_star
@@ -155,10 +155,31 @@ class LearnerNoise(Learner):
                     plt.show()
                 plt.clf()
                 plt.close("all")
+            # TODO DELETE
+            name = "Phase_portrait.pdf"
+            plt.plot(simulation[:, 0].detach().numpy(), simulation[:,
+                                                        1].detach().numpy(),
+                     '--', label=rf"True")
+            plt.plot(estimation[:, 0].detach().numpy(), estimation[:,
+                                                        1].detach().numpy(),
+                     '--', label=rf"Estimated")
+            plt.legend(loc=1)
+            plt.grid(visible=True)
+            plt.title(
+                rf"Test trajectory for $\omega_c$ {np.round(w_c, 3)}, RMSE {np.round(error.numpy(), 4)}")
+            plt.xlabel(rf"$x_{1}$")
+            plt.ylabel(rf"$x_{2}$")
+            plt.savefig(
+                os.path.join(current_traj_folder, name), bbox_inches="tight"
+            )
+            if verbose:
+                plt.show()
+            plt.clf()
+            plt.close("all")
 
         filename = "RMSE_traj.txt"
         with open(os.path.join(traj_folder, filename), "w") as f:
-            print(traj_error, file=f)
+            print(traj_error / nb_trajs, file=f)
 
     def save_rmse_wc(self, mesh, w_c_array, verbose):
         errors = np.zeros((len(w_c_array)))
@@ -208,8 +229,13 @@ class LearnerNoise(Learner):
             error = RMSE(x_mesh, x_hat_star, dim=1)
 
 
-            # DELETE
-            tq, simulation = self.system.simulate(torch.tensor([0.1, 0.1]), (0, 50), 1e-2)
+            # TODO DELETE
+            tq, simulation = self.system.simulate(torch.tensor([0.1, 0.1]),
+                                                  (0, 60), 1e-2)
+            measurement = self.model.h(simulation)
+            y = torch.cat((tq.unsqueeze(1), measurement), dim=1)
+            estimation = self.model.predict(y,  (0, 60), 1e-2, w_c).detach()
+
 
 
             for i in range(1, x_mesh.shape[1]):
@@ -228,6 +254,7 @@ class LearnerNoise(Learner):
                 # cbar.set_label("Log estimation error")
 
                 plt.plot(simulation[:,0], simulation[:,1])
+                plt.plot(estimation[:, 0], estimation[:, 1])
 
                 plt.title(
                     r"RMSE between $x$ and $\hat{x}$"
@@ -383,7 +410,7 @@ class LearnerNoise(Learner):
 
         filename = "RMSE_traj.txt"
         with open(os.path.join(traj_folder, filename), "w") as f:
-            print(traj_error, file=f)
+            print(traj_error / nb_trajs, file=f)
 
     def plot_traj_sens(self, init_state, w_c_array, t_sim, dt, verbose):
 
@@ -445,7 +472,7 @@ class LearnerNoise(Learner):
 
         filename = "RMSE_traj.txt"
         with open(os.path.join(traj_folder, filename), "w") as f:
-            print(traj_error, file=f)
+            print(traj_error / nb_trajs, file=f)
 
     def save_results(
         self,

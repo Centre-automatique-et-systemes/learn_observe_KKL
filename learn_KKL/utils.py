@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+import torch.nn as nn
 from smt.sampling_methods import LHS
 from scipy import linalg
 
@@ -172,3 +173,65 @@ class StandardScaler:
 
     def __str__(self):
         return f'Standard scaler of mean {self._mean} and var {self._var}\n'
+
+# Simple MLP model with n hidden layers. Can pass StandardScaler to
+# normalize input and output in forward function.
+class MLPn(nn.Module):
+
+    def __init__(self, num_hl, n_in, n_hl, n_out, activation=nn.Tanh(),
+                 init=None, init_args={}, scaler_X=None, scaler_Y=None):
+        self.scaler_X = scaler_X
+        self.scaler_Y = scaler_Y
+        super(MLPn, self).__init__()
+        # Initialize weights using "He Init" if ReLU after, "Xavier" otherwise
+        if not init:
+            init = nn.init.xavier_uniform_
+        # Create ModuleList and add first layer with input dimension
+        # Layers: input * activation, hidden * activation, output
+        if isinstance(n_hl, int):
+            n_hl = [n_hl] * (num_hl + 1)
+        layers = nn.ModuleList()
+        layers.append(nn.Linear(n_in, n_hl[0]))
+        init(layers[-1].weight, *init_args)
+        if 'xavier' not in init.__name__:
+            init(layers[-1].bias, *init_args)  # not for tensors dim < 2
+        # Add num_hl layers of size n_hl with chosen activation
+        for i in range(num_hl):
+            layers.append(activation)
+            layers.append(nn.Linear(n_hl[i], n_hl[i + 1]))
+            init(layers[-1].weight, *init_args)
+            if 'xavier' not in init.__name__:
+                init(layers[-1].bias, *init_args)  # not for tensors dim < 2
+        # Append last layer with output dimension (linear activation)
+        layers.append(nn.Linear(n_hl[-1], n_out))
+        init(layers[-1].weight, *init_args)
+        if 'xavier' not in init.__name__:
+            init(layers[-1].bias, *init_args)  # not for tensors dim < 2
+        self.layers = layers
+
+    def set_scalers(self, scaler_X=None, scaler_Y=None):
+        self.scaler_X = scaler_X
+        self.scaler_Y = scaler_Y
+
+    def __call__(self, x):
+        # Compute output through all layers. Normalize in, denormalize out
+        if self.scaler_X:
+            x = self.scaler_X.transform(x)
+        for i, layer in enumerate(self.layers):
+            x = layer(x)
+        if self.scaler_Y:
+            x = self.scaler_Y.inverse_transform(x)
+        return x
+
+    def forward(self, x):
+        return self(x)
+
+    def freeze(self):
+        # Freeze all model parameters
+        for param in self.parameters():
+            param.requires_grad = False
+
+    def unfreeze(self):
+        # Unfreeze all model parameters
+        for param in self.parameters():
+            param.requires_grad = True

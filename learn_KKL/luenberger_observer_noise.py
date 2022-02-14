@@ -9,7 +9,7 @@ from torchdiffeq import odeint
 
 from learn_KKL.luenberger_observer import LuenbergerObserver
 
-from .utils import RMSE, generate_mesh, compute_h_infinity
+from .utils import RMSE, generate_mesh, compute_h_infinity, MLPn
 
 # Set double precision by default
 torch.set_default_tensor_type(torch.DoubleTensor)
@@ -45,12 +45,12 @@ class LuenbergerObserverNoise(LuenbergerObserver):
             D,
         )
 
-        self.encoder_layers = self.create_layers(
-            self.num_hl, self.size_hl, self.activation, self.dim_x, self.dim_z + 1
-        )
-        self.decoder_layers = self.create_layers(
-            self.num_hl, self.size_hl, self.activation, self.dim_z + 1, self.dim_x
-        )
+        self.encoder = MLPn(num_hl=self.num_hl, n_in=self.dim_x,
+                            n_hl=self.size_hl, n_out=self.dim_z + 1,
+                            activation=self.activation)
+        self.decoder = MLPn(num_hl=self.num_hl, n_in=self.dim_z,
+                            n_hl=self.size_hl, n_out=self.dim_x + 1,
+                            activation=self.activation)
 
     def __repr__(self):
         return "\n".join(
@@ -62,8 +62,8 @@ class LuenbergerObserverNoise(LuenbergerObserver):
                 "wc " + str(self.wc),
                 "D " + str(self.D),
                 "F " + str(self.F),
-                "encoder " + str(self.encoder_layers),
-                "decoder " + str(self.decoder_layers),
+                "encoder " + str(self.encoder),
+                "decoder " + str(self.decoder),
                 "method " + self.method,
                 "recon_lambda " + str(self.recon_lambda),
             ]
@@ -101,7 +101,8 @@ class LuenbergerObserverNoise(LuenbergerObserver):
         data: torch.tensor
             Pairs of (x, z) data points.
         """
-        mesh = generate_mesh(limits=limits, num_samples=num_samples, method=method)
+        mesh = generate_mesh(limits=limits, num_samples=num_samples,
+                             method=method)
         num_samples = mesh.shape[0]  # in case regular grid: changed
         self.k = k
         self.t_c = self.k / min(abs(linalg.eig(self.D)[0].real))
@@ -125,16 +126,9 @@ class LuenbergerObserverNoise(LuenbergerObserver):
         data = data_fw[-1]
         return data
 
-    def generate_data_svl(
-        self,
-        limits: np.array,
-        w_c: np.array,
-        num_datapoints: int,
-        k: int = 10,
-        dt: float = 1e-2,
-        stack: bool = True,
-        method: str = "LHS",
-    ):
+    def generate_data_svl(self, limits: np.array, w_c: np.array,
+                          num_datapoints: int, k: int = 10, dt: float = 1e-2,
+                          stack: bool = True, method: str = "LHS"):
 
         num_samples = int(np.ceil(num_datapoints / len(w_c)))
 
