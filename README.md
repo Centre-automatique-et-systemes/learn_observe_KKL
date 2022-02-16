@@ -5,6 +5,7 @@
 - clone the repo in dir/repo
 - create a virtual environment for this directory (with pip: `python3 -m venv 
   venv`), source it (`source venv/bin/activate`)
+- install interpolation repo: `git clone https://github.com/aliutkus/torchinterp1d` into dir, `cd torchinterp1d`, `pip install -e .`
 - go to the repo, then run `pip install -e .` to install the package
 
 ### Contents
@@ -23,5 +24,8 @@ user is encouraged to first run the tutorials in order to understand how the
 toolbox is structured.
 
 ### To reproduce the results of the paper:
+Supervised learning with dependency on $$\omega_c$$: run 
+
+Autoencoder with $$D$$ learned jointly: run 
 
 ### If you use this toolbox, please cite:
