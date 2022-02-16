@@ -24,5 +24,8 @@ user is encouraged to first run the tutorials in order to understand how the
 toolbox is structured.
 
 ### To reproduce the results of the paper:
+Supervised learning with dependency on $$\omega_c$$: run 
+
+Autoencoder with $$D$$ learned jointly: run 
 
 ### If you use this toolbox, please cite:
