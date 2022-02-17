@@ -355,7 +355,7 @@ class RevDuffing(System):
         return torch.zeros_like(x)
 
     def __repr__(self):
-        return "RevDuffing"
+        return "Reversed Duffing Oscillator"
 
 
 class VanDerPol(System):
@@ -424,7 +424,7 @@ class HO_unknown_freq(System):
         return xdot
 
     def __repr__(self):
-        return "ho_unknown_freq"
+        return "Harmonic oscillator with unknown frequency"
 
 
 class QuanserQubeServo2(System):
@@ -546,9 +546,9 @@ class QuanserQubeServo2(System):
         return xdot
 
     def __repr__(self):
-        return "VanDerPol"
+        return "Qube Servo 2"
 
-class saturatedVanDerPol(System):
+class SaturatedVanDerPol(System):
     """ See https://en.wikipedia.org/wiki/Van_der_Pol_oscillator for detailed
     reference for this system.
     """
@@ -582,4 +582,4 @@ class saturatedVanDerPol(System):
         return xdot
 
     def __repr__(self):
-        return "VanDerPol"
+        return "Saturated Van Der Pol"
