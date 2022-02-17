@@ -481,11 +481,6 @@ class Learner(pl.LightningModule):
             self.save_plot('Val_loss.pdf', 'Validation loss over time', 'log',
                            self.val_loss.detach())
 
-            # Add t_c to specifications
-            with open(specs_file, 'a') as f:
-                print(f'k {self.model.k}', file=f)
-                print(f't_c {self.model.t_c}', file=f)
-
             # No control theoretic evaluation of the observer with only T
             if self.method == 'T':
                 return 0
@@ -501,6 +496,11 @@ class Learner(pl.LightningModule):
             num_samples = len(mesh)  # update num_samples from uniform grid
 
             print(f'Shape of mesh for evaluation: {mesh.shape}')
+
+            # Add t_c to specifications
+            with open(specs_file, 'a') as f:
+                print(f'k {self.model.k}', file=f)
+                print(f't_c {self.model.t_c}', file=f)
 
             self.save_pdf_heatmap(x_mesh, x_hat_star, verbose)
             self.save_random_traj(x_mesh, num_samples, nb_trajs, verbose, tsim,

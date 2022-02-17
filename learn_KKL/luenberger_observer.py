@@ -268,7 +268,7 @@ class LuenbergerObserver(nn.Module):
             wc: float = 1.0,
             num_hl: int = 5,
             size_hl: int = 50,
-            activation=nn.SiLU(),
+            activation=nn.ReLU(),
             recon_lambda: float = 1.0,
             D="block_diag",
     ):
@@ -400,7 +400,7 @@ class LuenbergerObserver(nn.Module):
         (in order to avoid information loss you should strive for rankF = dim_y"""
         self.F = F
 
-    def set_DF(self, wc: float = 1.0, method: str = "direct") -> torch.tensor:
+    def set_DF(self, wc: float = 1.0, method: str = "block_diag") -> torch.tensor:
         """
         Returns a matrix from the eigenvalues of a dim_z order
         bessel filter with a given cutoff frequency for a given

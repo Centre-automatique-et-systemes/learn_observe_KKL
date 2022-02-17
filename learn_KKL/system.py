@@ -563,7 +563,6 @@ class saturatedVanDerPol(System):
     def f(self, x):
         xdot = torch.zeros_like(x)
         a = torch.max(torch.abs(x), dim=-1).values
-        #a = torch.max(xdot[..., 0],xdot[...,1])
         idx = torch.gt(a, 3)
         g = torch.ones_like(a)
         g[idx] = 1 - torch.exp(-.1 / (a[idx] - 3))

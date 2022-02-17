@@ -26,7 +26,7 @@ class LuenbergerObserverNoise(LuenbergerObserver):
         wc: float = 1.0,
         num_hl: int = 5,
         size_hl: int = 50,
-        activation=nn.SiLU(),
+        activation=nn.ReLU(),
         recon_lambda: float = 1.0,
         D="block_diag",
     ):
