@@ -518,11 +518,6 @@ class Learner(pl.LightningModule):
                 self.val_loss.detach(),
             )
 
-            # Add t_c to specifications
-            with open(specs_file, "a") as f:
-                print(f"k {self.model.k}", file=f)
-                print(f"t_c {self.model.t_c}", file=f)
-
             # No control theoretic evaluation of the observer with only T
             if self.method == "T":
                 return 0
