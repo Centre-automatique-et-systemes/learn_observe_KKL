@@ -48,8 +48,8 @@ class LuenbergerObserverNoise(LuenbergerObserver):
         self.encoder = MLPn(num_hl=self.num_hl, n_in=self.dim_x,
                             n_hl=self.size_hl, n_out=self.dim_z + 1,
                             activation=self.activation)
-        self.decoder = MLPn(num_hl=self.num_hl, n_in=self.dim_z,
-                            n_hl=self.size_hl, n_out=self.dim_x + 1,
+        self.decoder = MLPn(num_hl=self.num_hl, n_in=self.dim_z + 1,
+                            n_hl=self.size_hl, n_out=self.dim_x,
                             activation=self.activation)
 
     def __repr__(self):
