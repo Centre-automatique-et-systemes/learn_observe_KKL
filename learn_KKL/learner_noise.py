@@ -423,7 +423,6 @@ class LearnerNoise(Learner):
 
         # Save these test trajectories
         os.makedirs(traj_folder, exist_ok=True)
-        traj_error = 0.0
 
         for i in range(w_c_array.shape[0]):
             # TODO run predictions in parallel for all test trajectories!!!
@@ -469,10 +468,6 @@ class LearnerNoise(Learner):
                     plt.show()
                 plt.clf()
                 plt.close("all")
-
-        filename = "RMSE_traj.txt"
-        with open(os.path.join(traj_folder, filename), "w") as f:
-            print(traj_error / nb_trajs, file=f)
 
     def save_results(
         self,

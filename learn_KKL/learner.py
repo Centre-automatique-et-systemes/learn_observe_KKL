@@ -538,6 +538,11 @@ class Learner(pl.LightningModule):
 
             print(f"Shape of mesh for evaluation: {mesh.shape}")
 
+            # Add t_c to specifications
+            with open(specs_file, 'a') as f:
+                print(f'k {self.model.k}', file=f)
+                print(f't_c {self.model.t_c}', file=f)
+
             self.save_pdf_heatmap(x_mesh, x_hat_star, verbose)
             self.save_random_traj(x_mesh, num_samples, nb_trajs, verbose, tsim, dt)
 

@@ -548,3 +548,38 @@ class QuanserQubeServo2(System):
     def __repr__(self):
         return "VanDerPol"
 
+class saturatedVanDerPol(System):
+    """ See https://en.wikipedia.org/wiki/Van_der_Pol_oscillator for detailed
+    reference for this system.
+    """
+
+    def __init__(self, eps: float = 1.0):
+        super().__init__()
+        self.dim_x = 2
+        self.dim_y = 1
+
+        self.eps = eps
+
+        self.u = self.null_controller
+        self.u_1 = self.null_controller
+
+    def f(self, x):
+        xdot = torch.zeros_like(x)
+        a = torch.max(torch.abs(x), dim=-1).values
+        idx = torch.gt(a, 3)
+        g = torch.ones_like(a)
+        g[idx] = 1 - torch.exp(-.1 / (a[idx] - 3))
+        xdot[..., 0] = x[..., 1]
+        xdot[..., 1] = self.eps * (1 - torch.pow(x[..., 0], 2)) * x[..., 1] - x[..., 0]
+        return xdot * torch.unsqueeze(g, dim=-1)
+
+    def h(self, x):
+        return torch.unsqueeze(x[..., 0], dim=-1)
+
+    def g(self, x):
+        xdot = torch.zeros_like(x)
+        xdot[..., 1] = torch.ones_like(x[..., 1])
+        return xdot
+
+    def __repr__(self):
+        return "VanDerPol"
