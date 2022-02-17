@@ -211,6 +211,11 @@ class Learner(pl.LightningModule):
             loss, loss1, loss2 = self.model.loss(self.method, batch, x_hat, z_hat)
             self.log("train_loss1", loss1, on_step=True, prog_bar=False, logger=True)
             self.log("train_loss2", loss2, on_step=True, prog_bar=False, logger=True)
+            # print(torch.linalg.eigvals(self.model.D))
+            # if self.model.D_scaled.grad is not None:
+            #     print(torch.mean(self.model.encoder.layers[0].weight.grad))
+            #     print(torch.mean(self.model.D_scaled.grad))
+            # wait = input('')
         elif self.method == "T":
             z = batch[:, self.model.dim_x :]
             z_hat = self.forward(batch)
@@ -268,6 +273,20 @@ class Learner(pl.LightningModule):
                 print(key, ": ", val, file=f)
             for key, val in vars(self).items():
                 print(key, ": ", val, file=f)
+
+        if 'Jointly' in self.model.__class__.__name__:
+            eig0 = torch.linalg.eigvals(self.model.D_0)
+            eig = torch.linalg.eigvals(self.model.D)
+            plt.plot(eig0.real, eig0.imag, 'x', label='Initial')
+            plt.plot(eig.real, eig.imag, 'o', label='Final')
+            plt.title('Eigenvalues of optimized D')
+            plt.xlabel(r'$\mathbb{R}$')
+            plt.ylabel(r'$i\mathbb{R}$')
+            plt.legend()
+            plt.savefig(os.path.join(self.results_folder, 'OptimD_eigvals.pdf'),
+                        bbox_inches='tight')
+            plt.clf()
+            plt.close('all')
         return specs_file
 
     def save_pkl(self, fileName, object):
@@ -517,11 +536,6 @@ class Learner(pl.LightningModule):
                 "log",
                 self.val_loss.detach(),
             )
-
-            # Add t_c to specifications
-            with open(specs_file, "a") as f:
-                print(f"k {self.model.k}", file=f)
-                print(f"t_c {self.model.t_c}", file=f)
 
             # No control theoretic evaluation of the observer with only T
             if self.method == "T":

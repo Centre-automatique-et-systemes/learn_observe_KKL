@@ -134,12 +134,12 @@ def RMSE(x, y, dim=None):
 # https://discuss.pytorch.org/t/pytorch-tensor-scaling/38576
 class StandardScaler:
     def __init__(self, X, device):
-        self._mean = torch.mean(X, dim=0).to(device)
-        self._var = torch.var(X, dim=0, unbiased=False).to(device)
+        self._mean = torch.mean(X, dim=0)#.to(device)
+        self._var = torch.var(X, dim=0, unbiased=False)#.to(device)
         # If var = 0., i.e. values all same, make it 1 so unchanged!
         idx = torch.nonzero(self._var == 0.)
         self._var[idx] += 1.
-        self._scale = torch.sqrt(self._var).to(device)
+        self._scale = torch.sqrt(self._var)#.to(device)
         self.n_samples_seen_ = len(X)
 
     def fit(self, X):

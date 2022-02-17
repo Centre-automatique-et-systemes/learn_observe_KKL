@@ -529,8 +529,9 @@ class LuenbergerObserver(nn.Module):
 
         elif method == "diag":
             # Diagonal method
+            wc = wc / (2 * np.pi)
             D = -torch.tensor(
-                [[i] for i in range(1, self.dim_z + 1)]) * torch.eye(
+                [[i * wc] for i in range(1, self.dim_z + 1)]) * torch.eye(
                 self.dim_z
             )
             F = torch.ones(self.dim_z, self.dim_y)
@@ -612,11 +613,11 @@ class LuenbergerObserver(nn.Module):
 
         def dydt(t, z: torch.tensor):
             if self.u_1 == self.u:
-                z_dot = torch.matmul(self.D, z) + torch.matmul(self.F ,measurement(t).t())
+                z_dot = torch.matmul(self.D, z) + torch.matmul(self.F, measurement(t).t())
             else:
                 z_dot = (
                     torch.matmul(self.D, z)
-                    + torch.matmul(self.F ,measurement(t).t())
+                    + torch.matmul(self.F, measurement(t).t())
                     + torch.mul(self.phi(z), self.u_1(t) - self.u(t))
                 )
             return z_dot
@@ -825,9 +826,11 @@ class LuenbergerObserver(nn.Module):
         )
         lhs = torch.einsum("ijk,ik->ij", dTdx, self.f(x))
 
-        D = self.D.to(self.device)
-        F = self.F.to(self.device)
-        rhs = torch.matmul(z_hat, D.t()) + torch.matmul(self.h(x), F.t())
+        # D = self.D.to(self.device)
+        # F = self.F.to(self.device)
+        # rhs = torch.matmul(z_hat, D.t()) + torch.matmul(self.h(x), F.t())
+        rhs = torch.matmul(
+            z_hat, self.D.t()) + torch.matmul(self.h(x), self.F.t())
 
         # PDE loss MSE(lhs, rhs)
         loss_2 = MSE(lhs, rhs, dim=dim)

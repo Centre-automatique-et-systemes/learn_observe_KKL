@@ -355,7 +355,7 @@ class RevDuffing(System):
         return torch.zeros_like(x)
 
     def __repr__(self):
-        return "Reversed Duffing Oscillator"
+        return "Reversed_Duffing_Oscillator"
 
 
 class VanDerPol(System):
