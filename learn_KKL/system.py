@@ -470,7 +470,7 @@ class QuanserQubeServo2(System):
         tau = -(self.km * (Vm - self.km * theta_dot)) / self.Rm
 
         xdot = torch.zeros_like(x)
-        xdot[..., 0] = theta_dot
+        xdot[..., 0] = theta_dot 
         xdot[..., 1] = alpha_dot
         xdot[..., 2] = (
             -self.Lp
@@ -535,7 +535,10 @@ class QuanserQubeServo2(System):
         return xdot
 
     def h(self, x):
-        return torch.unsqueeze(x[..., 0], dim=-1)
+        x_dot = torch.zeros((x.shape[0], self.dim_y))
+        x_dot[..., 0] = x[...,1]
+        # x_dot[..., 1] = x[...,1]
+        return x_dot
 
     def g(self, x):
         xdot = torch.zeros_like(x)
