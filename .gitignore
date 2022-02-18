@@ -17,7 +17,6 @@ main_copy.py
 
 # Log files
 runs/
-experiments/
 jupyter_notebook/runs/
 *.ipynb_checkpoints
 
