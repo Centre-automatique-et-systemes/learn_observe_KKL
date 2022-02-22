@@ -487,6 +487,92 @@ class LearnerNoise(Learner):
                 plt.clf()
                 plt.close("all")
 
+    def plot_rsme_error(self, init_state, w_c_arr, verbose, tsim, dt, std=0.0):
+        # Estimation over the test trajectories with T_star
+        nb_trajs = w_c_arr.shape[0]
+        traj_folder = os.path.join(self.results_folder, "Test_trajectories_RMSE_{}".format(str(std)))
+        tq, simulation = self.system.simulate(init_state, tsim, dt)
+
+        noise = torch.normal(0, std, size=(simulation.shape[0], 2))
+
+        measurement_noise = simulation.add(noise)
+
+        measurement = self.model.h(measurement_noise)
+
+        # Save these test trajectories
+        os.makedirs(traj_folder, exist_ok=True)
+        traj_error = 0.0
+    
+        # Save these test trajectories
+        os.makedirs(traj_folder, exist_ok=True)
+        traj_error = 0.0
+    
+        plot_style = ["-", "--", "-."]
+
+        for i in range(nb_trajs):
+            # TODO run predictions in parallel for all test trajectories!!!
+            # Need to figure out how to interpolate y in parallel for all
+            # trajectories!!!
+            y = torch.cat((tq.unsqueeze(1), measurement), dim=1)
+
+            if i < len(w_c_arr):
+                w_c = w_c_arr[i]
+            else:
+                print('error')
+
+            estimation = self.model.predict(y, tsim, dt, w_c).detach()
+            error = RMSE(simulation, estimation)
+            traj_error += error
+
+            current_traj_folder = os.path.join(traj_folder, f"Traj_{i}")
+            os.makedirs(current_traj_folder, exist_ok=True)
+
+            filename = f"RMSE_{i}.txt"
+            with open(os.path.join(current_traj_folder, filename), "w") as f:
+                print(error.cpu().numpy(), file=f)
+
+            self.save_csv(
+                simulation.cpu().numpy(),
+                os.path.join(current_traj_folder, f"True_traj_{i}.csv"),
+            )
+            self.save_csv(
+                estimation.cpu().numpy(),
+                os.path.join(current_traj_folder, f"Estimated_traj_{i}.csv"),
+            )
+    
+            os.makedirs(current_traj_folder, exist_ok=True)
+    
+            filename = f"RMSE_{i}.txt"
+            with open(os.path.join(current_traj_folder, filename), "w") as f:
+                print(error.cpu().numpy(), file=f)
+    
+            # for i in range(simulation.shape[1]):
+            name = "Traj" + str(1) + ".pdf"
+            plt.plot(
+                tq,
+                RMSE(estimation, simulation, 1).cpu().numpy(),
+                plot_style[i],
+                linewidth=0.8,
+                markersize=1,
+                label=rf"$\omega_c = {round(float(w_c_arr[i]), 2)}$",
+            )
+    
+        plt.legend(loc=1)
+        plt.grid(visible=True)
+        plt.title(rf"Test trajectory RMSE error")
+        plt.xlabel(rf"$t$")
+        plt.ylabel(rf"$\hat{{x}}-x$")
+        plt.savefig(os.path.join(current_traj_folder, name), bbox_inches="tight")
+        if verbose:
+            plt.show()
+        plt.clf()
+        plt.close("all")
+    
+        filename = "RMSE_traj.txt"
+        with open(os.path.join(traj_folder, filename), "w") as f:
+            print(traj_error, file=f)
+    
+
     def save_results(
         self, checkpoint_path=None,
     ):

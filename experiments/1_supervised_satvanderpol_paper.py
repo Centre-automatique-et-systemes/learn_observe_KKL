@@ -67,7 +67,7 @@ if __name__ == "__main__":
     transformation_function = "T_star"
 
     # Trainer options
-    num_epochs = 30
+    num_epochs = 1
     trainer_options = {"max_epochs": num_epochs}
     batch_size = 10
     init_learning_rate = 1e-3
@@ -154,15 +154,22 @@ if __name__ == "__main__":
     learner_T_star.save_rmse_wc(mesh, wc_arr, verbose)
     learner_T_star.plot_sensitiviy_wc(mesh, wc_arr, verbose)
 
+
     # Trajectories
     std_array = [0.0, 0.25, 0.5]
     wc_arr = np.array([0.46, 0.9])
+    tsim = (0, 20)
+    dt = 1e-2
+    x_0 = torch.tensor([1.0, 1.0])
+
+    learner_T_star.plot_rsme_error(x_0, wc_arr, verbose, tsim, dt, std=0.5)
+
     for std in std_array:
         learner_T_star.save_trj(
-            torch.tensor([1.0, 1.0]), wc_arr, 0, verbose, (0, 20), 1e-2, var=std
+           x_0 , wc_arr, 0, verbose, tsim, dt, var=std
         )
         learner_T_star.plot_traj_error(
-            torch.tensor([1.0, 1.0]), wc_arr, 0, verbose, (0, 20), 1e-2, var=std
+            x_0, wc_arr, 0, verbose, tsim, dt, var=std
         )
 
     # Heatmap
