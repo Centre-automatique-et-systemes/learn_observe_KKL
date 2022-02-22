@@ -323,7 +323,7 @@ class LearnerNoise(Learner):
         line_3 = ax1.plot(
             w_c_array,
             errors[:, 2],
-            label=r"$\frac{1}{N}\max_{z_i} \left| \frac{\partial \mathcal{T}^*}{\partial z} (z_i) \right|_{l^2} \left| G \right|_\infty$",
+            label=r"$\frac{1}{N}\max_{z_i} \left| \frac{\partial \mathcal{T}^*}{\partial z} (z_i) \right| \left| G_{\epsilon} \right|_\infty$",
             color=orange,
         )
         # ax2.tick_params(axis='y')

@@ -40,7 +40,7 @@ if __name__ == "__main__":
     system = SaturatedVanDerPol()
 
     # Define data params
-    wc_arr = np.linspace(0.03, 1.0, 100)
+    wc_arr = np.linspace(0.5, 5., 100)
     x_limits = np.array([[-2.5, 2.5], [-2.5, 2.5]])
     num_samples = 70000
 
@@ -164,3 +164,11 @@ if __name__ == "__main__":
         learner_T_star.plot_traj_error(
             torch.tensor([1.0, 1.0]), wc_arr, 0, verbose, (0, 20), 1e-2, var=std
         )
+
+    # Heatmap
+    mesh = learner_T_star.model.generate_data_svl(
+        x_limits, wc_arr, 10000, method="uniform", stack=False
+    )
+
+    # learner.plot_sensitiviy_wc(mesh, wc_arr, verbose)
+    learner_T_star.save_pdf_heatmap(mesh, verbose)
