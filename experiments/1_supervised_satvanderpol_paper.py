@@ -67,7 +67,7 @@ if __name__ == "__main__":
     transformation_function = "T_star"
 
     # Trainer options
-    num_epochs = 1
+    num_epochs = 30
     trainer_options = {"max_epochs": num_epochs}
     batch_size = 10
     init_learning_rate = 1e-3
