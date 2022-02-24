@@ -87,18 +87,17 @@ class LearnerNoise(Learner):
         with open(os.path.join(traj_folder, filename), "w") as f:
             print(traj_error / nb_trajs, file=f)
 
-    def save_trj(self, init_state, w_c_arr, nb_trajs, verbose, tsim, dt, var=0.0):
+    def save_trj(self, init_state, w_c_arr, nb_trajs, verbose, tsim, dt, var=0.2):
         # Estimation over the test trajectories with T_star
         nb_trajs += w_c_arr.shape[0]
         traj_folder = os.path.join(self.results_folder, "Test_trajectories")
         tq, simulation = self.system.simulate(init_state, tsim, dt)
 
-        noise = torch.normal(0, var, size=(simulation.shape[0], 2))
+        noise = torch.normal(0, var, size=(simulation.shape))
 
-        measurement_noise = simulation.add(noise)
+        simulation_noise = simulation.add(noise)
 
-        measurement = self.model.h(measurement_noise)
-        # measurement = measurement.add(noise)
+        measurement = self.model.h(simulation_noise)
 
         # Save these test trajectories
         os.makedirs(traj_folder, exist_ok=True)
@@ -138,7 +137,7 @@ class LearnerNoise(Learner):
             for j in range(estimation.shape[1]):
                 name = "Traj" + str(j) + ".pdf"
                 if j == 0:
-                    plt.plot(tq, measurement_noise[:, j].detach().numpy(), '-', label=r"$y$")
+                    plt.plot(tq, simulation_noise[:, j].detach().numpy(), '-', label=r"$y$")
                 plt.plot(tq, simulation[:, j].detach().numpy(), '--', label=rf"$x_{j + 1}$")
                 plt.plot(
                     tq, estimation[:, j].detach().numpy(), '-.', label=rf"$\hat{{x}}_{j + 1}$"
@@ -471,15 +470,7 @@ class LearnerNoise(Learner):
 
     def save_results(
         self,
-        limits: np.array,
-        wc_arr_train,
-        nb_trajs=10,
-        t_sim=(0, 60),
-        dt=1e-2,
-        num_samples=80000,
         checkpoint_path=None,
-        verbose=False,
-        fast=False,
     ):
         """
         Save the model, the training and validation data. Also saving several

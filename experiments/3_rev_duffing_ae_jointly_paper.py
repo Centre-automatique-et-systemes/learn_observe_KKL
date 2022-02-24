@@ -13,7 +13,7 @@ working_path = str(pathlib.Path().resolve())
 sys.path.append(working_path)
 
 # Import KKL observer
-from learn_KKL.learner_noise import LearnerNoise
+from learn_KKL.learner import Learner
 from learn_KKL.system import RevDuffing
 from learn_KKL.luenberger_observer_jointly import LuenbergerObserverJointly
 from learn_KKL.utils import generate_mesh
@@ -36,24 +36,24 @@ if __name__ == "__main__":
     learning_method = "Autoencoder"
     num_hl = 5
     size_hl = 50
-    activation = nn.SiLU()
+    activation = nn.ReLU()
 
     # Define system
     system = RevDuffing()
 
     # Define data params
     x_limits = np.array([[-1.0, 1.0], [-1.0, 1.0]])
-    num_samples = 70000
-    init_wc = 0.5
+    num_samples = 10000
+    init_wc = 0.8
 
     # Create the observer (autoencoder design)
     observer = LuenbergerObserverJointly(
-        dim_x=system.dim_x, dim_y=system.dim_y, method=learning_method, wc=init_wc, recon_lambda=0.8
+        dim_x=system.dim_x, dim_y=system.dim_y, method=learning_method, wc=init_wc
     )
     observer.set_dynamics(system)
 
     # Generate the data
-    data = generate_mesh(x_limits, 10000, method="LHS")
+    data = generate_mesh(x_limits, num_samples, method="LHS")
     data, val_data = train_test_split(data, test_size=0.3, shuffle=True)
 
     ##########################################################################
@@ -84,7 +84,7 @@ if __name__ == "__main__":
     )
 
     # Instantiate learner
-    learner = LearnerNoise(
+    learner = Learner(
         observer=observer,
         system=system,
         training_data=data,
@@ -123,11 +123,10 @@ if __name__ == "__main__":
     ##########################################################################
 
     learner.save_results(
-        limits=np.array([[-1, 1.0], [-1.0, 1.0]]),
-        nb_trajs=10,
-        tsim=(0, 60),
-        dt=1e-2,
-        fast=True,
-        checkpoint_path=checkpoint_callback.best_model_path,
-    )
-
+         limits=np.array([[-1, 1.0], [-1.0, 1.0]]),
+         nb_trajs=10,
+         tsim=(0, 40),
+         dt=1e-2,
+         fast=True,
+         checkpoint_path=checkpoint_callback.best_model_path,
+     )
