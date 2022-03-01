@@ -354,7 +354,7 @@ class LuenbergerObserver(nn.Module):
             return self.forward_T(*input)
         elif method == "T_star":
             return self.forward_T_star(*input)
-        elif method == "Autoencoder":
+        elif "Autoencoder" in method:
             return self.forward_autoencoder(*input)
 
     def set_dynamics(self, system):

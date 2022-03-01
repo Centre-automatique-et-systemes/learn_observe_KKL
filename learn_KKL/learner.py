@@ -101,7 +101,7 @@ class Learner(pl.LightningModule):
         self.validation_data = validation_data
         self.num_train = len(self.training_data)
         self.num_val = len(self.validation_data)
-        if self.method == "Autoencoder":
+        if "Autoencoder" in self.method:
             self.scaler_x = StandardScaler(self.training_data, self.device)
             self.scaler_z = None
         else:
@@ -183,7 +183,7 @@ class Learner(pl.LightningModule):
 
     def forward(self, batch):
         # Compute x_hat and/or z_hat depending on the method
-        if self.method == "Autoencoder":
+        if "Autoencoder" in self.method:
             x = batch  # .to(self.device)
             z_hat, x_hat = self.model(self.method, x)
             return z_hat, x_hat
@@ -211,11 +211,12 @@ class Learner(pl.LightningModule):
             loss, loss1, loss2 = self.model.loss(self.method, batch, x_hat, z_hat)
             self.log("train_loss1", loss1, on_step=True, prog_bar=False, logger=True)
             self.log("train_loss2", loss2, on_step=True, prog_bar=False, logger=True)
-            # print(torch.linalg.eigvals(self.model.D))
-            # if self.model.D_scaled.grad is not None:
-            #     print(torch.mean(self.model.encoder.layers[0].weight.grad))
-            #     print(torch.mean(self.model.D_scaled.grad))
-            # wait = input('')
+        elif self.method == "Autoencoder_jointly":
+            z_hat, x_hat = self.forward(batch)
+            loss, loss1, loss2, loss3 = self.model.loss(self.method, batch, x_hat, z_hat)
+            self.log("train_loss1", loss1, on_step=True, prog_bar=False, logger=True)
+            self.log("train_loss2", loss2, on_step=True, prog_bar=False, logger=True)
+            self.log("train_loss3", loss3, on_step=True, prog_bar=False, logger=True)
         elif self.method == "T":
             z = batch[:, self.model.dim_x :]
             z_hat = self.forward(batch)
@@ -247,6 +248,12 @@ class Learner(pl.LightningModule):
                 loss, loss1, loss2 = self.model.loss(self.method, batch, x_hat, z_hat)
                 self.log("val_loss1", loss1, on_step=True, prog_bar=False, logger=True)
                 self.log("val_loss2", loss2, on_step=True, prog_bar=False, logger=True)
+            elif self.method == "Autoencoder_jointly":
+                z_hat, x_hat = self.forward(batch)
+                loss, loss1, loss2, loss3 = self.model.loss(self.method, batch, x_hat, z_hat)
+                self.log("val_loss1", loss1, on_step=True, prog_bar=False, logger=True)
+                self.log("val_loss2", loss2, on_step=True, prog_bar=False, logger=True)
+                self.log("val_loss3", loss3, on_step=True, prog_bar=False, logger=True)
             elif self.method == "T":
                 z = batch[:, self.model.dim_x :]
                 z_hat = self.forward(batch)

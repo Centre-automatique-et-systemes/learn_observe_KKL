@@ -17,13 +17,14 @@ class LuenbergerObserverJointly(LuenbergerObserver):
             self,
             dim_x: int,
             dim_y: int,
-            method: str = "Autoencoder",
+            method: str = "Autoencoder_jointly",
             dim_z: int = None,
             wc: float = 1.0,
             num_hl: int = 5,
             size_hl: int = 50,
             activation=nn.ReLU(),
             recon_lambda: float = 1.0,
+            sensitivity_lambda=0,
             D="block_diag",
     ):
 
@@ -40,6 +41,10 @@ class LuenbergerObserverJointly(LuenbergerObserver):
             recon_lambda,
             D,
         )
+        self.sensitivity_lambda = sensitivity_lambda
+        if self.sensitivity_lambda > 0:
+            raise Exception('Adding a sensitivity term to the AE loss is '
+                            'experimental and should be corrected first!')
 
     @property
     def D(self):
@@ -74,10 +79,11 @@ class LuenbergerObserverJointly(LuenbergerObserver):
                 "decoder " + str(self.decoder),
                 "method " + self.method,
                 "recon_lambda " + str(self.recon_lambda),
+                "sensitivity_lambda " + str(self.sensitivity_lambda),
             ]
         )
 
-    def loss_autoencoder_sensitivity(
+    def loss_autoencoder_jointly(
              self, x: torch.tensor, x_hat: torch.tensor,
              z_hat: torch.tensor, dim=None) -> torch.tensor:
          """
@@ -117,20 +123,31 @@ class LuenbergerObserverJointly(LuenbergerObserver):
          loss, loss_1, loss_2 = self.loss_autoencoder(
              x, x_hat, z_hat, dim)
 
-         # Compute gradients of T_star with respect to inputs
-         dTdh = torch.autograd.functional.jacobian(
-             self.decoder, z_hat, create_graph=False, strict=False, vectorize=False
-         )
-         dTdz = torch.transpose(
-             torch.transpose(torch.diagonal(dTdh, dim1=0, dim2=2), 1, 2), 0, 1
-         )
-         dTdz = dTdz[:, :, : self.dim_z]  # TODO correct this loss
-         # D = self.D.to(self.device)
-         # F = self.F.to(self.device)
-         # loss_3 = torch.linalg.norm(dTdz,
-         #                            torch.matmul(torch.matmul(torch.inverse(D), F)))
-         loss_3 = torch.linalg.norm(
-             dTdz, torch.matmul(torch.matmul(torch.inverse(self.D), self.F)))
+         if self.sensitivity_lambda > 0:
+             # Compute gradients of T_star with respect to inputs
+             dTdh = torch.autograd.functional.jacobian(
+                 self.decoder, z_hat, create_graph=False, strict=False, vectorize=False
+             )
+             dTdz = torch.transpose(
+                 torch.transpose(torch.diagonal(dTdh, dim1=0, dim2=2), 1, 2), 0, 1
+             )
+             dTdz = dTdz[:, :, : self.dim_z]  # TODO correct this loss!!!
+             loss_3 = self.sensitivity_lambda * torch.linalg.norm(
+                 torch.matmul(dTdz, torch.matmul(torch.inverse(self.D), self.F)))
 
-         return loss + loss_3, loss_1, loss_2
+         else:
+             loss_3 = torch.zeros_like(loss)
+
+         return loss + loss_3, loss_1, loss_2, loss_3
+
+
+    def loss(self, method="Autoencoder_jointly", *input):
+        if method == "T":
+            return self.loss_T(*input)
+        elif method == "T_star":
+            return self.loss_T_star(*input)
+        elif method == "Autoencoder":
+            return self.loss_autoencoder(*input)
+        elif method == "Autoencoder_jointly":
+            return self.loss_autoencoder_jointly(*input)
 

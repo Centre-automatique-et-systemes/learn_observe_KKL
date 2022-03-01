@@ -33,7 +33,7 @@ if __name__ == "__main__":
     # Setup observer #########################################################
     ##########################################################################
     # Learning method
-    learning_method = "Autoencoder"
+    learning_method = "Autoencoder_jointly"
     num_hl = 5
     size_hl = 50
     activation = nn.ReLU()
@@ -45,12 +45,9 @@ if __name__ == "__main__":
     # Define data params
     x_limits = np.array([[-1.0, 1.0], [-1.0, 1.0]])
     num_samples = 70000
-    init_wc = 1
+    init_wc = 0.5
 
     # Create the observer (autoencoder design)
-    # observer = LuenbergerObserverJointly(
-    #     dim_x=system.dim_x, dim_y=system.dim_y, method=learning_method, wc=init_wc
-    # )
     observer = LuenbergerObserverJointly(
         dim_x=system.dim_x, dim_y=system.dim_y, method=learning_method,
         wc=init_wc, recon_lambda=recon_lambda
@@ -119,7 +116,7 @@ if __name__ == "__main__":
     print(f"Logs stored in {learner.results_folder}/tb_logs")
     # which should be similar to jupyter_notebooks/runs/method/exp_0/tb_logs/
     # Then type this in terminal:
-    # tensorboard --logdir=name_of_folder --port=8080
+    # tensorboard --logdir=name_of_folder
 
     # Train and save results
     trainer.fit(learner)
