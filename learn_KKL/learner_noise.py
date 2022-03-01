@@ -153,7 +153,7 @@ class LearnerNoise(Learner):
                 plt.legend(loc=1)
                 plt.grid(visible=True)
                 plt.title(
-                    rf"Test trajectory for $\omega_c$ {np.round(w_c, 3)}, RMSE {np.round(error.numpy(),4)}"
+                    rf"Test trajectory for $\omega_c = $ {np.round(w_c, 3)}, RMSE = {np.round(error.numpy(),4)}"
                 )
                 plt.xlabel(rf"$t$")
                 plt.ylabel(rf"$x_{j + 1}$")
@@ -258,8 +258,8 @@ class LearnerNoise(Learner):
                     x_mesh[:, i],
                     cmap="jet",
                     c=np.log(error.detach().numpy()),
-                    vmin=-11,
-                    vmax=-3,
+                    # vmin=-11,
+                    # vmax=-3,
                 )
                 cbar = plt.colorbar()
                 cbar.set_label("Log estimation error")
@@ -292,7 +292,6 @@ class LearnerNoise(Learner):
         for j in range(len(w_c_array)):
             z_mesh = mesh[:, self.model.dim_x :, j]
             self.model.D, _ = self.model.set_DF(w_c_array[j])
-            print(j)
             errors[j] = self.model.sensitivity_norm(z_mesh)
 
         # errors = functional.normalize(errors)
@@ -307,18 +306,18 @@ class LearnerNoise(Learner):
 
         fig, ax1 = plt.subplots()
 
-        # ax1.set_xlabel(r"$\omega_c$")
-        # # ax1.set_ylabel('exp', color=color)
-        # ax1.tick_params(axis='y')
-        # line_1 = ax1.plot(
-        #     w_c_array,
-        #     errors[:, 0],
-        #     label=r"$\frac{1}{N}\max_{z_i} \left| \frac{\partial \mathcal{T}^*}{\partial z} (z_i) \right|_{l^2}$",
-        #     color=blue
-        # )
-        # line_2 = ax1.plot(w_c_array, errors[:, 1], label=r"$\left| G \right|_\infty$", color=green)
+        ax1.set_xlabel(r"$\omega_c$")
+        # ax1.set_ylabel('exp', color=color)
+        ax1.tick_params(axis='y')
+        line_1 = ax1.plot(
+            w_c_array,
+            errors[:, 0],
+            label=r"$\frac{1}{N}\max_{z_i} \left| \frac{\partial \mathcal{T}^*}{\partial z} (z_i) \right|_{l^2}$",
+            color=blue
+        )
+        line_2 = ax1.plot(w_c_array, errors[:, 1], label=r"$\left| G \right|_\infty$", color=green)
 
-        # ax2 = ax1.twinx()
+        ax2 = ax1.twinx()
 
         line_3 = ax1.plot(
             w_c_array,
@@ -326,11 +325,12 @@ class LearnerNoise(Learner):
             label=r"$\frac{1}{N}\max_{z_i} \left| \frac{\partial \mathcal{T}^*}{\partial z} (z_i) \right| \left| G_{\epsilon} \right|_\infty$",
             color=orange,
         )
-        # ax2.tick_params(axis='y')
+        ax2.tick_params(axis='y')
         fig.tight_layout()
 
         # added these three lines
-        lns = line_3
+        lns = line_3 + line_1 + line_2
+        # lns = line_3
         labs = [l.get_label() for l in lns]
         ax1.legend(lns, labs, loc=1)
         ax1.grid(False)
@@ -559,7 +559,7 @@ class LearnerNoise(Learner):
     
         plt.legend(loc=1)
         plt.grid(visible=True)
-        plt.title(rf"Test trajectory RMSE error")
+        plt.title(rf"Test trajectory RMSE")
         plt.xlabel(rf"$t$")
         plt.ylabel(rf"$\hat{{x}}-x$")
         plt.savefig(os.path.join(current_traj_folder, name), bbox_inches="tight")

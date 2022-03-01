@@ -40,9 +40,10 @@ if __name__ == "__main__":
     system = SaturatedVanDerPol()
 
     # Define data params
-    wc_arr = np.linspace(0.5, 5., 100)
-    x_limits = np.array([[-2.5, 2.5], [-2.5, 2.5]])
-    num_samples = 70000
+    # wc_arr = np.linspace(0.3, 3., 10)
+    wc_arr = np.array([2.8])
+    x_limits = np.array([[-2.7, 2.7], [-2.7, 2.7]])
+    num_samples = wc_arr.shape[0] * 50000
 
     # Instantiate observer object
     observer = LuenbergerObserverNoise(
@@ -67,9 +68,9 @@ if __name__ == "__main__":
     transformation_function = "T_star"
 
     # Trainer options
-    num_epochs = 1
+    num_epochs = 30
     trainer_options = {"max_epochs": num_epochs}
-    batch_size = 10
+    batch_size = 20
     init_learning_rate = 1e-3
 
     # Optim options
@@ -143,12 +144,13 @@ if __name__ == "__main__":
     # Params
     idx = np.random.choice(np.arange(len(learner_T_star.training_data)), size=(10000,))
     verbose = False
+    x_limits = np.array([[-2.7, 2.7], [-2.7, 2.7]])
 
     learner_T_star.save_pdf_training(learner_T_star.training_data[idx], verbose)
 
     # Mesh
     mesh = learner_T_star.model.generate_data_svl(
-        x_limits, wc_arr, 10000, method="LHS", stack=False
+        x_limits, wc_arr, 3000, method="uniform", stack=False
     )
 
     learner_T_star.save_rmse_wc(mesh, wc_arr, verbose)
@@ -157,7 +159,7 @@ if __name__ == "__main__":
 
     # Trajectories
     std_array = [0.0, 0.25, 0.5]
-    wc_arr = np.array([0.46, 0.9])
+    wc_arr = np.array([2.8, 0.3, 0.8])
     tsim = (0, 20)
     dt = 1e-2
     x_0 = torch.tensor([1.0, 1.0])
