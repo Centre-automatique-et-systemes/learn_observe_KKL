@@ -332,7 +332,7 @@ class Learner(pl.LightningModule):
             plt.clf()
             plt.close("all")
 
-    def save_random_traj(self, x_mesh, num_samples, nb_trajs, verbose, tsim, dt, std=0.2):
+    def save_random_traj(self, x_mesh, num_samples, nb_trajs, verbose, tsim, dt, std=0.):
         # Estimation over the test trajectories with T_star
         random_idx = np.random.choice(np.arange(num_samples), size=(nb_trajs,))
         trajs_init = x_mesh[random_idx]
@@ -354,7 +354,8 @@ class Learner(pl.LightningModule):
             # trajectories!!!
             y = torch.cat((tq.unsqueeze(1), measurement[:, i]), dim=1)
             estimation = self.model.predict(y, tsim, dt).detach()
-            traj_error += RMSE(simulation[:, i], estimation)
+            rmse = RMSE(simulation[:, i], estimation)
+            traj_error += rmse
 
             current_traj_folder = os.path.join(traj_folder, f"Traj_{i}")
             os.makedirs(current_traj_folder, exist_ok=True)
@@ -388,6 +389,27 @@ class Learner(pl.LightningModule):
 
                 plt.clf()
                 plt.close("all")
+
+            name = "Phase_portrait.pdf"  # TODO DELETE
+            plt.plot(simulation[:, i, 0].detach().numpy(), simulation[:, i,
+                                                        1].detach().numpy(),
+                     label=rf"True")
+            plt.plot(estimation[:, 0].detach().numpy(), estimation[:,
+                                                        1].detach().numpy(),
+                     '--', label=rf"Estimated")
+            plt.legend(loc=1)
+            plt.grid(visible=True)
+            plt.title(
+                rf"Test trajectory for $\sigma =$ {std}, RMSE {np.round(rmse.numpy(), 4)}")
+            plt.xlabel(rf"$x_{1}$")
+            plt.ylabel(rf"$x_{2}$")
+            plt.savefig(
+                os.path.join(current_traj_folder, name), bbox_inches="tight"
+            )
+            if verbose:
+                plt.show()
+            plt.clf()
+            plt.close("all")
 
         filename = "RMSE_traj.txt"
         with open(os.path.join(traj_folder, filename), "w") as f:

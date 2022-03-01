@@ -420,22 +420,21 @@ class LuenbergerObserver(nn.Module):
             Method used to calculate D. Choose betweeen 'indirect', 'direct'
             and 'diag'.
         """
-        if method not in [
-            "indirect",
-            "direct",
-            "diag",
-            "companion",
-            "block_diag",
-            "block_companion",
-        ]:
-            raise NameError("{} not defined.".format(method))
 
         wc = wc * 2 * np.pi
+        if method.startswith('butter'):
+            filter = signal.butter
+            method = method.split('_', 1)[1]
+        elif method.startswith('bessel'):
+            filter = signal.bessel
+            method = method.split('_', 1)[1]
+        else:
+            filter = signal.bessel  # default
 
         # Set the KKL matrix D with different methods
         if method == "indirect":
             # Indirect method to place poles of D with Bessel filter
-            _, pO, _ = signal.bessel(self.dim_z, wc, analog=True, output="zpk")
+            _, pO, _ = filter(self.dim_z, wc, analog=True, output="zpk")
             pO = np.sort(pO)
             A = -np.array([[i] for i in range(1, self.dim_z + 1)]) * np.eye(
                 self.dim_z)
@@ -449,7 +448,7 @@ class LuenbergerObserver(nn.Module):
 
         elif method == "direct":
             # Direct method to place poles of D with Bessel filter
-            _, pO, _ = signal.bessel(self.dim_z, wc, analog=True, output="zpk")
+            _, pO, _ = filter(self.dim_z, wc, analog=True, output="zpk")
             pO = np.sort(pO)
             A = np.zeros((self.dim_z, self.dim_z))
             B = -np.eye(self.dim_z)
@@ -461,7 +460,7 @@ class LuenbergerObserver(nn.Module):
 
         elif method == "companion":
             # D in companion form of Bessel filter denominator
-            _, a = signal.bessel(self.dim_z, wc, analog=True, output="ba")
+            _, a = filter(self.dim_z, wc, analog=True, output="ba")
             D = torch.as_tensor(
                 np.polynomial.polynomial.polycompanion(np.flip(a)))
             F = torch.zeros(self.dim_z, self.dim_y)
@@ -471,7 +470,7 @@ class LuenbergerObserver(nn.Module):
             # D as block diagonal of real (block of dim 1) and complex conjugate
             # (block of dim 2) eigenvalues of Bessel filter
             D = np.zeros((self.dim_z, self.dim_z))
-            _, pO, _ = signal.bessel(self.dim_z, wc, analog=True, output="zpk")
+            _, pO, _ = filter(self.dim_z, wc, analog=True, output="zpk")
             pO = np.sort(pO)
             real_idx = -1
             complex_idx = 0
@@ -500,7 +499,7 @@ class LuenbergerObserver(nn.Module):
             # (companion matrix of dim 2) eigenvalues of Bessel filter
             D = np.zeros((self.dim_z, self.dim_z))
             F = np.zeros((self.dim_z, self.dim_y))
-            _, pO, _ = signal.bessel(self.dim_z, wc, analog=True, output="zpk")
+            _, pO, _ = filter(self.dim_z, wc, analog=True, output="zpk")
             pO = np.sort(pO)
             real_idx = 0
             complex_idx = -1
@@ -534,6 +533,15 @@ class LuenbergerObserver(nn.Module):
                 [[i * wc] for i in range(1, self.dim_z + 1)]) * torch.eye(
                 self.dim_z
             )
+            F = torch.ones(self.dim_z, self.dim_y)
+
+        elif method.startswith('id'):
+            wc = wc / (2 * np.pi)
+            D = - wc * torch.eye(self.dim_z)
+            F = torch.ones(self.dim_z, self.dim_y)
+
+        elif method.startswith('randn'):
+            D = torch.randn(self.dim_z, self.dim_z) / self.dim_z
             F = torch.ones(self.dim_z, self.dim_y)
 
         else:

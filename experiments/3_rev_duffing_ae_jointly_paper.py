@@ -37,18 +37,23 @@ if __name__ == "__main__":
     num_hl = 5
     size_hl = 50
     activation = nn.ReLU()
+    recon_lambda = 0.1
 
     # Define system
     system = RevDuffing()
 
     # Define data params
     x_limits = np.array([[-1.0, 1.0], [-1.0, 1.0]])
-    num_samples = 10000
-    init_wc = 0.8
+    num_samples = 70000
+    init_wc = 1
 
     # Create the observer (autoencoder design)
+    # observer = LuenbergerObserverJointly(
+    #     dim_x=system.dim_x, dim_y=system.dim_y, method=learning_method, wc=init_wc
+    # )
     observer = LuenbergerObserverJointly(
-        dim_x=system.dim_x, dim_y=system.dim_y, method=learning_method, wc=init_wc
+        dim_x=system.dim_x, dim_y=system.dim_y, method=learning_method,
+        wc=init_wc, recon_lambda=recon_lambda
     )
     observer.set_dynamics(system)
 
@@ -63,24 +68,25 @@ if __name__ == "__main__":
     # Trainer options
     num_epochs = 30
     trainer_options = {"max_epochs": num_epochs}
-    batch_size = 10
+    batch_size = 100
     init_learning_rate = 1e-3
 
     # Optim options
     optim_method = optim.Adam
-    optimizer_options = {"weight_decay": 1e-6}
+    optimizer_options = {"weight_decay": 1e-8}
 
     # Scheduler options
     scheduler_method = optim.lr_scheduler.ReduceLROnPlateau
     scheduler_options = {
         "mode": "min",
         "factor": 0.1,
-        "patience": 3,
+        "patience": 1,
         "threshold": 1e-4,
         "verbose": True,
     }
     stopper = pl.callbacks.early_stopping.EarlyStopping(
-        monitor="val_loss", min_delta=5e-4, patience=3, verbose=False, mode="min"
+        monitor="val_loss", min_delta=5e-4, patience=3, verbose=False,
+        mode="min"
     )
 
     # Instantiate learner
