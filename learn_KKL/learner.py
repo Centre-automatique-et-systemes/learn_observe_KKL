@@ -490,7 +490,6 @@ class Learner(pl.LightningModule):
 
             specs_file = self.save_specifications()
 
-            # self.save_pkl('/model.pkl', self.model)  # no need for both
             self.save_pkl("/learner.pkl", self)
 
             self.save_csv(
