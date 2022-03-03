@@ -22,7 +22,8 @@ class LearnerNoise(Learner):
         # Estimation over the test trajectories with T_star
         nb_trajs += w_c_arr.shape[0]
 
-        random_idx = np.random.choice(np.arange(x_mesh.shape[0]), size=(nb_trajs,))
+        random_idx = np.random.choice(np.arange(x_mesh.shape[0]),
+                                      size=(nb_trajs,), replace=False)
         trajs_init = x_mesh[random_idx]
         traj_folder = os.path.join(self.results_folder, "Test_trajectories")
         tq, simulation = self.system.simulate(trajs_init, tsim, dt)
@@ -277,7 +278,7 @@ class LearnerNoise(Learner):
         errors = np.zeros((len(w_c_array), 3))
 
         for j in range(len(w_c_array)):
-            z_mesh = mesh[:, self.model.dim_x :, j]
+            z_mesh = mesh[:, self.model.dim_x:, j]
             self.model.D, _ = self.model.set_DF(w_c_array[j])
             print(j)
             errors[j] = self.model.sensitivity_norm(z_mesh)

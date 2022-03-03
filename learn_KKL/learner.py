@@ -40,7 +40,7 @@ class Learner(pl.LightningModule):
 
     method: str
         Method for training the model's encoder, decoder, or both jointly.
-        Can be 'T', 'T_star', 'Autoencoder' respectively.
+        Can be 'T', 'T_star', 'Autoencoder', 'Autoencoder_jointly' respectively.
 
     batch_size: int
         Size of the minibatches.
@@ -134,7 +134,7 @@ class Learner(pl.LightningModule):
         # Folder to save results
         i = 0
         params = os.path.join(os.getcwd(), "runs", str(self.system), self.model.method)
-        if self.model.method == "Supervised":
+        if "Supervised" in self.model.method:
             params += "/" + self.method
         while os.path.isdir(os.path.join(params, f"exp_{i}")):
             i += 1
@@ -281,7 +281,7 @@ class Learner(pl.LightningModule):
             for key, val in vars(self).items():
                 print(key, ": ", val, file=f)
 
-        if 'Jointly' in self.model.__class__.__name__:
+        if 'jointly' in self.method:
             eig0 = torch.linalg.eigvals(self.model.D_0)
             eig = torch.linalg.eigvals(self.model.D)
             plt.plot(eig0.real, eig0.imag, 'x', label='Initial')
@@ -341,7 +341,8 @@ class Learner(pl.LightningModule):
 
     def save_random_traj(self, x_mesh, num_samples, nb_trajs, verbose, tsim, dt, std=0.):
         # Estimation over the test trajectories with T_star
-        random_idx = np.random.choice(np.arange(num_samples), size=(nb_trajs,))
+        random_idx = np.random.choice(np.arange(num_samples),
+                                      size=(nb_trajs,), replace=False)
         trajs_init = x_mesh[random_idx]
         traj_folder = os.path.join(self.results_folder, "Test_trajectories")
         tq, simulation = self.system.simulate(trajs_init, tsim, dt)
@@ -407,7 +408,7 @@ class Learner(pl.LightningModule):
             plt.legend(loc=1)
             plt.grid(visible=True)
             plt.title(
-                rf"Test trajectory for $\sigma =$ {std}, RMSE {np.round(rmse.numpy(), 4)}")
+                rf"Test trajectory for $\sigma =$ {std}, RMSE = {np.round(rmse.numpy(), 4)}")
             plt.xlabel(rf"$x_{1}$")
             plt.ylabel(rf"$x_{2}$")
             plt.savefig(
@@ -540,7 +541,7 @@ class Learner(pl.LightningModule):
 
             # Save training and validation data
             idx = np.random.choice(
-                np.arange(len(self.training_data)), size=(10000,)
+                np.arange(len(self.training_data)), size=(10000,), replace=False
             )  # subsampling for plots
 
             specs_file = self.save_specifications()

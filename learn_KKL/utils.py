@@ -33,14 +33,20 @@ def generate_mesh(limits: np.array, num_samples: int,
         Mesh in shape (num_samples, 2).
     """
 
-    # Sample either a uniformly grid or use latin hypercube sampling
+    # Sample either a uniform grid or use latin hypercube sampling
     if method == 'uniform':
-        # Linspace upper bound and cut additional samples
-        # TODO Enhancement
-        axes = np.linspace(limits[:, 0], limits[:, 1], int(np.ceil(np.power(num_samples, 1/len(limits)))))
+        # Linspace upper bound and cut additional samples at random (
+        # otherwise all cut in the same region!)
+        axes = np.linspace(limits[:, 0], limits[:, 1], int(np.ceil(np.power(
+            num_samples, 1/len(limits)))))
         axes_list = [axes[:, i] for i in range(axes.shape[1])]
         mesh = np.array(np.meshgrid(*axes_list)).T.reshape(-1, axes.shape[1])
-        mesh = mesh[:num_samples, ]
+        idx = np.random.choice(np.arange(len(mesh)), size=(num_samples,),
+                               replace=False)
+        print(f'Uniform grid: deleted {len(mesh) - num_samples} samples at '
+              f'random to match the desired number of samples {num_samples} '
+              f'from the uniform grid matching the dimension from above')
+        mesh = mesh[idx]
     elif method == 'LHS':
         sampling = LHS(xlimits=limits)
         mesh = sampling(num_samples)
