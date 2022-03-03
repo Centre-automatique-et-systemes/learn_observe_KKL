@@ -203,7 +203,7 @@ class System:
         tq = torch.arange(tsim[0], tsim[1], dt)
 
         # Solve
-        sol = odeint(dxdt, x_0, tq, method='euler', options=dict(step_size=1e-4))
+        sol = odeint(dxdt, x_0, tq)
 
         return tq, torch.squeeze(sol)
 

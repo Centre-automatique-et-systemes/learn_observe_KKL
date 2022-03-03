@@ -622,7 +622,7 @@ class LuenbergerObserver(nn.Module):
             return z_dot
 
         # Solve
-        z = odeint(dydt, z_0, tq, method='euler', options=dict(step_size=1e-4))
+        z = odeint(dydt, z_0, tq, method='euler', options=dict(step_size=1e-3))
 
         return tq, z
 
@@ -671,7 +671,7 @@ class LuenbergerObserver(nn.Module):
         tq = torch.arange(tsim[0], tsim[1], dt)
 
         # Solve
-        sol = odeint(dydt, y_0, tq, method='euler', options=dict(step_size=1e-4))
+        sol = odeint(dydt, y_0, tq)
 
         return tq, sol
 

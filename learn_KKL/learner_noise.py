@@ -309,13 +309,13 @@ class LearnerNoise(Learner):
         ax1.set_xlabel(r"$\omega_c$")
         # ax1.set_ylabel('exp', color=color)
         ax1.tick_params(axis='y')
-        line_1 = ax1.plot(
-            w_c_array,
-            errors[:, 0],
-            label=r"$\frac{1}{N}\max_{z_i} \left| \frac{\partial \mathcal{T}^*}{\partial z} (z_i) \right|_{l^2}$",
-            color=blue
-        )
-        line_2 = ax1.plot(w_c_array, errors[:, 1], label=r"$\left| G \right|_\infty$", color=green)
+        # line_1 = ax1.plot(
+        #     w_c_array,
+        #     errors[:, 0],
+        #     label=r"$\frac{1}{N}\max_{z_i} \left| \frac{\partial \mathcal{T}^*}{\partial z} (z_i) \right|_{l^2}$",
+        #     color=blue
+        # )
+        # line_2 = ax1.plot(w_c_array, errors[:, 1], label=r"$\left| G \right|_\infty$", color=green)
 
         ax2 = ax1.twinx()
 
@@ -329,8 +329,8 @@ class LearnerNoise(Learner):
         fig.tight_layout()
 
         # added these three lines
-        lns = line_3 + line_1 + line_2
-        # lns = line_3
+        # lns = line_3 + line_1 + line_2
+        lns = line_3
         labs = [l.get_label() for l in lns]
         ax1.legend(lns, labs, loc=1)
         ax1.grid(False)

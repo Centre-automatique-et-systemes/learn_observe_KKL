@@ -40,8 +40,8 @@ if __name__ == "__main__":
     system = SaturatedVanDerPol()
 
     # Define data params
-    # wc_arr = np.linspace(0.3, 3., 10)
-    wc_arr = np.array([2.8])
+    wc_arr = np.linspace(0.3, 3., 10)
+    # wc_arr = np.array([2.8])
     x_limits = np.array([[-2.7, 2.7], [-2.7, 2.7]])
     num_samples = wc_arr.shape[0] * 50000
 

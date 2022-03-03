@@ -40,10 +40,9 @@ if __name__ == "__main__":
     system = RevDuffing()
 
     # Define data params
-    # wc_arr = np.linspace(0.03, 1.0, 100)
-    wc_arr = np.array([ 1.0 ])
-    x_limits = np.array([[-1.0, 1.0], [-1.0, 1.0]])
-    num_samples = 50000
+    wc_arr = np.linspace(0.03, 1.0, 100)
+    x_limits = np.array([[-1.4, 1.4], [-1.4, 1.4]])
+    num_samples = 200000
 
     # Instantiate observer object
     observer = LuenbergerObserverNoise(
@@ -160,10 +159,10 @@ if __name__ == "__main__":
     wc_arr = np.array([0.032, 0.111, 1.0])
     for std in std_array:
         learner_T_star.save_trj(
-            torch.tensor([1.0, 1.0]), wc_arr, 0, verbose, (0, 50), 1e-2, var=std
+            torch.tensor([0.7, 0.7]), wc_arr, 0, verbose, (0, 50), 1e-2, var=std
         )
         learner_T_star.plot_traj_error(
-            torch.tensor([1.0, 1.0]), wc_arr, 0, verbose, (0, 50), 1e-2, var=std
+            torch.tensor([0.7, 0.7]), wc_arr, 0, verbose, (0, 50), 1e-2, var=std
         )
 
     # Heatmap
