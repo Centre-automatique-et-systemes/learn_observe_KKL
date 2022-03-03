@@ -43,9 +43,10 @@ def generate_mesh(limits: np.array, num_samples: int,
         mesh = np.array(np.meshgrid(*axes_list)).T.reshape(-1, axes.shape[1])
         idx = np.random.choice(np.arange(len(mesh)), size=(num_samples,),
                                replace=False)
-        print(f'Uniform grid: deleted {len(mesh) - num_samples} samples at '
-              f'random to match the desired number of samples {num_samples} '
-              f'from the uniform grid matching the dimension from above')
+        print(f'Computed the smallest possible uniform grid for the '
+              f'given dimensions, then deleted {len(mesh) - num_samples} '
+              f'samples randomly to match the desired number of samples'
+              f' {num_samples}.')
         mesh = mesh[idx]
     elif method == 'LHS':
         sampling = LHS(xlimits=limits)
