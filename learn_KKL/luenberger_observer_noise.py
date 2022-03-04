@@ -181,51 +181,50 @@ class LuenbergerObserverNoise(LuenbergerObserver):
     #     return torch.cat(
     #         (dTdz_norm.unsqueeze(0), sv.unsqueeze(0), product.unsqueeze(0)), dim=0
     #     )
-    def sensitivity_norm(self, z):
-        # # Save
-        # dTdh = torch.autograd.functional.jacobian(
-        #     self.decoder, z, create_graph=False, strict=False, vectorize=False
-        # )
-        # dTdz = torch.transpose(
-        #     torch.transpose(torch.diagonal(dTdh, dim1=0, dim2=2), 1, 2), 0, 1
-        # )
-        # dTdz = dTdz[:, :, : self.dim_z]
-        #
-        # # dTdz_norm = max(torch.linalg.matrix_norm(dTdz, ord=2))/(z.shape[0]*z.shape[1])
-        # idx_max = np.argmax(
-        #     torch.linalg.matrix_norm(dTdz, ord=2).detach().numpy())
-        #
-        # Tmax = dTdz[idx_max]
-        #
-        # path = "runs/SaturatedVanDerPol/Supervised_noise/T_star/Paper_Lukas/Test_paper" \
-        #        "/exp_10_wc/"
-        # # path = "runs/Reversed_Duffing_Oscillator/Supervised_noise/T_star/Paper_Lukas/Test_paper/exp_wc_100/"
-        # wc = z[0, -1].item()
-        # import pandas as pd
-        # file = pd.DataFrame(Tmax)
-        # file.to_csv(path + f'Tmax_wc{round(float(wc), 2)}.csv', header=False)
-        # file = pd.DataFrame(dTdz.flatten(1, -1))
-        # file.to_csv(path + f'dTdz_wc{round(float(wc), 2)}.csv', header=False)
+    def sensitivity_norm(self, z, load=False, path=''):
+        # Save
+        dTdh = torch.autograd.functional.jacobian(
+            self.decoder, z, create_graph=False, strict=False, vectorize=False
+        )
+        dTdz = torch.transpose(
+            torch.transpose(torch.diagonal(dTdh, dim1=0, dim2=2), 1, 2), 0, 1
+        )
+        dTdz = dTdz[:, :, : self.dim_z]
 
-        # Load
+        # dTdz_norm = max(torch.linalg.matrix_norm(dTdz, ord=2))/(z.shape[0]*z.shape[1])
+        idx_max = np.argmax(
+            torch.linalg.matrix_norm(dTdz, ord=2).detach().numpy())
+
+        Tmax = dTdz[idx_max]
+
+        path = "runs/SaturatedVanDerPol/Supervised_noise/T_star/Paper_Lukas/Test_paper" \
+               "/exp_10_wc0.02-2/"
+        # path = "runs/Reversed_Duffing_Oscillator/Supervised_noise/T_star/Paper_Lukas/Test_paper/exp_wc_100/"
         wc = z[0, -1].item()
+        import pandas as pd
+        file = pd.DataFrame(Tmax)
+        file.to_csv(path + f'Tmax_wc{round(float(wc), 2)}.csv', header=False)
+        file = pd.DataFrame(dTdz.flatten(1, -1))
+        file.to_csv(path + f'dTdz_wc{round(float(wc), 2)}.csv', header=False)
+
+        # # Load
+        # wc = z[0, -1].item()
         # path = "runs/SaturatedVanDerPol/Supervised_noise/T_star/Paper_Lukas/Test_paper" \
-        #        "/exp_10_wc/zi_mesh_BFsampling1e5uniform/"
-        path = "runs/Reversed_Duffing_Oscillator/Supervised_noise/T_star" \
-               "/Paper_Lukas/Test_paper/exp_wc_100/zi_mesh_BFsampling2e5uniform/"
-        df = pd.read_csv(path + f'Tmax_wc{round(float(wc), 2)}.csv', sep=',',
-                         header=None)
-        Tmax = torch.from_numpy(df.drop(df.columns[0], axis=1).values)
-        df = pd.read_csv(path + f'dTdz_wc{round(float(wc), 2)}.csv', sep=',',
-                         header=None)
-        dTdz = torch.from_numpy(
-            df.drop(df.columns[0], axis=1).values).reshape(
-            (-1, Tmax.shape[0], Tmax.shape[1]))
+        #        "/exp_10_wc0.3-3/zi_mesh_BFsampling1e5uniform2/"
+        # # path = "runs/Reversed_Duffing_Oscillator/Supervised_noise/T_star" \
+        # #        "/Paper_Lukas/Test_paper/exp_wc_100/zi_mesh_BFsampling2e5uniform/"
+        # df = pd.read_csv(path + f'Tmax_wc{round(float(wc), 2)}.csv', sep=',',
+        #                  header=None)
+        # Tmax = torch.from_numpy(df.drop(df.columns[0], axis=1).values)
+        # df = pd.read_csv(path + f'dTdz_wc{round(float(wc), 2)}.csv', sep=',',
+        #                  header=None)
+        # dTdz = torch.from_numpy(
+        #     df.drop(df.columns[0], axis=1).values).reshape(
+        #     (-1, Tmax.shape[0], Tmax.shape[1]))
 
         C = np.eye(self.D.shape[0])
-        print(torch.linalg.eigvals(self.D))
         # sv = torch.tensor(
-        #     compute_h_infinity(self.D.numpy(), self.F.numpy(), C, 1e-3))
+        #     compute_h_infinity(self.D.numpy(), self.F.numpy(), C, 1e-10))
         sv = torch.tensor(compute_h_infinity(self.D.numpy(), self.F.numpy(),
                                              np.dot(Tmax.detach().numpy(),
                                                           C), 1e-3))
