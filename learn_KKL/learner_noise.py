@@ -7,6 +7,7 @@ from learn_KKL.learner import Learner
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import numpy as np
+import pandas as pd
 import torch
 from torch.nn import functional
 
@@ -91,7 +92,7 @@ class LearnerNoise(Learner):
     def save_trj(self, init_state, w_c_arr, nb_trajs, verbose, tsim, dt, var=0.2):
         # Estimation over the test trajectories with T_star
         nb_trajs += w_c_arr.shape[0]
-        traj_folder = os.path.join(self.results_folder, "Test_trajectories")
+        traj_folder = os.path.join(self.results_folder, "Test_trajectories_{}".format(str(var)))
         tq, simulation = self.system.simulate(init_state, tsim, dt)
 
         noise = torch.normal(0, var, size=(simulation.shape))
@@ -138,14 +139,23 @@ class LearnerNoise(Learner):
             for j in range(estimation.shape[1]):
                 name = "Traj" + str(j) + ".pdf"
                 if j == 0:
-                    plt.plot(tq, simulation_noise[:, j].detach().numpy(), '-', label=r"$y$")
-                plt.plot(tq, simulation[:, j].detach().numpy(), '--', label=rf"$x_{j + 1}$")
+                    plt.plot(
+                        tq, measurement[:, j].detach().numpy(), "-", label=r"$y$"
+                    )
                 plt.plot(
-                    tq, estimation[:, j].detach().numpy(), '-.', label=rf"$\hat{{x}}_{j + 1}$"
+                    tq, simulation[:, j].detach().numpy(), "--", label=rf"$x_{j + 1}$"
+                )
+                plt.plot(
+                    tq,
+                    estimation[:, j].detach().numpy(),
+                    "-.",
+                    label=rf"$\hat{{x}}_{j + 1}$",
                 )
                 plt.legend(loc=1)
                 plt.grid(visible=True)
-                plt.title(rf"Test trajectory for $\omega_c$ {np.round(w_c, 3)}, RMSE {np.round(error.numpy(),4)}")
+                plt.title(
+                    rf"Test trajectory for $\omega_c = $ {np.round(w_c, 3)}, RMSE = {np.round(error.numpy(),4)}"
+                )
                 plt.xlabel(rf"$t$")
                 plt.ylabel(rf"$x_{j + 1}$")
                 plt.savefig(
@@ -157,21 +167,26 @@ class LearnerNoise(Learner):
                 plt.close("all")
             # TODO DELETE
             name = "Phase_portrait.pdf"
-            plt.plot(simulation[:, 0].detach().numpy(), simulation[:,
-                                                        1].detach().numpy(),
-                     '--', label=rf"True")
-            plt.plot(estimation[:, 0].detach().numpy(), estimation[:,
-                                                        1].detach().numpy(),
-                     '--', label=rf"Estimated")
+            plt.plot(
+                simulation[:, 0].detach().numpy(),
+                simulation[:, 1].detach().numpy(),
+                "--",
+                label=rf"True",
+            )
+            plt.plot(
+                estimation[:, 0].detach().numpy(),
+                estimation[:, 1].detach().numpy(),
+                "--",
+                label=rf"Estimated",
+            )
             plt.legend(loc=1)
             plt.grid(visible=True)
             plt.title(
-                rf"Test trajectory for $\omega_c$ {np.round(w_c, 3)}, RMSE {np.round(error.numpy(), 4)}")
+                rf"Test trajectory for $\omega_c$ {np.round(w_c, 3)}, RMSE {np.round(error.numpy(), 4)}"
+            )
             plt.xlabel(rf"$x_{1}$")
             plt.ylabel(rf"$x_{2}$")
-            plt.savefig(
-                os.path.join(current_traj_folder, name), bbox_inches="tight"
-            )
+            plt.savefig(os.path.join(current_traj_folder, name), bbox_inches="tight")
             if verbose:
                 plt.show()
             plt.clf()
@@ -228,15 +243,13 @@ class LearnerNoise(Learner):
 
             error = RMSE(x_mesh, x_hat_star, dim=1)
 
-
             # TODO DELETE
-            tq, simulation = self.system.simulate(torch.tensor([0.1, 0.1]),
-                                                  (0, 60), 1e-2)
+            tq, simulation = self.system.simulate(
+                torch.tensor([0.1, 0.1]), (0, 60), 1e-2
+            )
             measurement = self.model.h(simulation)
             y = torch.cat((tq.unsqueeze(1), measurement), dim=1)
-            estimation = self.model.predict(y,  (0, 60), 1e-2, w_c).detach()
-
-
+            estimation = self.model.predict(y, (0, 60), 1e-2, w_c).detach()
 
             for i in range(1, x_mesh.shape[1]):
                 # https://stackoverflow.com/questions/37822925/how-to-smooth-by-interpolation-when-using-pcolormesh
@@ -246,14 +259,14 @@ class LearnerNoise(Learner):
                     x_mesh[:, i],
                     cmap="jet",
                     c=np.log(error.detach().numpy()),
-                    vmin=-11,
-                    vmax=-3
+                    # vmin=-11,
+                    # vmax=-3,
                 )
                 cbar = plt.colorbar()
                 cbar.set_label("Log estimation error")
                 # cbar.set_label("Log estimation error")
 
-                plt.plot(simulation[:,0], simulation[:,1])
+                plt.plot(simulation[:, 0], simulation[:, 1])
                 plt.plot(estimation[:, 0], estimation[:, 1])
 
                 plt.title(
@@ -274,30 +287,70 @@ class LearnerNoise(Learner):
                 plt.clf()
                 plt.close("all")
 
-    def plot_sensitiviy_wc(self, mesh, w_c_array, verbose, y_lim=[None, None]):
+    def plot_sensitiviy_wc(self, mesh, w_c_array, verbose,
+                           y_lim=[None, None], save=True, path=''):
         errors = np.zeros((len(w_c_array), 3))
+        if path == '':
+            path = os.path.join(self.results_folder, 'zi_mesh')
+            os.makedirs(path, exist_ok=True)
 
+        D_arr = torch.zeros(0, 3, 3)
         for j in range(len(w_c_array)):
-            z_mesh = mesh[:, self.model.dim_x:, j]
-            self.model.D, _ = self.model.set_DF(w_c_array[j])
-            print(j)
-            errors[j] = self.model.sensitivity_norm(z_mesh)
+            wc = w_c_array[j]
+            self.model.D, _ = self.model.set_DF(wc)
+
+            if save:
+                z_mesh = mesh[:, self.model.dim_x:, j]
+
+                file = pd.DataFrame(mesh[:, :, j])
+                file.to_csv(os.path.join(
+                    path, f'zi_data_wc{wc:0.3g}.csv'), header=False)
+                for i in range(self.model.dim_x, self.model.dim_x +
+                                                 self.model.dim_z - 1):
+                    plt.scatter(mesh[:, i, j], mesh[:, i + 1, j])
+                    plt.savefig(os.path.join(
+                        path, f'zi_data_wc{wc:0.3g}_{i}.pdf'),
+                        bbox_inches='tight')
+                    plt.clf()
+                    plt.close('all')
+            else:
+                # Load mesh that was saved in path
+                # df = pd.read_csv(os.path.join(
+                #     path, f'zi_data_wc{wc:0.3g}.csv'), sep=',',
+                #     header=None)
+                df = pd.read_csv(os.path.join(
+                    path, f'zi_data_wc{round(float(wc), 2)}.csv'), sep=',',
+                    header=None)
+                mesh = torch.from_numpy(df.drop(df.columns[0], axis=1).values)
+                z_mesh = mesh[:, self.model.dim_x:]
+
+
+            errors[j] = self.model.sensitivity_norm(z_mesh, save=save, path=path)
+            D_arr = torch.cat((D_arr, torch.unsqueeze(self.model.D, 0)))
 
         # errors = functional.normalize(errors)
         self.save_csv(
+            D_arr.flatten(1, -1),
+            os.path.join(path, "D_arr.csv"),
+        )
+        self.save_csv(
+            w_c_array,
+            os.path.join(path, "w_c_array.csv"),
+        )
+        self.save_csv(
             np.concatenate((np.expand_dims(w_c_array, 1), errors), axis=1),
-            os.path.join(self.results_folder, "sensitivity.csv"),
+            os.path.join(path, "sensitivity.csv"),
         )
         name = "sensitivity_wc.pdf"
-        blue = 'tab:blue'
-        orange = 'tab:orange'
-        green = 'tab:green'
+        blue = "tab:blue"
+        orange = "tab:orange"
+        green = "tab:green"
 
         fig, ax1 = plt.subplots()
 
-        # ax1.set_xlabel(r"$\omega_c$")
-        # # ax1.set_ylabel('exp', color=color)
-        # ax1.tick_params(axis='y')
+        ax1.set_xlabel(r"$\omega_c$")
+        # ax1.set_ylabel('exp', color=color)
+        ax1.tick_params(axis='y')
         # line_1 = ax1.plot(
         #     w_c_array,
         #     errors[:, 0],
@@ -306,25 +359,26 @@ class LearnerNoise(Learner):
         # )
         # line_2 = ax1.plot(w_c_array, errors[:, 1], label=r"$\left| G \right|_\infty$", color=green)
 
-        # ax2 = ax1.twinx() 
+        ax2 = ax1.twinx()
 
         line_3 = ax1.plot(
             w_c_array,
             errors[:, 2],
-            label=r"$\frac{1}{N}\max_{z_i} \left| \frac{\partial \mathcal{T}^*}{\partial z} (z_i) \right|_{l^2} \left| G \right|_\infty$",
-            color=orange
+            label=r"$\frac{1}{N}\max_{z_i} \left| \frac{\partial \mathcal{T}^*}{\partial z} (z_i) \right| \left| G_{\epsilon} \right|_\infty$",
+            color=orange,
         )
-        # ax2.tick_params(axis='y')
+        ax2.tick_params(axis='y')
         fig.tight_layout()
 
         # added these three lines
+        # lns = line_3 + line_1 + line_2
         lns = line_3
         labs = [l.get_label() for l in lns]
         ax1.legend(lns, labs, loc=1)
         ax1.grid(False)
 
         plt.title("Gain tuning criterion")
-      
+
         plt.savefig(os.path.join(self.results_folder, name), bbox_inches="tight")
 
         if verbose:
@@ -334,11 +388,13 @@ class LearnerNoise(Learner):
         plt.clf()
         plt.close("all")
 
-    def plot_traj_error(self, init_state, w_c_arr, nb_trajs, verbose, tsim, dt, var=0.0):
+    def plot_traj_error(
+        self, init_state, w_c_arr, nb_trajs, verbose, tsim, dt, var=0.0
+    ):
         # Estimation over the test trajectories with T_star
 
         nb_trajs += w_c_arr.shape[0]
-        traj_folder = os.path.join(self.results_folder, "Test_trajectories_error")
+        traj_folder = os.path.join(self.results_folder, "Test_trajectories_error_{}".format(str(var)))
         tq, simulation = self.system.simulate(init_state, tsim, dt)
 
         noise = torch.normal(0, var, size=(simulation.shape[0], 2))
@@ -351,9 +407,8 @@ class LearnerNoise(Learner):
         # Save these test trajectories
         os.makedirs(traj_folder, exist_ok=True)
         traj_error = 0.0
-        
-        
-        plot_style = ['-','--','-.']
+
+        plot_style = ["-", "--", "-."]
 
         for i in range(nb_trajs):
             # TODO run predictions in parallel for all test trajectories!!!
@@ -385,24 +440,29 @@ class LearnerNoise(Learner):
                 estimation.cpu().numpy(),
                 os.path.join(current_traj_folder, f"Estimated_traj_{i}.csv"),
             )
-            
+
             self.save_csv(
-                abs(estimation.cpu().numpy()-simulation.cpu().numpy()),
+                abs(estimation.cpu().numpy() - simulation.cpu().numpy()),
                 os.path.join(current_traj_folder, f"Error_traj_{i}.csv"),
             )
 
             # for i in range(simulation.shape[1]):
             name = "Traj" + str(1) + ".pdf"
-            plt.plot(tq, estimation[:, 1].cpu().numpy()-simulation[:, 1].cpu().numpy(), plot_style[i], linewidth=0.8, markersize=1, label=rf'$\omega_c = {round(float(w_c_arr[i]), 2)}$')
+            plt.plot(
+                tq,
+                estimation[:, 1].cpu().numpy() - simulation[:, 1].cpu().numpy(),
+                plot_style[i],
+                linewidth=0.8,
+                markersize=1,
+                label=rf"$\omega_c = {round(float(w_c_arr[i]), 2)}$",
+            )
 
         plt.legend(loc=1)
         plt.grid(visible=True)
         plt.title(rf"Test trajectory error")
         plt.xlabel(rf"$t$")
         plt.ylabel(rf"$\hat{{x}}_{1 + 1}-x_{1+1}$")
-        plt.savefig(
-            os.path.join(current_traj_folder, name), bbox_inches="tight"
-        )
+        plt.savefig(os.path.join(current_traj_folder, name), bbox_inches="tight")
         if verbose:
             plt.show()
         plt.clf()
@@ -423,6 +483,8 @@ class LearnerNoise(Learner):
 
         # Save these test trajectories
         os.makedirs(traj_folder, exist_ok=True)
+
+        traj_error = 0.0
 
         for i in range(w_c_array.shape[0]):
             # TODO run predictions in parallel for all test trajectories!!!
@@ -469,9 +531,90 @@ class LearnerNoise(Learner):
                 plt.clf()
                 plt.close("all")
 
+    def plot_rmse_error(self, init_state, w_c_arr, verbose, tsim, dt, std=0.0):
+        # Estimation over the test trajectories with T_star
+        nb_trajs = w_c_arr.shape[0]
+        traj_folder = os.path.join(self.results_folder, "Test_trajectories_RMSE_{}".format(str(std)))
+        tq, simulation = self.system.simulate(init_state, tsim, dt)
+
+        noise = torch.normal(0, std, size=(simulation.shape[0], 2))
+
+        measurement_noise = simulation.add(noise)
+
+        measurement = self.model.h(measurement_noise)
+    
+        # Save these test trajectories
+        os.makedirs(traj_folder, exist_ok=True)
+        traj_error = 0.0
+    
+        plot_style = ["-", "--", "-."]
+
+        for i in range(nb_trajs):
+            # TODO run predictions in parallel for all test trajectories!!!
+            # Need to figure out how to interpolate y in parallel for all
+            # trajectories!!!
+            y = torch.cat((tq.unsqueeze(1), measurement), dim=1)
+
+            if i < len(w_c_arr):
+                w_c = w_c_arr[i]
+            else:
+                print('error')
+
+            estimation = self.model.predict(y, tsim, dt, w_c).detach()
+            error = RMSE(simulation, estimation)
+            traj_error += error
+
+            current_traj_folder = os.path.join(traj_folder, f"Traj_{i}")
+            os.makedirs(current_traj_folder, exist_ok=True)
+
+            filename = f"RMSE_{i}.txt"
+            with open(os.path.join(current_traj_folder, filename), "w") as f:
+                print(error.cpu().numpy(), file=f)
+
+            self.save_csv(
+                simulation.cpu().numpy(),
+                os.path.join(current_traj_folder, f"True_traj_{i}.csv"),
+            )
+            self.save_csv(
+                estimation.cpu().numpy(),
+                os.path.join(current_traj_folder, f"Estimated_traj_{i}.csv"),
+            )
+    
+            os.makedirs(current_traj_folder, exist_ok=True)
+    
+            filename = f"RMSE_{i}.txt"
+            with open(os.path.join(current_traj_folder, filename), "w") as f:
+                print(error.cpu().numpy(), file=f)
+    
+            # for i in range(simulation.shape[1]):
+            name = "Traj" + str(1) + ".pdf"
+            plt.plot(
+                tq,
+                RMSE(estimation, simulation, 1).cpu().numpy(),
+                plot_style[i],
+                linewidth=0.8,
+                markersize=1,
+                label=rf"$\omega_c = {round(float(w_c_arr[i]), 2)}$",
+            )
+    
+        plt.legend(loc=1)
+        plt.grid(visible=True)
+        plt.title(rf"Test trajectory RMSE")
+        plt.xlabel(rf"$t$")
+        plt.ylabel(rf"$\hat{{x}}-x$")
+        plt.savefig(os.path.join(current_traj_folder, name), bbox_inches="tight")
+        if verbose:
+            plt.show()
+        plt.clf()
+        plt.close("all")
+    
+        filename = "RMSE_traj.txt"
+        with open(os.path.join(traj_folder, filename), "w") as f:
+            print(traj_error, file=f)
+    
+
     def save_results(
-        self,
-        checkpoint_path=None,
+        self, checkpoint_path=None,
     ):
         """
         Save the model, the training and validation data. Also saving several
@@ -480,29 +623,9 @@ class LearnerNoise(Learner):
 
         Parameters
         ----------
-        limits: np.array
-            Array for the limits of all axes of x, used for sampling the
-            heatmap and the initial conditions of the test trajectories.
-            Form np.array([[min_1, max_1], ..., [min_n, max_n]]).
-
-        nb_trajs: int
-            Number of test trajectories.
-
-        tsim: tuple
-            Length of simulations for the test trajectories.
-
-        dt: int
-            Sampling time of the simulations for the test trajectories.
-
         checkpoint_path: str
             Path to the checkpoint from which to retrieve the best obtained
             model.
-
-        verbose: bool
-            Whether to show the plots or just save them.
-
-        fast: bool
-            Whether to compute the loss over a grid, which is slow.
         """
         with torch.no_grad():
             if checkpoint_path:
@@ -511,7 +634,6 @@ class LearnerNoise(Learner):
 
             specs_file = self.save_specifications()
 
-            self.save_pkl("/model.pkl", self.model)
             self.save_pkl("/learner.pkl", self)
 
             self.save_csv(

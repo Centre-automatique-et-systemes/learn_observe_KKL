@@ -424,7 +424,7 @@ class HO_unknown_freq(System):
         return xdot
 
     def __repr__(self):
-        return "Harmonic oscillator with unknown frequency"
+        return "HO_unknown_freq"
 
 
 class QuanserQubeServo2(System):
@@ -546,7 +546,7 @@ class QuanserQubeServo2(System):
         return xdot
 
     def __repr__(self):
-        return "Qube Servo 2"
+        return "QuanserQubeServo2"
 
 class SaturatedVanDerPol(System):
     """ See https://en.wikipedia.org/wiki/Van_der_Pol_oscillator for detailed
@@ -582,4 +582,4 @@ class SaturatedVanDerPol(System):
         return xdot
 
     def __repr__(self):
-        return "Saturated Van Der Pol"
+        return "SaturatedVanDerPol"
