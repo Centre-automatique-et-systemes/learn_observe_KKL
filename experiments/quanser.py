@@ -124,7 +124,8 @@ if __name__ == "__main__":
     #     "Val_loss.pdf", "Validation loss over time", "log", learner_T.val_loss.detach()
     # )
 
-    # idx = np.random.choice(np.arange(len(learner_T.training_data)), size=(10000,))
+    # idx = np.random.choice(np.arange(len(learner_T.training_data)),
+    #                        size=(10000,), replace=False)
     # verbose = False
     # num_samples = 70000
     # mesh = learner_T.model.generate_data_svl(

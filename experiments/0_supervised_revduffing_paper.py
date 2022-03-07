@@ -31,7 +31,7 @@ if __name__ == "__main__":
     ##########################################################################
 
     # # Learning method
-    # learning_method = "Supervised"
+    # learning_method = "Supervised_noise"
     # num_hl = 5
     # size_hl = 50
     # activation = nn.SiLU()
@@ -141,7 +141,8 @@ if __name__ == "__main__":
     # )
     #
     # # Params
-    # idx = np.random.choice(np.arange(len(learner_T_star.training_data)), size=(10000,))
+    # idx = np.random.choice(np.arange(len(learner_T_star.training_data)),
+    #                        size=(10000,), replace=False)
     # verbose = False
     #
     # learner_T_star.save_pdf_training(learner_T_star.training_data[idx], verbose)
@@ -161,7 +162,7 @@ if __name__ == "__main__":
     print('Computing our gain-tuning criterion can take some time but saves '
           'intermediary data in a subfolder zi_mesh: if you have already run '
           'this script, set save to False and path to this subfolder.')
-    save = True
+    save = False
     path = ''
     if save:
         mesh = learner_T_star.model.generate_data_svl(

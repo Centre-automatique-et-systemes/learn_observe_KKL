@@ -128,7 +128,7 @@ if __name__ == "__main__":
     learner.save_results(
          limits=np.array([[-1, 1.0], [-1.0, 1.0]]),
          nb_trajs=10,
-         tsim=(0, 40),
+         tsim=(0, 50),
          dt=1e-2,
          fast=True,
          checkpoint_path=checkpoint_callback.best_model_path,

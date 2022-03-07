@@ -408,7 +408,8 @@ class Learner(pl.LightningModule):
             plt.legend(loc=1)
             plt.grid(visible=True)
             plt.title(
-                rf"Test trajectory for $\sigma =$ {std}, RMSE = {np.round(rmse.numpy(), 4)}")
+                rf"Test trajectory for $\sigma =$ {std:0.2g}, RMSE = "
+                rf"{rmse.numpy():0.2g}")
             plt.xlabel(rf"$x_{1}$")
             plt.ylabel(rf"$x_{2}$")
             plt.savefig(
@@ -540,8 +541,9 @@ class Learner(pl.LightningModule):
                 self.load_state_dict(checkpoint_model["state_dict"])
 
             # Save training and validation data
+            nb = int(np.min([10000, len(self.training_data)]))
             idx = np.random.choice(
-                np.arange(len(self.training_data)), size=(10000,), replace=False
+                np.arange(len(self.training_data)), size=(nb,), replace=False
             )  # subsampling for plots
 
             specs_file = self.save_specifications()

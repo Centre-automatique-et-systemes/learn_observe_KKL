@@ -184,25 +184,27 @@ class LuenbergerObserverNoise(LuenbergerObserver):
 
             wc = z[0, -1].item()
             file = pd.DataFrame(Tmax)
-            file.to_csv(os.path.join(path, f'Tmax_wc{wc:0.3g}.csv'),
+            file.to_csv(os.path.join(path, f'Tmax_wc{wc:0.2g}.csv'),
                         header=False)
-            # file = pd.DataFrame(dTdz.flatten(1, -1))
-            # file.to_csv(os.path.join(path, f'dTdz_wc{wc:0.3g}.csv'),
-            #             header=False)
+            file = pd.DataFrame(dTdz.flatten(1, -1))
+            file.to_csv(os.path.join(path, f'dTdz_wc{wc:0.2g}.csv'),
+                        header=False)
         else:
             # Load intermediary data
             wc = z[0, -1].item()
-            # df = pd.read_csv(os.path.join(path, f'Tmax_wc{wc:0.3g}.csv'),
+            # df = pd.read_csv(os.path.join(path, f'Tmax_wc{wc:0.2g}.csv'),
             #                  sep=',', header=None)
             df = pd.read_csv(os.path.join(path, f'Tmax_wc'
                                                 f'{round(float(wc), 2)}.csv'),
                              sep=',', header=None)
             Tmax = torch.from_numpy(df.drop(df.columns[0], axis=1).values)
-            # df = pd.read_csv(os.path.join(path, f'dTdz_wc{wc:0.3g}.csv'),
+            # df = pd.read_csv(os.path.join(path, f'dTdz_wc{wc:0.2g}.csv'),
             #                  sep=',', header=None)
-            # dTdz = torch.from_numpy(
-            #     df.drop(df.columns[0], axis=1).values).reshape(
-            #     (-1, Tmax.shape[0], Tmax.shape[1]))
+            df = pd.read_csv(os.path.join(path, f'dTdz_wc{round(float(wc), 2)}.csv'),
+                             sep=',', header=None)
+            dTdz = torch.from_numpy(
+                df.drop(df.columns[0], axis=1).values).reshape(
+                (-1, Tmax.shape[0], Tmax.shape[1]))
 
         C = np.eye(self.D.shape[0])
         if version == 1:

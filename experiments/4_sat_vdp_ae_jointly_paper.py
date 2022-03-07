@@ -43,7 +43,7 @@ if __name__ == "__main__":
     system = SaturatedVanDerPol()
 
     # Define data params
-    x_limits = np.array([[-2.9, 2.9], [-2.9, 2.9]])
+    x_limits = np.array([[-2.7, 2.7], [-2.7, 2.7]])
     num_samples = 70000
     init_wc = 1.
 
@@ -128,7 +128,7 @@ if __name__ == "__main__":
     learner.save_results(
          limits=np.array([[-2.5, 2.5], [-2.5, 2.5]]),
          nb_trajs=10,
-         tsim=(0, 40),
+         tsim=(0, 20),
          dt=1e-2,
          fast=True,
          checkpoint_path=checkpoint_callback.best_model_path,

@@ -52,7 +52,8 @@ class LearnerNoise(Learner):
                 w_c = rd.uniform(0.5, 1.5)
 
             estimation = self.model.predict(y, tsim, dt, w_c).detach()
-            traj_error += RMSE(simulation[:, i], estimation)
+            rmse = RMSE(simulation[:, i], estimation)
+            traj_error += rmse
 
             current_traj_folder = os.path.join(traj_folder, f"Traj_{i}")
             os.makedirs(current_traj_folder, exist_ok=True)
@@ -75,7 +76,8 @@ class LearnerNoise(Learner):
                     tq, estimation[:, j].detach().numpy(), label=rf"$\hat{{x}}_{j + 1}$"
                 )
                 plt.legend(loc=1)
-                plt.title(rf"Random trajectory for $\omega_c$ {w_c}")
+                plt.title(rf"Random trajectory for $\omega_c$ {w_c:0.2g}, "
+                          rf"RMSE = "rf"{rmse:0.2g}")
                 plt.xlabel(rf"$t$")
                 plt.ylabel(rf"$x_{j + 1}$")
                 plt.savefig(
@@ -154,7 +156,8 @@ class LearnerNoise(Learner):
                 plt.legend(loc=1)
                 plt.grid(visible=True)
                 plt.title(
-                    rf"Test trajectory for $\omega_c = $ {np.round(w_c, 3)}, RMSE = {np.round(error.numpy(),4)}"
+                    rf"Test trajectory for $\omega_c = $ "
+                    rf"{w_c:0.2g}, RMSE = {error:0.2g}"
                 )
                 plt.xlabel(rf"$t$")
                 plt.ylabel(rf"$x_{j + 1}$")
@@ -182,7 +185,7 @@ class LearnerNoise(Learner):
             plt.legend(loc=1)
             plt.grid(visible=True)
             plt.title(
-                rf"Test trajectory for $\omega_c$ {np.round(w_c, 3)}, RMSE {np.round(error.numpy(), 4)}"
+                rf"Test trajectory for $\omega_c$ {w_c:0.2g}, RMSE {error:0.2g)}"
             )
             plt.xlabel(rf"$x_{1}$")
             plt.ylabel(rf"$x_{2}$")
@@ -271,7 +274,7 @@ class LearnerNoise(Learner):
 
                 plt.title(
                     r"RMSE between $x$ and $\hat{x}$"
-                    + rf" with $\omega_c =$ {round(w_c.item(), 2)}"
+                    + rf" with $\omega_c =$ {w_c.item():0.2g}"
                 )
                 plt.grid(False)
                 plt.xlabel(rf"$x_{i}$")
@@ -304,22 +307,22 @@ class LearnerNoise(Learner):
 
                 file = pd.DataFrame(mesh[:, :, j])
                 file.to_csv(os.path.join(
-                    path, f'zi_data_wc{wc:0.3g}.csv'), header=False)
+                    path, f'zi_data_wc{wc:0.2g}.csv'), header=False)
                 for i in range(self.model.dim_x, self.model.dim_x +
                                                  self.model.dim_z - 1):
                     plt.scatter(mesh[:, i, j], mesh[:, i + 1, j])
                     plt.savefig(os.path.join(
-                        path, f'zi_data_wc{wc:0.3g}_{i}.pdf'),
+                        path, f'zi_data_wc{wc:0.2g}_{i}.pdf'),
                         bbox_inches='tight')
                     plt.clf()
                     plt.close('all')
             else:
                 # Load mesh that was saved in path
                 # df = pd.read_csv(os.path.join(
-                #     path, f'zi_data_wc{wc:0.3g}.csv'), sep=',',
+                #     path, f'zi_data_wc{wc:0.2g}.csv'), sep=',',
                 #     header=None)
                 df = pd.read_csv(os.path.join(
-                    path, f'zi_data_wc{round(float(wc), 2)}.csv'), sep=',',
+                    path, f'zi_data_wc{wc:0.2g}.csv'), sep=',',
                     header=None)
                 mesh = torch.from_numpy(df.drop(df.columns[0], axis=1).values)
                 z_mesh = mesh[:, self.model.dim_x:]
@@ -454,7 +457,7 @@ class LearnerNoise(Learner):
                 plot_style[i],
                 linewidth=0.8,
                 markersize=1,
-                label=rf"$\omega_c = {round(float(w_c_arr[i]), 2)}$",
+                label=rf"$\omega_c = {float(w_c_arr[i]):0.2g}$",
             )
 
         plt.legend(loc=1)
@@ -594,7 +597,7 @@ class LearnerNoise(Learner):
                 plot_style[i],
                 linewidth=0.8,
                 markersize=1,
-                label=rf"$\omega_c = {round(float(w_c_arr[i]), 2)}$",
+                label=rf"$\omega_c = {float(w_c_arr[i]):0.2g}$",
             )
     
         plt.legend(loc=1)
