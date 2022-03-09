@@ -631,7 +631,7 @@ class LuenbergerObserver(nn.Module):
             return z_dot
 
         # Solve
-        z = odeint(dydt, z_0, tq)
+        z = odeint(dydt, z_0, tq, method='euler', options=dict(step_size=1e-3))
 
         return tq, z
 

@@ -25,6 +25,8 @@ toolbox is structured.
 
 ### To reproduce the results of the paper:
 Supervised learning with dependency on w_c: run 
+The final plots for our gain tuning criterion were obtained in Matlab by 
+running 
 
 Autoencoder with D learned jointly: run 
 
