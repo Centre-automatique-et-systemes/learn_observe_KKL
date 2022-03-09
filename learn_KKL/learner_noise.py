@@ -269,13 +269,8 @@ class LearnerNoise(Learner):
                 cbar.set_label("Log estimation error")
                 # cbar.set_label("Log estimation error")
 
-<<<<<<< HEAD
                 plt.plot(simulation[:,0], simulation[:,1])
                 plt.plot(estimation[:, 0], estimation[:, 1], '--')
-=======
-                plt.plot(simulation[:, 0], simulation[:, 1])
-                plt.plot(estimation[:, 0], estimation[:, 1])
->>>>>>> d288be17b55dda766ae80cb1abcd44c62d49f273
 
                 plt.title(
                     r"RMSE between $x$ and $\hat{x}$"

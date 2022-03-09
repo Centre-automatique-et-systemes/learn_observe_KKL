@@ -43,15 +43,9 @@ if __name__ == "__main__":
     system = SaturatedVanDerPol()
 
     # Define data params
-<<<<<<< HEAD
     x_limits = np.array([[-1.5, 1.5], [-1.5, 1.5]])
     num_samples = 50000
     init_wc = 0.3
-=======
-    x_limits = np.array([[-2.7, 2.7], [-2.7, 2.7]])
-    num_samples = 70000
-    init_wc = 1.
->>>>>>> d288be17b55dda766ae80cb1abcd44c62d49f273
 
     # Create the observer (autoencoder design)
     observer = LuenbergerObserverJointly(
