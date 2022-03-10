@@ -564,11 +564,12 @@ class SaturatedVanDerPol(System):
         self.u_1 = self.null_controller
 
     def f(self, x):
+        limit = 20
         xdot = torch.zeros_like(x)
         a = torch.max(torch.abs(x), dim=-1).values
-        idx = torch.gt(a, 3)
+        idx = torch.gt(a, limit)
         g = torch.ones_like(a)
-        g[idx] = 1 - torch.exp(-.1 / (a[idx] - 3))
+        g[idx] = 1 - torch.exp(-.1 / (a[idx] - limit))
         xdot[..., 0] = x[..., 1]
         xdot[..., 1] = self.eps * (1 - torch.pow(x[..., 0], 2)) * x[..., 1] - x[..., 0]
         return xdot * torch.unsqueeze(g, dim=-1)

@@ -101,19 +101,13 @@ class Learner(pl.LightningModule):
         self.validation_data = validation_data
         self.num_train = len(self.training_data)
         self.num_val = len(self.validation_data)
-        if "Autoencoder" in self.method:
-            self.scaler_x = StandardScaler(self.training_data, self.device)
-            self.scaler_z = None
-        else:
-            self.scaler_x = StandardScaler(
-                self.training_data[:, : self.model.dim_x], self.device
-            )
-            self.scaler_z = StandardScaler(
-                self.training_data[:, self.model.dim_x :], self.device
-            )
-        self.model.set_scalers(scaler_x=self.scaler_x, scaler_z=self.scaler_z)
-        self.train_loss = torch.zeros((0, 1))
-        self.val_loss = torch.zeros((0, 1))
+        # Indices of x and z in training data: same in and out
+        self.x_idx_in = [i for i in range(self.model.dim_x)]
+        self.x_idx_out = [i for i in range(self.model.dim_x)]
+        self.z_idx_in = [i for i in range(self.model.dim_x, self.model.dim_x
+                                          + self.model.dim_z)]
+        self.z_idx_out = [i for i in range(self.model.dim_x, self.model.dim_x
+                                           + self.model.dim_z)]
 
         # Optimization
         self.batch_size = batch_size
@@ -122,6 +116,8 @@ class Learner(pl.LightningModule):
         self.optimizer_options = optimizer_options
         self.scheduler = scheduler
         self.scheduler_options = scheduler_options
+        self.train_loss = torch.zeros((0, 1))
+        self.val_loss = torch.zeros((0, 1))
 
         # If method == 'T', freeze T_star and vice versa
         if self.method == "T":
@@ -140,6 +136,22 @@ class Learner(pl.LightningModule):
             i += 1
         self.results_folder = os.path.join(params, f"exp_{i}")
         print(f"Results saved in in {self.results_folder}")
+
+        # Scaling data: not for "Supervised_noise", which has different scalers
+        # for encoder (x, wc) -> (z) and decoder (z, wc) -> (x)
+        if self.model.method not in ["Supervised_noise"]:
+            if "Autoencoder" in self.method:
+                self.scaler_x = StandardScaler(self.training_data, self.device)
+                self.scaler_z = None
+            else:
+                self.scaler_x = StandardScaler(
+                    self.training_data[:, self.x_idx_in], self.device
+                )
+                self.scaler_z = StandardScaler(
+                    self.training_data[:, self.z_idx_in], self.device
+                )
+            self.model.set_scalers(scaler_x=self.scaler_x,
+                                   scaler_z=self.scaler_z)
 
     def configure_optimizers(self):
         # https://pytorch-lightning.readthedocs.io/en/stable/common/optimizers.html
@@ -188,11 +200,11 @@ class Learner(pl.LightningModule):
             z_hat, x_hat = self.model(self.method, x)
             return z_hat, x_hat
         elif self.method == "T":
-            x = batch[:, : self.model.dim_x]  # .to(self.device)
+            x = batch[:, self.x_idx_in]
             z_hat = self.model(self.method, x)
             return z_hat
         elif self.method == "T_star":
-            z = batch[:, self.model.dim_x :]  # .to(self.device)
+            z = batch[:, self.z_idx_in]
             x_hat = self.model(self.method, z)
             return x_hat
         else:
@@ -218,11 +230,11 @@ class Learner(pl.LightningModule):
             self.log("train_loss2", loss2, on_step=True, prog_bar=False, logger=True)
             self.log("train_loss3", loss3, on_step=True, prog_bar=False, logger=True)
         elif self.method == "T":
-            z = batch[:, self.model.dim_x :]
+            z = batch[:, self.z_idx_out]
             z_hat = self.forward(batch)
             loss = self.model.loss(self.method, z, z_hat)
         elif self.method == "T_star":
-            x = batch[:, : self.model.dim_x]
+            x = batch[:, self.x_idx_out]
             x_hat = self.forward(batch)
             loss = self.model.loss(self.method, x, x_hat)
         self.log("train_loss", loss, on_step=True, prog_bar=True, logger=True)
@@ -255,11 +267,11 @@ class Learner(pl.LightningModule):
                 self.log("val_loss2", loss2, on_step=True, prog_bar=False, logger=True)
                 self.log("val_loss3", loss3, on_step=True, prog_bar=False, logger=True)
             elif self.method == "T":
-                z = batch[:, self.model.dim_x :]
+                z = batch[:, self.z_idx_out]
                 z_hat = self.forward(batch)
                 loss = self.model.loss(self.method, z, z_hat)
             elif self.method == "T_star":
-                x = batch[:, : self.model.dim_x]
+                x = batch[:, self.x_idx_out]
                 x_hat = self.forward(batch)
                 loss = self.model.loss(self.method, x, x_hat)
             self.log("val_loss", loss, on_step=True, prog_bar=True, logger=True)
@@ -315,138 +327,144 @@ class Learner(pl.LightningModule):
             plt.close("all")
 
     def save_pdf_heatmap(self, x_mesh, x_hat_star, verbose):
-        error = RMSE(x_mesh, x_hat_star, dim=1)
-        for i in range(1, x_mesh.shape[1]):
-            # https://stackoverflow.com/questions/37822925/how-to-smooth-by-interpolation-when-using-pcolormesh
-            name = "RMSE_heatmap" + str(i) + ".pdf"
-            plt.scatter(
-                x_mesh[:, i - 1],
-                x_mesh[:, i],
-                cmap="jet",
-                c=np.log(error.detach().numpy()),
-            )
-            cbar = plt.colorbar()
-            cbar.set_label("Log estimation error")
-            cbar.set_label("Log estimation error")
-            plt.title(r"RMSE between $x$ and $\hat{x}$")
-            plt.xlabel(rf"$x_{i}$")
-            plt.ylabel(rf"$x_{i + 1}$")
-            plt.legend()
-            plt.savefig(os.path.join(self.results_folder, name), bbox_inches="tight")
-            if verbose:
-                plt.show()
-
-            plt.clf()
-            plt.close("all")
-
-    def save_random_traj(self, x_mesh, num_samples, nb_trajs, verbose, tsim, dt, std=0.):
-        # Estimation over the test trajectories with T_star
-        random_idx = np.random.choice(np.arange(num_samples),
-                                      size=(nb_trajs,), replace=False)
-        trajs_init = x_mesh[random_idx]
-        traj_folder = os.path.join(self.results_folder, "Test_trajectories")
-        tq, simulation = self.system.simulate(trajs_init, tsim, dt)
-
-        noise = torch.normal(0, std, size=(simulation.shape))
-
-        simulation_noise = simulation.add(noise)
-
-        measurement = self.model.h(simulation_noise)
-
-        # Save these test trajectories
-        os.makedirs(traj_folder, exist_ok=True)
-        traj_error = 0.0
-        for i in range(nb_trajs):
-            # TODO run predictions in parallel for all test trajectories!!!
-            # Need to figure out how to interpolate y in parallel for all
-            # trajectories!!!
-            y = torch.cat((tq.unsqueeze(1), measurement[:, i]), dim=1)
-            estimation = self.model.predict(y, tsim, dt).detach()
-            rmse = RMSE(simulation[:, i], estimation)
-            traj_error += rmse
-
-            current_traj_folder = os.path.join(traj_folder, f"Traj_{i}")
-            os.makedirs(current_traj_folder, exist_ok=True)
-
-            self.save_csv(
-                simulation[:, i].cpu().numpy(),
-                os.path.join(current_traj_folder, f"True_traj_{i}.csv"),
-            )
-            self.save_csv(
-                estimation.cpu().numpy(),
-                os.path.join(current_traj_folder, f"Estimated_traj_{i}.csv"),
-            )
-
-            for j in range(estimation.shape[1]):
-                name = "Traj" + str(j) + ".pdf"
-                if j == 0:
-                    plt.plot(tq, simulation_noise[:,i, j].detach().numpy(), '-', label=r"$y$")
-                plt.plot(tq, simulation[:,i, j].detach().numpy(), '--', label=rf"$x_{j + 1}$")
-                plt.plot(
-                    tq, estimation[:, j].detach().numpy(), '-.', label=rf"$\hat{{x}}_{j + 1}$"
+        with torch.no_grad():
+            error = RMSE(x_mesh, x_hat_star, dim=1)
+            for i in range(1, x_mesh.shape[1]):
+                # https://stackoverflow.com/questions/37822925/how-to-smooth-by-interpolation-when-using-pcolormesh
+                name = "RMSE_heatmap" + str(i) + ".pdf"
+                plt.scatter(
+                    x_mesh[:, i - 1],
+                    x_mesh[:, i],
+                    cmap="jet",
+                    c=np.log(error.detach().numpy()),
                 )
+                cbar = plt.colorbar()
+                cbar.set_label("Log estimation error")
+                cbar.set_label("Log estimation error")
+                plt.title(r"RMSE between $x$ and $\hat{x}$")
+                plt.xlabel(rf"$x_{i}$")
+                plt.ylabel(rf"$x_{i + 1}$")
                 plt.legend()
-                plt.grid(visible=True)
-                plt.xlabel(rf"$t$")
-                plt.ylabel(rf"$x_{j + 1}$")
-                plt.savefig(
-                    os.path.join(current_traj_folder, name), bbox_inches="tight"
-                )
+                plt.savefig(os.path.join(self.results_folder, name), bbox_inches="tight")
                 if verbose:
                     plt.show()
 
                 plt.clf()
                 plt.close("all")
 
-            name = "Phase_portrait.pdf"  # TODO DELETE
-            plt.plot(simulation[:, i, 0].detach().numpy(), simulation[:, i,
-                                                        1].detach().numpy(),
-                     label=rf"True")
-            plt.plot(estimation[:, 0].detach().numpy(), estimation[:,
-                                                        1].detach().numpy(),
-                     '--', label=rf"Estimated")
-            plt.legend(loc=1)
-            plt.grid(visible=True)
-            plt.title(
-                rf"Test trajectory for $\sigma =$ {std:0.2g}, RMSE = "
-                rf"{rmse.numpy():0.2g}")
-            plt.xlabel(rf"$x_{1}$")
-            plt.ylabel(rf"$x_{2}$")
-            plt.savefig(
-                os.path.join(current_traj_folder, name), bbox_inches="tight"
-            )
-            if verbose:
-                plt.show()
-            plt.clf()
-            plt.close("all")
+    def save_random_traj(self, x_mesh, num_samples, nb_trajs, verbose, tsim, dt, std=0.):
+        with torch.no_grad():
+            # Estimation over the test trajectories with T_star
+            random_idx = np.random.choice(np.arange(num_samples),
+                                          size=(nb_trajs,), replace=False)
+            trajs_init = x_mesh[random_idx]
+            traj_folder = os.path.join(self.results_folder, "Test_trajectories")
+            tq, simulation = self.system.simulate(trajs_init, tsim, dt)
 
-        filename = "RMSE_traj.txt"
-        with open(os.path.join(traj_folder, filename), "w") as f:
-            print(traj_error / nb_trajs, file=f)
+            noise = torch.normal(0, std, size=(simulation.shape))
 
-    def save_invert_heatmap(self, x_mesh, x_hat_AE, verbose):
-        # Invertibility heatmap
-        error = RMSE(x_mesh, x_hat_AE, dim=1)
-        for i in range(1, x_mesh.shape[1]):
-            name = "Invertibility_heatmap" + str(i) + ".pdf"
-            plt.scatter(
-                x_mesh[:, i - 1],
-                x_mesh[:, i],
-                cmap="jet",
-                c=np.log(error.detach().numpy()),
-            )
-            cbar = plt.colorbar()
-            cbar.set_label("Log estimation error")
-            plt.title(r"RMSE between $x$ and $T^*(T(x))$")
-            plt.xlabel(rf"$x_{i}$")
-            plt.ylabel(rf"$x_{i + 1}$")
-            plt.legend()
-            plt.savefig(os.path.join(self.results_folder, name), bbox_inches="tight")
-            if verbose:
-                plt.show()
+            simulation_noise = simulation.add(noise)
 
-            plt.clf()
-            plt.close("all")
+            measurement = self.model.h(simulation_noise)
+
+            # Save these test trajectories
+            os.makedirs(traj_folder, exist_ok=True)
+            traj_error = 0.0
+            for i in range(nb_trajs):
+                # TODO run predictions in parallel for all test trajectories!!!
+                # Need to figure out how to interpolate y in parallel for all
+                # trajectories!!!
+                y = torch.cat((tq.unsqueeze(1), measurement[:, i]), dim=1)
+                estimation = self.model.predict(y, tsim, dt).detach()
+                rmse = RMSE(simulation[:, i], estimation)
+                traj_error += rmse
+
+                current_traj_folder = os.path.join(traj_folder, f"Traj_{i}")
+                os.makedirs(current_traj_folder, exist_ok=True)
+
+                self.save_csv(
+                    simulation[:, i].cpu().numpy(),
+                    os.path.join(current_traj_folder, f"True_traj_{i}.csv"),
+                )
+                self.save_csv(
+                    estimation.cpu().numpy(),
+                    os.path.join(current_traj_folder, f"Estimated_traj_{i}.csv"),
+                )
+
+                for j in range(estimation.shape[1]):
+                    name = "Traj" + str(j) + ".pdf"
+                    if j == 0:
+                        plt.plot(tq, simulation_noise[:,i, j].detach().numpy(), '-', label=r"$y$")
+                    plt.plot(tq, simulation[:,i, j].detach().numpy(), '--', label=rf"$x_{j + 1}$")
+                    plt.plot(
+                        tq, estimation[:, j].detach().numpy(), '-.', label=rf"$\hat{{x}}_{j + 1}$"
+                    )
+                    plt.legend()
+                    plt.grid(visible=True)
+                    plt.xlabel(rf"$t$")
+                    plt.ylabel(rf"$x_{j + 1}$")
+                    plt.savefig(
+                        os.path.join(current_traj_folder, name), bbox_inches="tight"
+                    )
+                    if verbose:
+                        plt.show()
+
+                    plt.clf()
+                    plt.close("all")
+
+                name = "Phase_portrait.pdf"  # TODO DELETE
+                plt.plot(simulation[:, i, 0].detach().numpy(), simulation[:, i,
+                                                            1].detach().numpy(),
+                         label=rf"True")
+                plt.plot(estimation[:, 0].detach().numpy(), estimation[:,
+                                                            1].detach().numpy(),
+                         '--', label=rf"Estimated")
+                plt.legend(loc=1)
+                plt.grid(visible=True)
+                plt.title(
+                    rf"Test trajectory for $\sigma =$ {std:0.2g}, RMSE = "
+                    rf"{rmse.numpy():0.2g}")
+                plt.xlabel(rf"$x_{1}$")
+                plt.ylabel(rf"$x_{2}$")
+                plt.savefig(
+                    os.path.join(current_traj_folder, name), bbox_inches="tight"
+                )
+                if verbose:
+                    plt.show()
+                plt.clf()
+                plt.close("all")
+
+            filename = "RMSE_traj.txt"
+            with open(os.path.join(traj_folder, filename), "w") as f:
+                print(traj_error / nb_trajs, file=f)
+
+    def save_invert_heatmap(self, x_mesh, x_hat_AE, verbose, wc=None):
+        with torch.no_grad():
+            # Invertibility heatmap
+            error = RMSE(x_mesh, x_hat_AE, dim=1)
+            for i in range(1, x_mesh.shape[1]):
+                name = "Invertibility_heatmap" + str(i) + ".pdf"
+                plt.scatter(
+                    x_mesh[:, i - 1],
+                    x_mesh[:, i],
+                    cmap="jet",
+                    c=np.log(error.detach().numpy()),
+                )
+                cbar = plt.colorbar()
+                cbar.set_label("Log estimation error")
+                if wc is not None:
+                    plt.title(rf"RMSE between $x$ and $T^*(T(x))$, $\omega_c$ = {wc:0.2g}")
+                else:
+                    plt.title(r"RMSE between $x$ and $T^*(T(x))$")
+                plt.xlabel(rf"$x_{i}$")
+                plt.ylabel(rf"$x_{i + 1}$")
+                plt.legend()
+                plt.savefig(os.path.join(self.results_folder, name), bbox_inches="tight")
+                if verbose:
+                    plt.show()
+
+                plt.clf()
+                plt.close("all")
 
     def save_plot(self, name, title, y_scale, data):
         plt.plot(data, "+-", label="loss")
@@ -458,40 +476,41 @@ class Learner(pl.LightningModule):
         plt.close("all")
 
     def save_loss_grid(self, x_mesh, x_hat_AE, z_hat_T, x_hat_star, verbose):
-        losses = []
-        if self.method == "Autoencoder":
-            loss, loss1, loss2 = self.model.loss_autoencoder(
-                x_mesh, x_hat_AE, z_hat_T, dim=-1
-            )
-            losses.append(loss1)
-            losses.append(loss2)
-        elif self.method == "T_star":
-            loss = self.model.loss_T_star(x_mesh, x_hat_star, dim=-1)
-            losses.append(loss)
-        for j in range(len(losses)):
-            loss = losses[j]
-            for i in range(1, x_mesh.shape[1]):
-                name = f"Loss{j + 1}_{i - 1}.pdf"
-                plt.scatter(
-                    x_mesh[:, i - 1],
-                    x_mesh[:, i],
-                    cmap="jet",
-                    c=np.log(loss.detach().numpy()),
+        with torch.no_grad():
+            losses = []
+            if self.method == "Autoencoder":
+                loss, loss1, loss2 = self.model.loss_autoencoder(
+                    x_mesh, x_hat_AE, z_hat_T, dim=-1
                 )
-                cbar = plt.colorbar()
-                cbar.set_label("Log loss")
-                plt.title("Loss over grid")
-                plt.xlabel(rf"$x_{i}$")
-                plt.ylabel(rf"$x_{i + 1}$")
-                plt.legend()
-                plt.savefig(
-                    os.path.join(self.results_folder, name), bbox_inches="tight"
-                )
-                if verbose:
-                    plt.show()
+                losses.append(loss1)
+                losses.append(loss2)
+            elif self.method == "T_star":
+                loss = self.model.loss_T_star(x_mesh, x_hat_star, dim=-1)
+                losses.append(loss)
+            for j in range(len(losses)):
+                loss = losses[j]
+                for i in range(1, x_mesh.shape[1]):
+                    name = f"Loss{j + 1}_{i - 1}.pdf"
+                    plt.scatter(
+                        x_mesh[:, i - 1],
+                        x_mesh[:, i],
+                        cmap="jet",
+                        c=np.log(loss.detach().numpy()),
+                    )
+                    cbar = plt.colorbar()
+                    cbar.set_label("Log loss")
+                    plt.title("Loss over grid")
+                    plt.xlabel(rf"$x_{i}$")
+                    plt.ylabel(rf"$x_{i + 1}$")
+                    plt.legend()
+                    plt.savefig(
+                        os.path.join(self.results_folder, name), bbox_inches="tight"
+                    )
+                    if verbose:
+                        plt.show()
 
-                plt.clf()
-                plt.close("all")
+                    plt.clf()
+                    plt.close("all")
 
     def save_results(
         self,
@@ -581,8 +600,8 @@ class Learner(pl.LightningModule):
 
             # Heatmap of RMSE(x, x_hat) with T_star
             mesh = self.model.generate_data_svl(limits, num_samples, method="uniform")
-            x_mesh = mesh[:, : self.model.dim_x]
-            z_mesh = mesh[:, self.model.dim_x :]
+            x_mesh = mesh[:, self.x_idx_out]
+            z_mesh = mesh[:, self.z_idx_out]
             x_hat_star = self.model("T_star", z_mesh)
 
             z_hat_T, x_hat_AE = self.model("Autoencoder", x_mesh)
