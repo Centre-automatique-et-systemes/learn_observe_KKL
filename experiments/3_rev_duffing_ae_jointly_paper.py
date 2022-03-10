@@ -45,7 +45,7 @@ if __name__ == "__main__":
     # Define data params
     x_limits = np.array([[-1.0, 1.0], [-1.0, 1.0]])
     num_samples = 70000
-    init_wc = 0.2
+    init_wc = 0.3
 
     # Create the observer (autoencoder design)
     observer = LuenbergerObserverJointly(

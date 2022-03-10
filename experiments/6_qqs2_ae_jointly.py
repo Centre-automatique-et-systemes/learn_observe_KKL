@@ -14,7 +14,7 @@ sys.path.append(working_path)
 
 # Import KKL observer
 from learn_KKL.learner import Learner
-from learn_KKL.system import SaturatedVanDerPol
+from learn_KKL.system import QuanserQubeServo2
 from learn_KKL.luenberger_observer_jointly import LuenbergerObserverJointly
 from learn_KKL.utils import generate_mesh
 
@@ -34,18 +34,18 @@ if __name__ == "__main__":
     ##########################################################################
     # Learning method
     learning_method = "Autoencoder_jointly"
-    num_hl = 5
-    size_hl = 50
+    num_hl = 20
+    size_hl = 100
     activation = nn.ReLU()
-    recon_lambda = 0.1
+    recon_lambda = 0.2
 
     # Define system
-    system = SaturatedVanDerPol()
+    system = QuanserQubeServo2()
 
     # Define data params
-    x_limits = np.array([[-1.5, 1.5], [-1.5, 1.5]])
-    num_samples = 50000
-    init_wc = 0.3
+    x_limits = np.array([[-0.5, 0.5], [0., 6.], [-30., 30.], [-16., 16.]])
+    num_samples = 80000
+    init_wc = 2.
 
     # Create the observer (autoencoder design)
     observer = LuenbergerObserverJointly(
@@ -56,7 +56,7 @@ if __name__ == "__main__":
 
     # Generate the data
     data = generate_mesh(x_limits, num_samples, method="LHS")
-    data, val_data = train_test_split(data, test_size=0.3, shuffle=True)
+    data, val_data = train_test_split(data, test_size=0.2, shuffle=True)
 
     ##########################################################################
     # Setup learner ##########################################################

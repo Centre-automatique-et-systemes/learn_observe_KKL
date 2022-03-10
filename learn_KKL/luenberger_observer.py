@@ -720,7 +720,7 @@ class LuenbergerObserver(nn.Module):
                              method=method)
         num_samples = mesh.shape[0]  # in case regular grid: changed
         self.k = k
-        self.t_c = self.k / min(abs(linalg.eig(self.D)[0].real))
+        self.t_c = self.k / min(abs(linalg.eig(self.D.detach().numpy())[0].real))
 
         y_0 = torch.zeros((num_samples, self.dim_x + self.dim_z))  # TODO
         y_1 = y_0.clone()

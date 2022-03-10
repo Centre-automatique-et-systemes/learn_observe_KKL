@@ -348,9 +348,131 @@ class Learner(pl.LightningModule):
                 plt.savefig(os.path.join(self.results_folder, name), bbox_inches="tight")
                 if verbose:
                     plt.show()
+        error = RMSE(x_mesh, x_hat_star, dim=1)
 
-                plt.clf()
-                plt.close("all")
+        # TODO DELETE
+        tq, simulation = self.system.simulate(torch.tensor([0.7, 0.7]),
+                                                  (0, 60), 1e-2)
+        measurement = self.model.h(simulation)
+        y = torch.cat((tq.unsqueeze(1), measurement), dim=1)
+        estimation = self.model.predict(y,  (0, 60), 1e-2).detach()
+
+        error = error.detach()
+
+        for i in range(1, x_mesh.shape[1]):
+            # https://stackoverflow.com/questions/37822925/how-to-smooth-by-interpolation-when-using-pcolormesh
+            name = "RMSE_heatmap" + str(i) + ".pdf"
+            plt.scatter(
+                x_mesh[:, i - 1].detach().numpy(),
+                x_mesh[:, i].detach().numpy(),
+                cmap="jet",
+                c=np.log(error.detach().numpy()),
+            )
+            cbar = plt.colorbar()
+            cbar.set_label("Log estimation error")
+            cbar.set_label("Log estimation error")
+
+            plt.plot(simulation[:,0], simulation[:,1])
+            plt.plot(estimation[:, 0], estimation[:, 1], '--')
+
+            plt.title(r"RMSE between $x$ and $\hat{x}$")
+            plt.xlabel(rf"$x_{i}$")
+            plt.ylabel(rf"$x_{i + 1}$")
+            plt.legend()
+            plt.savefig(os.path.join(self.results_folder, name), bbox_inches="tight")
+            if verbose:
+                plt.show()
+
+            plt.clf()
+            plt.close("all")
+
+    def save_trj(self, init_state, verbose, tsim, dt, var=0.2):
+        # Estimation over the test trajectories with T_star
+        traj_folder = os.path.join(self.results_folder, "Test_trajectories")
+        tq, simulation = self.system.simulate(init_state, tsim, dt)
+
+        noise = torch.normal(0, var, size=(simulation.shape))
+
+        simulation_noise = simulation.add(noise)
+
+        measurement = self.model.h(simulation_noise)
+
+        # Save these test trajectories
+        os.makedirs(traj_folder, exist_ok=True)
+        traj_error = 0.0
+
+        # TODO run predictions in parallel for all test trajectories!!!
+        # Need to figure out how to interpolate y in parallel for all
+        # trajectories!!!
+        y = torch.cat((tq.unsqueeze(1), measurement), dim=1)
+
+        estimation = self.model.predict(y, tsim, dt).detach()
+        error = RMSE(simulation, estimation)
+        traj_error += error
+
+        current_traj_folder = os.path.join(traj_folder, f"Traj_{var}")
+        os.makedirs(current_traj_folder, exist_ok=True)
+
+        filename = f"RMSE.txt"
+        with open(os.path.join(current_traj_folder, filename), "w") as f:
+            print(error.cpu().numpy(), file=f)
+
+        self.save_csv(
+            simulation.cpu().numpy(),
+            os.path.join(current_traj_folder, f"True_traj.csv"),
+        )
+        self.save_csv(
+            estimation.cpu().numpy(),
+            os.path.join(current_traj_folder, f"Estimated_traj.csv"),
+        )
+
+        for j in range(estimation.shape[1]):
+            name = "Traj" + str(j) + ".pdf"
+            if j == 0:
+                plt.plot(tq, simulation_noise[:, j].detach().numpy(), '-', label=r"$y$")
+            plt.plot(tq, simulation[:, j].detach().numpy(), '--', label=rf"$x_{j + 1}$")
+            plt.plot(
+                tq, estimation[:, j].detach().numpy(), '-.', label=rf"$\hat{{x}}_{j + 1}$"
+            )
+            plt.legend(loc=1)
+            plt.grid(visible=True)
+            plt.title(rf"Test trajectory, RMSE = {np.round(error.numpy(),4)}")
+            plt.xlabel(rf"$t$")
+            plt.ylabel(rf"$x_{j + 1}$")
+            plt.savefig(
+                os.path.join(current_traj_folder, name), bbox_inches="tight"
+            )
+            if verbose:
+                plt.show()
+            plt.clf()
+            plt.close("all")
+
+            # TODO DELETE
+            name = "Phase_portrait.pdf"
+            plt.plot(simulation[:, 0].detach().numpy(), simulation[:,
+                                                        1].detach().numpy(),
+                     '--', label=rf"True")
+            plt.plot(estimation[:, 0].detach().numpy(), estimation[:,
+                                                        1].detach().numpy(),
+                     '--', label=rf"Estimated")
+            plt.legend(loc=1)
+            plt.grid(visible=True)
+            plt.title(
+                rf"Test trajectory, RMSE = {np.round(error.numpy(), 4)}")
+            plt.xlabel(rf"$x_{1}$")
+            plt.ylabel(rf"$x_{2}$")
+            plt.savefig(
+                os.path.join(current_traj_folder, name), bbox_inches="tight"
+            )
+            if verbose:
+                plt.show()
+            plt.clf()
+            plt.close("all")
+
+        filename = "RMSE_traj.txt"
+        with open(os.path.join(traj_folder, filename), "w") as f:
+            print(traj_error, file=f)
+
 
     def save_random_traj(self, x_mesh, num_samples, nb_trajs, verbose, tsim, dt, std=0.):
         with torch.no_grad():
