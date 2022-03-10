@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
 
 # In order to import learn_KKL we need to add the working dir to the system path
-import pathlib; working_path = str(pathlib.Path().resolve())
-import sys; sys.path.append(working_path)
+import pathlib
+
+working_path = str(pathlib.Path().resolve())
+import sys
+
+sys.path.append(working_path)
 
 from learn_KKL.learner import Learner
 from learn_KKL.system import QuanserQubeServo2
@@ -15,6 +19,7 @@ import seaborn as sb
 import matplotlib.pyplot as plt
 import torch.optim as optim
 import torch
+import numpy as np
 
 
 sb.set_style("whitegrid")
@@ -23,24 +28,23 @@ if __name__ == "__main__":
     system = QuanserQubeServo2()
 
     observer = LuenbergerObserver(
-        dim_x=system.dim_x,
-        dim_y=system.dim_y,
-        method="Supervised",
-        wc=1.5,
-        recon_lambda=0.7,
-        D="direct",
+        dim_x=system.dim_x, dim_y=system.dim_y, method="Supervised", wc=1.5
     )
-
     observer.set_dynamics(system)
 
     tsim = (0, 10)
     dt = 1e-2
-    x_0 = torch.tensor(
-        [[0.0, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 ]]
-    )
-    _, data = observer.simulate_system(x_0, tsim, dt)
+    num_initial_conditions = 100
 
-    data, val_data = train_test_split(data[:, 0, :], test_size=0.01, shuffle=True)
+    x_limits = np.array([[0.0, 0.01], [0., 0.5], [0., 0.01], [0., 0.01]])
+
+    data = observer.generate_trajectory_data(
+        x_limits, num_initial_conditions, method="LHS", tsim=tsim, stack=True
+    )
+    data[:, 0] = ((data[:, 0] + np.pi) % (2 * np.pi)) - np.pi
+    data[:, 1] = ((data[:, 1] + np.pi) % (2 * np.pi)) - np.pi
+
+    data, val_data = train_test_split(data, test_size=0.2, shuffle=True)
 
     # Train the forward transformation using pytorch-lightning and the learner class
     # Options for training
@@ -48,13 +52,13 @@ if __name__ == "__main__":
     optimizer_options = {"weight_decay": 1e-6}
     scheduler_options = {
         "mode": "min",
-        "factor": 0.1,
+        "factor": 0.5,
         "patience": 3,
         "threshold": 1e-4,
         "verbose": True,
     }
     stopper = pl.callbacks.early_stopping.EarlyStopping(
-        monitor="val_loss", min_delta=5e-4, patience=3, verbose=False, mode="min"
+        monitor="val_loss", min_delta=1e-4, patience=3, verbose=False, mode="min"
     )
     # Instantiate learner
     learner_T_star = Learner(
@@ -63,8 +67,8 @@ if __name__ == "__main__":
         training_data=data,
         validation_data=val_data,
         method="T_star",
-        batch_size=10,
-        lr=1e-3,
+        batch_size=20,
+        lr=1e-2,
         optimizer=optim.Adam,
         optimizer_options=optimizer_options,
         scheduler=optim.lr_scheduler.ReduceLROnPlateau,
@@ -88,21 +92,31 @@ if __name__ == "__main__":
     # Train and save results
     trainer.fit(learner_T_star)
 
+    x_0 = torch.tensor([0.0, 0.1, 0.0, 0.0]) + abs(np.random.randn(4) * 0.01)
     tq, simulation = system.simulate(x_0, tsim, dt)
+
+    simulation[:, 0] = ((simulation[:, 0] + np.pi) % (2 * np.pi)) - np.pi
+    simulation[:, 1] = ((simulation[:, 1] + np.pi) % (2 * np.pi)) - np.pi
+    
     measurement = system.h(simulation)
     # Save these test trajectories
     # Need to figure out how to interpolate y in parallel for all
     # trajectories!!!
-    y = torch.cat((tq.unsqueeze(1), measurement[:,0].unsqueeze(1)), dim=1)
+    y = torch.cat((tq.unsqueeze(1), measurement[:, 0].unsqueeze(1)), dim=1)
     estimation = observer.predict(y, tsim, dt).detach()
 
-    plt.plot(tq, simulation.detach().numpy(), label=rf"$x$")
-    plt.plot(tq, estimation.detach().numpy(), label=rf"$\hat{{x}}$")
-    plt.legend()
-    plt.xlabel(rf"$t$")
-    plt.ylabel(rf"$x$")
-
-    plt.show()
+    for i in range(simulation.shape[1]):
+        plt.scatter(tq, simulation[:, i].detach().numpy(), label=rf"$x$")
+        plt.scatter(
+            tq,
+            estimation[:, i].detach().numpy(),
+            label=rf"$\hat{{x}}$",
+            linestyle="dashed",
+        )
+        plt.legend()
+        plt.xlabel(rf"$t$")
+        plt.ylabel(rf"$x$")
+        plt.show()
 
     # limits = np.array([[-1.0, 1.0], [-1.0, 1.0]])
     # learner_T.save_results(

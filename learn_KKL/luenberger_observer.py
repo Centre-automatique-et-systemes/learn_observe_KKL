@@ -93,6 +93,7 @@ for more information.
 Copyright 2021 Lukas Bahr.
 """
 
+from xmlrpc.client import boolean
 import numpy as np
 import torch
 from scipy import linalg
@@ -260,17 +261,17 @@ class LuenbergerObserver(nn.Module):
     """
 
     def __init__(
-            self,
-            dim_x: int,
-            dim_y: int,
-            method: str = "Autoencoder",
-            dim_z: int = None,
-            wc: float = 1.0,
-            num_hl: int = 5,
-            size_hl: int = 50,
-            activation=nn.ReLU(),
-            recon_lambda: float = 1.0,
-            D="block_diag",
+        self,
+        dim_x: int,
+        dim_y: int,
+        method: str = "Autoencoder",
+        dim_z: int = None,
+        wc: float = 1.0,
+        num_hl: int = 5,
+        size_hl: int = 50,
+        activation=nn.ReLU(),
+        recon_lambda: float = 1.0,
+        D="block_diag",
     ):
         super(LuenbergerObserver, self).__init__()
 
@@ -300,20 +301,27 @@ class LuenbergerObserver(nn.Module):
             self.F = torch.ones((self.dim_z, self.dim_y))
 
         # Model params
-        self.device = torch.device(
-            "cuda:0" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.recon_lambda = recon_lambda
 
         # Define encoder and decoder architecture
         self.num_hl = num_hl
         self.size_hl = size_hl
         self.activation = activation
-        self.encoder = MLPn(num_hl=self.num_hl, n_in=self.dim_x,
-                            n_hl=self.size_hl, n_out=self.dim_z,
-                            activation=self.activation)
-        self.decoder = MLPn(num_hl=self.num_hl, n_in=self.dim_z,
-                            n_hl=self.size_hl, n_out=self.dim_x,
-                            activation=self.activation)
+        self.encoder = MLPn(
+            num_hl=self.num_hl,
+            n_in=self.dim_x,
+            n_hl=self.size_hl,
+            n_out=self.dim_z,
+            activation=self.activation,
+        )
+        self.decoder = MLPn(
+            num_hl=self.num_hl,
+            n_in=self.dim_z,
+            n_hl=self.size_hl,
+            n_out=self.dim_x,
+            activation=self.activation,
+        )
         self.scaler_x = None
         self.scaler_z = None
 
@@ -437,8 +445,7 @@ class LuenbergerObserver(nn.Module):
             # Indirect method to place poles of D with Bessel filter
             _, pO, _ = signal.bessel(self.dim_z, wc, analog=True, output="zpk")
             pO = np.sort(pO)
-            A = -np.array([[i] for i in range(1, self.dim_z + 1)]) * np.eye(
-                self.dim_z)
+            A = -np.array([[i] for i in range(1, self.dim_z + 1)]) * np.eye(self.dim_z)
             B = np.ones((self.dim_z, 1))
             whole_D = signal.place_poles(A, B, pO)
             if whole_D.rtol == 0 and B.shape[1] != 1:
@@ -462,8 +469,7 @@ class LuenbergerObserver(nn.Module):
         elif method == "companion":
             # D in companion form of Bessel filter denominator
             _, a = signal.bessel(self.dim_z, wc, analog=True, output="ba")
-            D = torch.as_tensor(
-                np.polynomial.polynomial.polycompanion(np.flip(a)))
+            D = torch.as_tensor(np.polynomial.polynomial.polycompanion(np.flip(a)))
             F = torch.zeros(self.dim_z, self.dim_y)
             F[-1] = torch.ones(self.dim_y)
 
@@ -517,8 +523,7 @@ class LuenbergerObserver(nn.Module):
                     ignore_next = False
                 else:
                     D[complex_idx - 1, complex_idx - 1] = 0.0
-                    D[complex_idx - 1, complex_idx] = -(
-                                v.real ** 2 + v.imag ** 2)
+                    D[complex_idx - 1, complex_idx] = -(v.real ** 2 + v.imag ** 2)
                     D[complex_idx, complex_idx - 1] = 1.0
                     D[complex_idx, complex_idx] = 2 * v.real
                     F[complex_idx] = torch.ones(self.dim_y)
@@ -529,8 +534,7 @@ class LuenbergerObserver(nn.Module):
 
         elif method == "diag":
             # Diagonal method
-            D = -torch.tensor(
-                [[i] for i in range(1, self.dim_z + 1)]) * torch.eye(
+            D = -torch.tensor([[i] for i in range(1, self.dim_z + 1)]) * torch.eye(
                 self.dim_z
             )
             F = torch.ones(self.dim_z, self.dim_y)
@@ -612,22 +616,24 @@ class LuenbergerObserver(nn.Module):
 
         def dydt(t, z: torch.tensor):
             if self.u_1 == self.u:
-                z_dot = torch.matmul(self.D, z) + torch.matmul(self.F ,measurement(t).t())
+                z_dot = torch.matmul(self.D, z) + torch.matmul(
+                    self.F, measurement(t).t()
+                )
             else:
                 z_dot = (
                     torch.matmul(self.D, z)
-                    + torch.matmul(self.F ,measurement(t).t())
+                    + torch.matmul(self.F, measurement(t).t())
                     + torch.mul(self.phi(z), self.u_1(t) - self.u(t))
                 )
             return z_dot
 
         # Solve
-        z = odeint(dydt, z_0, tq, method='euler', options=dict(step_size=1e-3))
+        z = odeint(dydt, z_0, tq, method="euler", options=dict(step_size=1e-3))
 
         return tq, z
 
     def simulate_system(
-            self, y_0: torch.tensor, tsim: tuple, dt, only_x: bool = False
+        self, y_0: torch.tensor, tsim: tuple, dt, only_x: bool = False
     ) -> torch.tensor:
         """
         Simulate Luenberger observer driven by a dynamical system.
@@ -657,7 +663,7 @@ class LuenbergerObserver(nn.Module):
 
         def dydt(t, y):  # TODO only simulate x backward, z forward (interpol y)
             x = y[..., : self.dim_x]  # TODO change notation y
-            z = y[..., self.dim_x:]
+            z = y[..., self.dim_x :]
             x_dot = self.f(x) + self.g(x) * self.u(t)
             if only_x:
                 z_dot = torch.zeros_like(z)
@@ -676,12 +682,12 @@ class LuenbergerObserver(nn.Module):
         return tq, sol
 
     def generate_data_svl(
-            self,
-            limits: tuple,
-            num_samples: int,
-            k: int = 10,
-            dt: float = 1e-2,
-            method: str = "LHS",
+        self,
+        limits: tuple,
+        num_samples: int,
+        k: int = 10,
+        dt: float = 1e-2,
+        method: str = "LHS",
     ):
         """
         Generate a grid of data points by simulating the system backward and
@@ -707,8 +713,7 @@ class LuenbergerObserver(nn.Module):
         data: torch.tensor
             Pairs of (x, z) data points.
         """
-        mesh = generate_mesh(limits=limits, num_samples=num_samples,
-                             method=method)
+        mesh = generate_mesh(limits=limits, num_samples=num_samples, method=method)
         num_samples = mesh.shape[0]  # in case regular grid: changed
         self.k = k
         self.t_c = self.k / min(abs(linalg.eig(self.D)[0].real))
@@ -731,6 +736,32 @@ class LuenbergerObserver(nn.Module):
         # number_simulations]
         data = data_fw[-1]
         return data
+
+    # TODO implement clean
+    def generate_trajectory_data(
+        self,
+        limits: tuple,
+        num_samples: int,
+        tsim: tuple,
+        k: int = 10,
+        dt: float = 1e-2,
+        method: str = "LHS",
+        stack: boolean = True
+    ):
+
+        # Get initial conditions for x,z from backward forward sampling
+        y_0 = self.generate_data_svl(
+            limits=limits, num_samples=num_samples, method=method, k=k, dt=dt
+        )
+
+        # Simulate x(t), z(t) to obtain trajectories for tsim
+        _, data = self.simulate_system(y_0, tsim, dt)
+
+        if stack:
+            return torch.cat(torch.unbind(data, dim=1), dim=0)
+        else:
+            return data
+
 
     @staticmethod
     def interpolate_func(x: torch.tensor) -> callable:
@@ -759,7 +790,7 @@ class LuenbergerObserver(nn.Module):
             # Create list of interp1d functions
             points, values = (
                 x[:, 0].contiguous().view(-1, 1).t(),
-                x[:, 1:].contiguous().view(-1, x.shape[1]-1).t(),
+                x[:, 1:].contiguous().view(-1, x.shape[1] - 1).t(),
             )
             interp_function = Interp1d()
 
@@ -780,8 +811,7 @@ class LuenbergerObserver(nn.Module):
         return interp
 
     def loss_autoencoder(
-            self, x: torch.tensor, x_hat: torch.tensor, z_hat: torch.tensor,
-            dim=None
+        self, x: torch.tensor, x_hat: torch.tensor, z_hat: torch.tensor, dim=None
     ) -> torch.tensor:
         """
         Loss function for training the observer model with the autoencoder
@@ -834,8 +864,7 @@ class LuenbergerObserver(nn.Module):
 
         return loss_1 + loss_2, loss_1, loss_2
 
-    def loss_T(self, z: torch.tensor, z_hat: torch.tensor,
-               dim=None) -> torch.tensor:
+    def loss_T(self, z: torch.tensor, z_hat: torch.tensor, dim=None) -> torch.tensor:
         """
         Loss function for training only the forward transformation T.
 
@@ -860,8 +889,8 @@ class LuenbergerObserver(nn.Module):
         return loss
 
     def loss_T_star(
-            self, x: torch.tensor, x_hat: torch.tensor,
-            dim=None) -> torch.tensor:
+        self, x: torch.tensor, x_hat: torch.tensor, dim=None
+    ) -> torch.tensor:
         """
         Loss function for training only the forward transformation T.
 
@@ -963,8 +992,7 @@ class LuenbergerObserver(nn.Module):
 
         return x_hat
 
-    def predict(self, measurement: torch.tensor, tsim: tuple,
-                dt: int) -> torch.tensor:
+    def predict(self, measurement: torch.tensor, tsim: tuple, dt: int) -> torch.tensor:
         """
         Forward function for autoencoder. Used for training the model.
         Computation follows as:
