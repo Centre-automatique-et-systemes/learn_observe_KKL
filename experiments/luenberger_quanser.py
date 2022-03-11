@@ -19,6 +19,7 @@ import seaborn as sb
 import matplotlib.pyplot as plt
 import torch.optim as optim
 import torch
+import os
 import numpy as np
 
 
@@ -28,27 +29,27 @@ if __name__ == "__main__":
     system = QuanserQubeServo2()
 
     observer = LuenbergerObserver(
-        dim_x=system.dim_x, dim_y=system.dim_y, method="Supervised", wc=1.5
+        dim_x=system.dim_x, dim_y=system.dim_y, method="Supervised", wc=3, dim_z=8
     )
     observer.set_dynamics(system)
 
     tsim = (0, 10)
     dt = 1e-2
     num_initial_conditions = 100
+    num_samples = 50000
 
-    x_limits = np.array([[0.0, 0.01], [0., 0.5], [0., 0.01], [0., 0.01]])
+    # x_limits = np.array([[0.0, 0.001], [0.0, 0.1], [0.0, 0.001], [0.0, 0.001]])
+    x_limits = np.array([[-0.4, 0.4], [0.0, 2*np.pi], [-30., 30.], [-15.0, 15.0]])
 
-    data = observer.generate_trajectory_data(
-        x_limits, num_initial_conditions, method="LHS", tsim=tsim, stack=True
-    )
-    data[:, 0] = ((data[:, 0] + np.pi) % (2 * np.pi)) - np.pi
-    data[:, 1] = ((data[:, 1] + np.pi) % (2 * np.pi)) - np.pi
-
+    # data = observer.generate_trajectory_data(
+    #     x_limits, num_initial_conditions, method="LHS", tsim=tsim, stack=True
+    # )
+    data = observer.generate_data_svl(x_limits, num_samples)
     data, val_data = train_test_split(data, test_size=0.2, shuffle=True)
 
     # Train the forward transformation using pytorch-lightning and the learner class
     # Options for training
-    trainer_options = {"max_epochs": 30}
+    trainer_options = {"max_epochs": 50}
     optimizer_options = {"weight_decay": 1e-6}
     scheduler_options = {
         "mode": "min",
@@ -86,18 +87,45 @@ if __name__ == "__main__":
         check_val_every_n_epoch=3,
     )
 
-    # To see logger in tensorboard, copy the following output name_of_folder
-    print(f"Logs stored in {learner_T_star.results_folder}/tb_logs")
-
     # Train and save results
     trainer.fit(learner_T_star)
+
+    # To see logger in tensorboard, copy the following output name_of_folder
+    print(f"Logs stored in {learner_T_star.results_folder}/tb_logs")
+    # which should be similar to jupyter_notebooks/runs/method/exp_0/tb_logs/
+
+    with torch.no_grad():
+        # Save training and validation data
+        idx = np.random.choice(
+            np.arange(len(learner_T_star.training_data)), size=(10000,)
+        )  # subsampling for plots
+
+        specs_file = learner_T_star.save_specifications()
+
+        learner_T_star.save_pkl("/learner.pkl", learner_T_star)
+
+        learner_T_star.save_csv(
+            learner_T_star.training_data.cpu().numpy(),
+            os.path.join(learner_T_star.results_folder, "training_data.csv"),
+        )
+        learner_T_star.save_csv(
+            learner_T_star.validation_data.cpu().numpy(),
+            os.path.join(learner_T_star.results_folder, "validation_data.csv"),
+        )
+        # Loss plot over time
+        learner_T_star.save_plot(
+            "Train_loss.pdf",
+            "Training loss over time",
+            "log",
+            learner_T_star.train_loss.detach(),
+        )
+        learner_T_star.save_plot(
+            "Val_loss.pdf", "Validation loss over time", "log", learner_T_star.val_loss.detach(),
+        )
 
     x_0 = torch.tensor([0.0, 0.1, 0.0, 0.0]) + abs(np.random.randn(4) * 0.01)
     tq, simulation = system.simulate(x_0, tsim, dt)
 
-    simulation[:, 0] = ((simulation[:, 0] + np.pi) % (2 * np.pi)) - np.pi
-    simulation[:, 1] = ((simulation[:, 1] + np.pi) % (2 * np.pi)) - np.pi
-    
     measurement = system.h(simulation)
     # Save these test trajectories
     # Need to figure out how to interpolate y in parallel for all
@@ -117,42 +145,3 @@ if __name__ == "__main__":
         plt.xlabel(rf"$t$")
         plt.ylabel(rf"$x$")
         plt.show()
-
-    # limits = np.array([[-1.0, 1.0], [-1.0, 1.0]])
-    # learner_T.save_results(
-    #     limits=limits,
-    #     wc_arr_train=wc_arr,
-    #     nb_trajs=10,
-    #     t_sim=(0, 40),
-    #     dt=1e-2,
-    #     checkpoint_path=checkpoint_callback.best_model_path,
-    # )
-
-    # learner_T.save_plot(
-    #     "Train_loss.pdf",
-    #     "Training loss over time",
-    #     "log",
-    #     learner_T.train_loss.detach(),
-    # )
-    # learner_T.save_plot(
-    #     "Val_loss.pdf", "Validation loss over time", "log", learner_T.val_loss.detach()
-    # )
-
-    # idx = np.random.choice(np.arange(len(learner_T.training_data)), size=(10000,))
-    # verbose = False
-    # num_samples = 70000
-    # mesh = learner_T.model.generate_data_svl(
-    #     limits, wc_arr, num_samples, method="uniform", stack=False
-    # )
-
-    # learner_T.save_pdf_training(learner_T.training_data[idx], verbose)
-    # learner_T.save_trj(
-    #     torch.tensor([0.225, -0.131]), wc_arr, 5, verbose, (0, 70), 1e-2, var=0.0
-    # )
-    # learner_T.save_pdf_heatmap(mesh, verbose)
-
-    # mesh = learner_T.model.generate_data_svl(
-    #     limits, wc_arr, 1 * 100, method="LHS", stack=False
-    # )
-    # learner_T.save_rmse_wc(mesh, wc_arr, verbose)
-    # learner_T.plot_sensitiviy_wc(mesh, wc_arr, verbose)

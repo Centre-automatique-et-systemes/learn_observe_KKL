@@ -9,6 +9,7 @@ __pycache__/
 __init__.pyc
 main.py
 scripts/
+qqs2_data/
 
 replot.py
 model.py
