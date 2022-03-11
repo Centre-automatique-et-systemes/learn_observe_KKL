@@ -584,7 +584,9 @@ class LuenbergerObserver(nn.Module):
 
         return torch.matmul(dTdx, msm)
 
-    def simulate(self, y: torch.tensor, tsim: tuple, dt: float) -> torch.tensor:
+    def simulate(self, y: torch.tensor, tsim: tuple, dt: float,
+                 method: str = "euler", solver_options={"step_size": 1e-3},
+                 ) -> torch.tensor:
         """
         Runs and outputs the results from Luenberger observer system.
         
@@ -631,7 +633,7 @@ class LuenbergerObserver(nn.Module):
             return z_dot
 
         # Solve
-        z = odeint(dydt, z_0, tq, method='euler', options=dict(step_size=1e-3))
+        z = odeint(dydt, z_0, tq, method=method, options=solver_options)
 
         return tq, z
 

@@ -17,8 +17,53 @@ Darr = Darr(:, 2:end);
 % zbar = argsup(dTstar/dz (z_i))
 % Tstar_max = dTstar/dz (zbar)
 
-% Criterion (analogy from transfer function of linear KKL):
-% sup_{z, x} norm (  G(jw, z, x) =  (jwI - dTstar/dz(z) D dT/dx(x))^-1 dTstar/dz(z) F, infty)
+% Criterion 1 (analogy from transfer function of linear KKL):
+% norm ( G(jw, z, x) =  (jwI - Tstar_max D Tmax)^-1 Tstar_max F, infty)
+
+figure()
+hinf = zeros(length(wc_arr), 1);
+Tmax_norm = zeros(length(wc_arr), 1);
+Tstar_max_norm = zeros(length(wc_arr), 1);
+
+for i = 1:length(wc_arr)
+    wc = wc_arr(i);
+    Tstar_max = table2array(readtable(append(path, 'Tstar_max_wc', sprintf('%0.2g', wc), '.csv')));
+    Tstar_max = Tstar_max(:, 2:end)
+    Tstar_max_norm(i) = norm(Tstar_max, 2);
+    Tmax = table2array(readtable(append(path, 'Tmax_wc', sprintf('%0.2g', wc), '.csv')));
+    Tmax = Tmax(:, 2:end)
+    Tmax_norm(i) = norm(Tmax, 2);
+    D = reshape(Darr(i, :), [dz, dz]).'
+    F = ones(dz, dy);
+    eig(Tstar_max * D * Tmax)  % Not stable?
+    sys = ss(Tstar_max * D * Tmax, Tstar_max * F, eye(dx), zeros(dx, dy));
+    bode(sys(1, 1))
+    hold on
+    ninf = norm(sys, inf);
+    hinf(i) = ninf;
+end
+
+N = 5e5 / length(wc_arr);
+crit1 = hinf;
+h = figure();
+plot(wc_arr, Tmax_norm)
+hold on
+plot(wc_arr, Tstar_max_norm)
+hold on
+plot(wc_arr, crit1)
+legend('Tmax norm', 'Tstar max norm', 'crit1')
+savefig(h, append(path, 'crit1.fig'))
+
+figure()
+plot(wc_arr, crit1)
+legend('crit1')
+
+csvwrite(append(path, 'crit1.csv'), [wc_arr', Tmax_norm, Tstar_max_norm, crit1])
+
+%%
+
+% Criterion 2 (analogy from transfer function of linear KKL):
+% sup_{z, x} norm (G(jw, z, x) =  (jwI - dTstar/dz(z) D dT/dx(x))^-1 dTstar/dz(z) F, infty)
 
 figure()
 hinf = zeros(length(wc_arr), 1);
@@ -32,14 +77,16 @@ for i = 1:length(wc_arr)
     dTstardz = permute(dTstardz, [1, 3, 2]);
     dTdx = table2array(readtable(append(path, 'dTdx_wc', sprintf('%0.2g', wc), '.csv')));
     dTdx = dTdx(:, 2:end);
-    dTdx = reshape(dTdx, [length(dTdx), dz, dx]);
+    dTdx = reshape(dTdx, [length(dTdx), dx, dz]);
     dTdx = permute(dTdx, [1, 3, 2]);
     D = reshape(Darr(i, :), [dz, dz]).'
-    F = ones(length(D), dy); 
-    % TODO
-    hinf_z = zeros(length(dTdz), 1);
-    for j = 1:length(dTdz)
-        sys = ss(D, F, squeeze(dTdz(j, :, :)) * eye(length(D)), zeros(dx, dy));
+    F = ones(dz, dy);
+    hinf_z = zeros(length(dTdx), 1);
+    for j = 1:length(dTdx)
+        current_dTstardz = squeeze(dTstardz(j, :, :));
+        current_dTdx = squeeze(dTdx(j, :, :));
+        eig(current_dTstardz * D * current_dTdx)  % Not stable?
+        sys = ss(current_dTstardz * D * current_dTdx, current_dTstardz * F, eye(dx), zeros(dx, dy));
         ninf = norm(sys, inf);
         hinf_z(j) = ninf;
     end
@@ -48,17 +95,18 @@ for i = 1:length(wc_arr)
 end
 
 N = 5e5 / length(wc_arr);
-crit1 = hinf .* Tmax_norm;
-figure()
-plot(wc_arr, hinf)
-hold on
+crit2 = hinf;
+h = figure();
 plot(wc_arr, Tmax_norm)
 hold on
-plot(wc_arr, crit1)
-legend('hinf','Tmax norm', 'crit1')
+plot(wc_arr, Tstar_max_norm)
+hold on
+plot(wc_arr, crit2)
+legend('Tmax norm', 'Tstar max norm', 'crit2')
+savefig(h, append(path, 'crit2.fig'))
 
 figure()
-plot(wc_arr, crit1)
-legend('crit1')
+plot(wc_arr, crit2)
+legend('crit2')
 
-csvwrite(append(path, 'crit1.csv'), [wc_arr', Tmax_norm, hinf, crit1])
+csvwrite(append(path, 'crit2.csv'), [wc_arr', Tmax_norm, Tstar_max_norm, crit2])

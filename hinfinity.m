@@ -8,7 +8,7 @@ dz = 3;
 wc_arr = linspace(0.03, 1, 10);
 
 %path = "runs/SaturatedVanDerPol/Supervised_noise/T_star/exp_10_0.1-2_ok3/zi_mesh_-11/";
-path = "runs/Reversed_Duffing_Oscillator/Supervised_noise/T_star/exp_10_wc0.03-1_2/xzi_mesh/";
+path = "runs/Reversed_Duffing_Oscillator/Supervised_noise/T_star/exp_10_wc0.03-1_2/xzi_mesh_5000/";
 Darr = table2array(readtable(append(path, 'D_arr.csv')));
 Darr = Darr(:, 2:end);
 

@@ -553,23 +553,23 @@ class SaturatedVanDerPol(System):
     reference for this system.
     """
 
-    def __init__(self, eps: float = 1.0):
+    def __init__(self, eps: float = 1.0, limit: float = 3.):
         super().__init__()
         self.dim_x = 2
         self.dim_y = 1
 
         self.eps = eps
+        self.limit = limit  # for saturation
 
         self.u = self.null_controller
         self.u_1 = self.null_controller
 
     def f(self, x):
-        limit = 20
         xdot = torch.zeros_like(x)
         a = torch.max(torch.abs(x), dim=-1).values
-        idx = torch.gt(a, limit)
+        idx = torch.gt(a, self.limit)
         g = torch.ones_like(a)
-        g[idx] = 1 - torch.exp(-.1 / (a[idx] - limit))
+        g[idx] = 1 - torch.exp(-.1 / (a[idx] - self.limit))
         xdot[..., 0] = x[..., 1]
         xdot[..., 1] = self.eps * (1 - torch.pow(x[..., 0], 2)) * x[..., 1] - x[..., 0]
         return xdot * torch.unsqueeze(g, dim=-1)

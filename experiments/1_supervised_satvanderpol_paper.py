@@ -37,7 +37,7 @@ if __name__ == "__main__":
     activation = nn.SiLU()
 
     # Define system
-    system = SaturatedVanDerPol()
+    system = SaturatedVanDerPol(limit=100.)
 
     # Define data params
     # wc_arr = np.linspace(0.1, 2., 50)
@@ -75,12 +75,13 @@ if __name__ == "__main__":
     x_limits = np.array([[-1, 1], [-1., 1]])
     # mesh = generate_mesh(limits=x_limits, num_samples=num_samples,
     #                      method="uniform")
-    mesh = torch.tensor([[2.5, 2.5]])
+    mesh = torch.tensor([[2.7, 2.7]])
     num_samples = mesh.shape[0]  # in case regular grid: changed
     wc = 0.1
     D, F = obs.set_DF(wc)
-    k = 10
+    k = 1#10
     t_c = k / min(abs(linalg.eig(D)[0].real))
+    #
     # Simulation with saturation
     y_0 = torch.zeros((num_samples, obs.dim_x + obs.dim_z))  # TODO
     y_1 = y_0.clone()
@@ -88,12 +89,13 @@ if __name__ == "__main__":
     tsim = (0, -t_c)
     dt = 1e-2
     y_0[:, : obs.dim_x] = mesh
-    _, data_bw_sat = observer.simulate_system(y_0, tsim, -dt, only_x=True)
+    tbw, data_bw_sat = observer.simulate_system(y_0, tsim, -dt, only_x=True)
     # Simulate both x and z forward in time starting from the last point
     # from previous simulation
-    tsim = (-t_c, 0)
+    tsim = (-t_c, 20)
     y_1[:, : obs.dim_x] = data_bw_sat[-1, :, : obs.dim_x]
-    tq, data_fw_sat = observer.simulate_system(y_1, tsim, dt)
+    tfw, data_fw_sat = observer.simulate_system(y_1, tsim, dt)
+    # #
     # # Simulation without saturation
     # y_0 = torch.zeros((num_samples, obs.dim_x + obs.dim_z))  # TODO
     # y_1 = y_0.clone()
@@ -112,20 +114,20 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
     # plt.plot(tq, torch.flip(data_bw[:, 0, 0], (0, )))
     # plt.plot(tq, data_fw[:, 0, 0])
-    plt.plot(tq, torch.flip(data_bw_sat[:, 0, 0], (0,)))
-    plt.plot(tq, data_fw_sat[:, 0, 0])
+    plt.plot(torch.flip(tbw, (0,)), torch.flip(data_bw_sat[:, 0, 0], (0,)))
+    plt.plot(tfw, data_fw_sat[:, 0, 0])
     plt.show()
     # plt.plot(tq, torch.flip(data_bw[:, 0, 1], (0, )))
     # plt.plot(tq, data_fw[:, 0, 1])
-    plt.plot(tq, torch.flip(data_bw_sat[:, 0, 1], (0,)))
-    plt.plot(tq, data_fw_sat[:, 0, 1])
+    plt.plot(torch.flip(tbw, (0,)), torch.flip(data_bw_sat[:, 0, 1], (0,)))
+    plt.plot(tfw, data_fw_sat[:, 0, 1])
     plt.show()
     # plt.plot(tq, data_fw[:, 0, 2])
     # plt.plot(tq, data_fw[:, 0, 3])
     # plt.plot(tq, data_fw[:, 0, 4])
-    plt.plot(tq, data_fw_sat[:, 0, 2])
-    plt.plot(tq, data_fw_sat[:, 0, 3])
-    plt.plot(tq, data_fw_sat[:, 0, 4])
+    plt.plot(tfw, data_fw_sat[:, 0, 2])
+    plt.plot(tfw, data_fw_sat[:, 0, 3])
+    plt.plot(tfw, data_fw_sat[:, 0, 4])
     plt.show()
     # d = obs.generate_data_svl(x_limits, wc_arr, num_samples,
     #                           method="LHS")

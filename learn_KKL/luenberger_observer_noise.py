@@ -270,11 +270,12 @@ class LuenbergerObserverNoise(LuenbergerObserver):
             )
         elif version == 3:
             C = np.eye(self.dim_x)
-            sv = torch.tensor(compute_h_infinity(
-                np.dot(np.dot(Tstar_max.detach().numpy(),
-                              self.D.numpy()), Tmax.numpy()),
-                np.dot(Tstar_max.detach().numpy(), self.F.numpy()),
-                C, 1e-3))
+            # sv = torch.tensor(compute_h_infinity(
+            #     np.dot(np.dot(Tstar_max.detach().numpy(),
+            #                   self.D.numpy()), Tmax.numpy()),
+            #     np.dot(Tstar_max.detach().numpy(), self.F.numpy()),
+            #     C, 1e-3))
+            sv = torch.tensor(0.)
             return torch.cat(
                 (torch.linalg.matrix_norm(Tmax, ord=2).unsqueeze(0),
                  torch.linalg.matrix_norm(Tstar_max, ord=2).unsqueeze(0),
