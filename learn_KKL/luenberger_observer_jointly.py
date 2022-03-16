@@ -26,6 +26,7 @@ class LuenbergerObserverJointly(LuenbergerObserver):
             recon_lambda: float = 1.0,
             sensitivity_lambda=0,
             D="block_diag",
+            solver_options=None,
     ):
 
         LuenbergerObserver.__init__(
@@ -40,6 +41,7 @@ class LuenbergerObserverJointly(LuenbergerObserver):
             activation,
             recon_lambda,
             D,
+            solver_options,
         )
         self.sensitivity_lambda = sensitivity_lambda
         if self.sensitivity_lambda > 0:

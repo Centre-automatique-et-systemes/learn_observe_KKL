@@ -352,7 +352,6 @@ class LearnerNoise(Learner):
                     plt.grid(False)
                     plt.xlabel(rf"$x_{i}$")
                     plt.ylabel(rf"$x_{i + 1}$")
-                    plt.legend(loc=1)
                     plt.savefig(
                         os.path.join(self.results_folder, name), bbox_inches="tight"
                     )

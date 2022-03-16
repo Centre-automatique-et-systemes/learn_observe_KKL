@@ -271,6 +271,7 @@ class LuenbergerObserver(nn.Module):
             activation=nn.ReLU(),
             recon_lambda: float = 1.0,
             D="block_diag",
+            solver_options=None,
     ):
         super(LuenbergerObserver, self).__init__()
 
@@ -317,6 +318,13 @@ class LuenbergerObserver(nn.Module):
         self.scaler_x = None
         self.scaler_z = None
 
+        # Options for numerical solver
+        if not solver_options:
+            self.solver_options = {'method': 'rk4',
+                                   'options': {'step_size': 1e-3}}
+        else:
+            self.solver_options = solver_options
+
     def f(self, x: torch.tensor):
         return 0
 
@@ -346,6 +354,7 @@ class LuenbergerObserver(nn.Module):
                 "decoder " + str(self.decoder),
                 "method " + self.method,
                 "recon_lambda " + str(self.recon_lambda),
+                "solver_options " + str(self.solver_options)
             ]
         )
 
@@ -585,8 +594,7 @@ class LuenbergerObserver(nn.Module):
         return torch.matmul(dTdx, msm)
 
     def simulate(self, y: torch.tensor, tsim: tuple, dt: float,
-                 method: str = "euler", solver_options={"step_size": 1e-3},
-                 ) -> torch.tensor:
+                 method: str = "rk4") -> torch.tensor:
         """
         Runs and outputs the results from Luenberger observer system.
         
@@ -596,7 +604,7 @@ class LuenbergerObserver(nn.Module):
         Parameters
         ----------
         y: torch.tensor
-            Measurment expected to be in form (t, y).
+            Measurement expected to be in form (t, y).
 
         tsim: tuple
             Tuple of (Start, End) time of simulation.
@@ -633,7 +641,7 @@ class LuenbergerObserver(nn.Module):
             return z_dot
 
         # Solve
-        z = odeint(dydt, z_0, tq, method=method, options=solver_options)
+        z = odeint(dydt, z_0, tq, **self.solver_options)
 
         return tq, z
 
@@ -682,7 +690,7 @@ class LuenbergerObserver(nn.Module):
         tq = torch.arange(tsim[0], tsim[1], dt)
 
         # Solve
-        sol = odeint(dydt, y_0, tq)
+        sol = odeint(dydt, y_0, tq, **self.solver_options)
 
         return tq, sol
 
@@ -690,7 +698,7 @@ class LuenbergerObserver(nn.Module):
             self,
             limits: tuple,
             num_samples: int,
-            k: int = 10,
+            k: int = 5,
             dt: float = 1e-2,
             method: str = "LHS",
     ):
@@ -741,6 +749,41 @@ class LuenbergerObserver(nn.Module):
         # Data contains (x_i, z_i) pairs in shape [dim_x + dim_z,
         # number_simulations]
         data = data_fw[-1]
+        return data
+
+    def generate_data_forward(self, init: torch.tensor, tsim: tuple,
+                              num_datapoints: int, k: int = 5,
+                              dt: float = 1e-2, stack: bool = True):
+        """
+        Generate data points by simulating the system forward in time from
+        some initial conditions, then cutting the beginning of the trajectory.
+        Parameters
+        ----------
+        init: torch.tensor
+            Initial conditions (x0, z0) from which to simulate.
+        tsim: tuple
+            Simulation time.
+        num_datapoints: int
+            Number of samples to take along trajectory * len(w_c) (convention).
+        k: int
+           Parameter for time t_c = k/min(lambda) before which to cut.
+        dt: float
+            Simulation step.
+        Returns
+        ----------
+        df: torch.tensor
+            Pairs of (x, z, wc) data points.
+        """
+
+        tq, data = self.simulate_system(init, tsim, dt)
+        self.k = k
+        self.t_c = self.k / min(
+            abs(linalg.eig(self.D.detach().numpy())[0].real))
+        data = data[(tq >= self.t_c)]  # cut trajectory before t_c
+        random_idx = np.random.choice(np.arange(len(data)),
+                                      size=(num_datapoints,), replace=False)
+        data = torch.squeeze(data[random_idx])
+
         return data
 
     @staticmethod

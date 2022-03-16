@@ -31,6 +31,7 @@ class LuenbergerObserverNoise(LuenbergerObserver):
         activation=nn.ReLU(),
         recon_lambda: float = 1.0,
         D="block_diag",
+        solver_options=None,
     ):
 
         LuenbergerObserver.__init__(
@@ -45,6 +46,7 @@ class LuenbergerObserverNoise(LuenbergerObserver):
             activation,
             recon_lambda,
             D,
+            solver_options,
         )
 
         self.wc_array = wc_array
@@ -94,6 +96,7 @@ class LuenbergerObserverNoise(LuenbergerObserver):
                 "decoder " + str(self.decoder),
                 "method " + self.method,
                 "recon_lambda " + str(self.recon_lambda),
+                "solver_options " + str(self.solver_options)
             ]
         )
 
@@ -101,60 +104,15 @@ class LuenbergerObserverNoise(LuenbergerObserver):
         self,
         limits: tuple,
         num_samples: int,
-        k: int = 10,
+        k: int = 5,
         dt: float = 1e-2,
         method: str = "LHS",
     ):
-        """
-        Generate a grid of data points by simulating the system backward and
-        forward in time.
-
-        Parameters
-        ----------
-        limits: np.array
-            Array for the limits of all axes, used for sampling with LHS.
-            Form np.array([[min_1, max_1], ..., [min_n, max_n]]).
-
-        num_samples: int
-            Number of samples in compact set.
-
-        k: int
-            Parameter for t_c = k/min(lambda)
-
-        dt: float
-            Simulation step.
-
-        Returns
-        ----------
-        data: torch.tensor
-            Pairs of (x, z) data points.
-        """
-        mesh = generate_mesh(limits=limits, num_samples=num_samples,
-                             method=method)
-        self.k = k
-        self.t_c = self.k / min(abs(linalg.eig(self.D)[0].real))
-
-        y_0 = torch.zeros((num_samples, self.dim_x + self.dim_z))  # TODO
-        y_1 = y_0.clone()
-
-        # Simulate only x system backward in time
-        tsim = (0, -self.t_c)
-        y_0[:, : self.dim_x] = mesh
-        _, data_bw = self.simulate_system(y_0, tsim, -dt, only_x=True)
-
-        # Simulate both x and z forward in time starting from the last point
-        # from previous simulation
-        tsim = (-self.t_c, 0)
-        y_1[:, : self.dim_x] = data_bw[-1, :, : self.dim_x]
-        _, data_fw = self.simulate_system(y_1, tsim, dt)
-
-        # Data contains (x_i, z_i) pairs in shape [dim_x + dim_z,
-        # number_simulations]
-        data = data_fw[-1]
-        return data
+        return LuenbergerObserver.generate_data_svl(
+            self, limits, num_samples, k, dt, method)
 
     def generate_data_svl(self, limits: np.array, w_c: np.array,
-                          num_datapoints: int, k: int = 10, dt: float = 1e-2,
+                          num_datapoints: int, k: int = 5, dt: float = 1e-2,
                           stack: bool = True, method: str = "LHS"):
 
         num_samples = int(np.ceil(num_datapoints / len(w_c)))
@@ -165,6 +123,57 @@ class LuenbergerObserverNoise(LuenbergerObserver):
             self.D, self.F = self.set_DF(w_c_i)
 
             data = self.generate_data_mesh(limits, num_samples, k, dt, method)
+
+            wc_i_tensor = torch.tensor(w_c_i).repeat(num_samples).unsqueeze(1)
+            data = torch.cat((data, wc_i_tensor), 1)
+
+            df[..., idx] = data.unsqueeze(-1)
+
+        if stack:
+            return torch.cat(torch.unbind(df, dim=-1), dim=0)
+        else:
+            return df
+
+    def generate_data_forward(self, init: torch.tensor, w_c: np.array,
+                              tsim: tuple, num_datapoints: int, k: int = 5,
+                              dt: float = 1e-2, stack: bool = True):
+        """
+        Generate data points by simulating the system forward in time from
+        some initial conditions, then cutting the beginning of the trajectory.
+        Parameters
+        ----------
+        init: torch.tensor
+            Initial conditions (x0, z0) from which to simulate.
+        w_c: np.array
+            Array of w_c values for which to simulate.
+        tsim: tuple
+            Simulation time.
+        num_datapoints: int
+            Number of samples to take along trajectory * len(w_c) (convention).
+        k: int
+           Parameter for time t_c = k/min(lambda) before which to cut.
+        dt: float
+            Simulation step.
+        Returns
+        ----------
+        df: torch.tensor
+            Pairs of (x, z, wc) data points.
+        """
+        num_samples = int(np.ceil(num_datapoints / len(w_c)))
+
+        df = torch.zeros(size=(num_samples, self.dim_x + self.dim_z + 1, len(w_c)))
+
+        for idx, w_c_i in np.ndenumerate(w_c):
+            self.D, self.F = self.set_DF(w_c_i)
+
+            tq, data = self.simulate_system(init, tsim, dt)
+            self.k = k
+            self.t_c = self.k / min(
+                abs(linalg.eig(self.D.detach().numpy())[0].real))
+            data = data[(tq >= self.t_c)]  # cut trajectory before t_c
+            random_idx = np.random.choice(np.arange(len(data)),
+                                          size=(num_samples,), replace=False)
+            data = torch.squeeze(data[random_idx])
 
             wc_i_tensor = torch.tensor(w_c_i).repeat(num_samples).unsqueeze(1)
             data = torch.cat((data, wc_i_tensor), 1)

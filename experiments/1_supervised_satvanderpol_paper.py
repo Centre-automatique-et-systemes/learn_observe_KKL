@@ -14,7 +14,7 @@ sys.path.append(working_path)
 
 # Import KKL observer
 from learn_KKL.learner_noise import LearnerNoise
-from learn_KKL.system import SaturatedVanDerPol
+from learn_KKL.system import SaturatedVanDerPol, VanDerPol
 from learn_KKL.luenberger_observer_noise import LuenbergerObserverNoise
 
 # Import learner utils
@@ -37,12 +37,13 @@ if __name__ == "__main__":
     activation = nn.SiLU()
 
     # Define system
-    system = SaturatedVanDerPol(limit=100.)
+    system = SaturatedVanDerPol(limit=1e6)
+    # system = VanDerPol()
 
     # Define data params
-    # wc_arr = np.linspace(0.1, 2., 50)
+    # wc_arr = np.linspace(0.1, 2., 10)
     wc_arr = np.array([0.1])
-    x_limits = np.array([[-2.7, 2.7], [-2.7, 2.7]])
+    x_limits = np.array([[-1., 1.], [-1., 1.]])
     num_samples = wc_arr.shape[0] * 10000
 
     # Instantiate observer object
@@ -79,9 +80,9 @@ if __name__ == "__main__":
     num_samples = mesh.shape[0]  # in case regular grid: changed
     wc = 0.1
     D, F = obs.set_DF(wc)
-    k = 1#10
+    k = 5
     t_c = k / min(abs(linalg.eig(D)[0].real))
-    #
+    print(t_c, D, linalg.eig(D))
     # Simulation with saturation
     y_0 = torch.zeros((num_samples, obs.dim_x + obs.dim_z))  # TODO
     y_1 = y_0.clone()
