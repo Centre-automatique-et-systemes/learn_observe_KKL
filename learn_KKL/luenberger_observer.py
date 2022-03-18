@@ -698,7 +698,7 @@ class LuenbergerObserver(nn.Module):
             self,
             limits: tuple,
             num_samples: int,
-            k: int = 5,
+            k: int = 10,
             dt: float = 1e-2,
             method: str = "LHS",
     ):
@@ -752,7 +752,7 @@ class LuenbergerObserver(nn.Module):
         return data
 
     def generate_data_forward(self, init: torch.tensor, tsim: tuple,
-                              num_datapoints: int, k: int = 5,
+                              num_datapoints: int, k: int = 10,
                               dt: float = 1e-2, stack: bool = True):
         """
         Generate data points by simulating the system forward in time from

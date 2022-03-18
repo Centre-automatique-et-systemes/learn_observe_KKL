@@ -104,7 +104,7 @@ class LuenbergerObserverNoise(LuenbergerObserver):
         self,
         limits: tuple,
         num_samples: int,
-        k: int = 5,
+        k: int = 10,
         dt: float = 1e-2,
         method: str = "LHS",
     ):
@@ -112,7 +112,7 @@ class LuenbergerObserverNoise(LuenbergerObserver):
             self, limits, num_samples, k, dt, method)
 
     def generate_data_svl(self, limits: np.array, w_c: np.array,
-                          num_datapoints: int, k: int = 5, dt: float = 1e-2,
+                          num_datapoints: int, k: int = 10, dt: float = 1e-2,
                           stack: bool = True, method: str = "LHS"):
 
         num_samples = int(np.ceil(num_datapoints / len(w_c)))
@@ -135,7 +135,7 @@ class LuenbergerObserverNoise(LuenbergerObserver):
             return df
 
     def generate_data_forward(self, init: torch.tensor, w_c: np.array,
-                              tsim: tuple, num_datapoints: int, k: int = 5,
+                              tsim: tuple, num_datapoints: int, k: int = 10,
                               dt: float = 1e-2, stack: bool = True):
         """
         Generate data points by simulating the system forward in time from
@@ -232,27 +232,18 @@ class LuenbergerObserverNoise(LuenbergerObserver):
         else:
             # Load intermediary data
             wc = z[0, -1].item()
-            # df = pd.read_csv(os.path.join(path, f'Tmax_wc{wc:0.2g}.csv'),
-            #                  sep=',', header=None)
-            df = pd.read_csv(os.path.join(path, f'Tmax_wc'
-                                                f'{round(float(wc), 2)}.csv'),
+            df = pd.read_csv(os.path.join(path, f'Tmax_wc{wc:0.2g}.csv'),
                              sep=',', header=None)
             Tmax = torch.from_numpy(df.drop(df.columns[0], axis=1).values)
-            # df = pd.read_csv(os.path.join(path, f'dTdx_wc{wc:0.2g}.csv'),
-            #                  sep=',', header=None)
-            df = pd.read_csv(os.path.join(path, f'dTdx_wc{round(float(wc), 2)}.csv'),
+            df = pd.read_csv(os.path.join(path, f'dTdx_wc{wc:0.2g}.csv'),
                              sep=',', header=None)
             dTdx = torch.from_numpy(
                 df.drop(df.columns[0], axis=1).values).reshape(
                 (-1, Tmax.shape[0], Tmax.shape[1]))
-            # df = pd.read_csv(os.path.join(path, f'Tstar_max_wc{wc:0.2g}.csv'),
-            #                  sep=',', header=None)
-            df = pd.read_csv(os.path.join(path, f'Tstar_max_wc{round(float(wc), 2)}.csv'),
+            df = pd.read_csv(os.path.join(path, f'Tstar_max_wc{wc:0.2g}.csv'),
                              sep=',', header=None)
             Tstar_max = torch.from_numpy(df.drop(df.columns[0], axis=1).values)
-            # df = pd.read_csv(os.path.join(path, f'dTstar_dz_wc{wc:0.2g}.csv'),
-            #                  sep=',', header=None)
-            df = pd.read_csv(os.path.join(path, f'dTstar_dz_wc{round(float(wc), 2)}.csv'),
+            df = pd.read_csv(os.path.join(path, f'dTstar_dz_wc{wc:0.2g}.csv'),
                              sep=',', header=None)
             dTstar_dz = torch.from_numpy(
                 df.drop(df.columns[0], axis=1).values).reshape(

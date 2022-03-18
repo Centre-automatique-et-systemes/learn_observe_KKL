@@ -41,12 +41,11 @@ if __name__ == "__main__":
     #
     # # Define data params
     # wc_arr = np.linspace(0.03, 1.0, 100)
-    # # wc_arr = np.array([0.03])
     # x_limits = np.array([[-1., 1.], [-1., 1.]])
-    # num_samples = wc_arr.shape[0] * 2000
+    # num_samples = wc_arr.shape[0] * 5000
     #
     # # Solver options
-    # solver_options = {'method': 'rk4', 'options': {'step_size': 1e-4}}
+    # solver_options = {'method': 'rk4', 'options': {'step_size': 1e-3}}
     #
     # # Instantiate observer object
     # observer = LuenbergerObserverNoise(
@@ -62,7 +61,8 @@ if __name__ == "__main__":
     # observer.set_dynamics(system)
     #
     # # Generate training data and validation data
-    # data = observer.generate_data_svl(x_limits, wc_arr, num_samples, method="LHS")
+    # data = observer.generate_data_svl(x_limits, wc_arr, num_samples,
+    #                                   method="LHS", k=10)
     # data, val_data = train_test_split(data, test_size=0.3, shuffle=True)
     #
     # ##########################################################################
@@ -215,7 +215,7 @@ if __name__ == "__main__":
     # learner_T_star.save_pdf_training(learner_T_star.training_data[idx], verbose)
 
     path = "runs/Reversed_Duffing_Oscillator/Supervised_noise/T_star" \
-           "/exp_2/"  # TODO
+           "/exp_4/"  # TODO
     import dill as pkl
     learner_path = path + "/learner.pkl"
     with open(learner_path, "rb") as rb_file:
@@ -225,21 +225,21 @@ if __name__ == "__main__":
     wc_arr = np.linspace(0.03, 1., 100)
     verbose = False
 
-    # Gain criterion
-    print('Computing our gain-tuning criterion can take some time but saves '
-          'intermediary data in a subfolder zi_mesh: if you have already run '
-          'this script, set save to False and path to this subfolder.')
-    save = True
-    path = ''
-    if save:
-        mesh = learner_T_star.model.generate_data_svl(
-            x_limits, wc_arr, 10000 * len(wc_arr), method="uniform", stack=False
-        )
-    else:
-        mesh = torch.randn((10, learner_T_star.model.dim_x +
-                            learner_T_star.model.dim_z, 1))
-    # learner_T_star.save_rmse_wc(mesh, wc_arr, verbose)
-    learner_T_star.plot_sensitiviy_wc(mesh, wc_arr, verbose, save=save, path=path)
+    # # Gain criterion
+    # print('Computing our gain-tuning criterion can take some time but saves '
+    #       'intermediary data in a subfolder zi_mesh: if you have already run '
+    #       'this script, set save to False and path to this subfolder.')
+    # save = True
+    # path = ''
+    # if save:
+    #     mesh = learner_T_star.model.generate_data_svl(
+    #         x_limits, wc_arr, 10000 * len(wc_arr), method="uniform", stack=False
+    #     )
+    # else:
+    #     mesh = torch.randn((10, learner_T_star.model.dim_x +
+    #                         learner_T_star.model.dim_z, 1))
+    # # learner_T_star.save_rmse_wc(mesh, wc_arr, verbose)
+    # learner_T_star.plot_sensitiviy_wc(mesh, wc_arr, verbose, save=save, path=path)
 
     # TODO
     # from learn_KKL.utils import generate_mesh
@@ -262,7 +262,7 @@ if __name__ == "__main__":
     wc_arr = np.array([0.03, 0.15, 1.0])
     tsim = (0, 50)
     dt = 1e-2
-    x_0 = torch.tensor([0.7, 0.7])
+    x_0 = torch.tensor([1.5, 1.5])
 
     # learner_T_star.plot_rmse_error(x_0, wc_arr, verbose, tsim, dt, std=0.25)
 
@@ -270,9 +270,9 @@ if __name__ == "__main__":
         learner_T_star.save_trj(
             x_0, wc_arr, 0, verbose, tsim, dt, var=std
         )
-        # learner_T_star.plot_traj_error(
-        #     x_0, wc_arr, 0, verbose, tsim, dt, var=std
-        # )
+        learner_T_star.plot_traj_error(
+            x_0, wc_arr, 0, verbose, tsim, dt, var=std
+        )
 
     # Heatmap
     mesh = learner_T_star.model.generate_data_svl(

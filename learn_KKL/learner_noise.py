@@ -322,7 +322,7 @@ class LearnerNoise(Learner):
 
                 # TODO DELETE
                 tq, simulation = self.system.simulate(
-                    torch.tensor([0.1, 0.1]), (0, 60), 1e-2
+                    torch.tensor([1.5, 1.5]), (0, 60), 1e-2
                 )
                 measurement = self.model.h(simulation)
                 y = torch.cat((tq.unsqueeze(1), measurement), dim=1)

@@ -41,7 +41,6 @@ if __name__ == "__main__":
     #
     # # Define data params
     # wc_arr = np.linspace(0.03, 1., 100)
-    # # wc_arr = np.array([0.1])
     # x_limits = np.array([[-1., 1.], [-1., 1.]])
     # num_samples = wc_arr.shape[0] * 5000
     #
@@ -227,14 +226,14 @@ if __name__ == "__main__":
     #
     # learner_T_star.save_pdf_training(learner_T_star.training_data[idx], verbose)
 
-    path = "runs/VanDerPol/Supervised_noise/T_star/exp_1"  # TODO
+    path = "runs/VanDerPol/Supervised_noise/T_star/exp_100_wc0.03-1_-11+1cycle_rk41e-2"  # TODO
     import dill as pkl
     learner_path = path + "/learner.pkl"
     with open(learner_path, "rb") as rb_file:
         learner_T_star = pkl.load(rb_file)
     learner_T_star.results_folder = path
     x_limits = np.array([[-1., 1.], [-1., 1.]])
-    wc_arr = np.linspace(0.03, 1., 100)[40:]
+    wc_arr = np.linspace(0.03, 1., 100)
     # wc_arr = np.array([0.6])
     verbose = False
 
@@ -242,7 +241,7 @@ if __name__ == "__main__":
     print('Computing our gain-tuning criterion can take some time but saves '
           'intermediary data in a subfolder zi_mesh: if you have already run '
           'this script, set save to False and path to this subfolder.')
-    save = True
+    save = False
     path = ''
     if save:
         mesh = learner_T_star.model.generate_data_svl(

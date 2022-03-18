@@ -37,14 +37,17 @@ if __name__ == "__main__":
     activation = nn.SiLU()
 
     # Define system
-    system = SaturatedVanDerPol(limit=1e6)
-    # system = VanDerPol()
+    # system = SaturatedVanDerPol(limit=1e6)
+    system = VanDerPol()
 
     # Define data params
     # wc_arr = np.linspace(0.1, 2., 10)
     wc_arr = np.array([0.1])
     x_limits = np.array([[-1., 1.], [-1., 1.]])
     num_samples = wc_arr.shape[0] * 10000
+
+    # Solver options
+    solver_options = {'method': 'rk4', 'options': {'step_size': 1e-4}}
 
     # Instantiate observer object
     observer = LuenbergerObserverNoise(
@@ -76,7 +79,7 @@ if __name__ == "__main__":
     x_limits = np.array([[-1, 1], [-1., 1]])
     # mesh = generate_mesh(limits=x_limits, num_samples=num_samples,
     #                      method="uniform")
-    mesh = torch.tensor([[2.7, 2.7]])
+    mesh = torch.tensor([[2.5, 2.5]])
     num_samples = mesh.shape[0]  # in case regular grid: changed
     wc = 0.1
     D, F = obs.set_DF(wc)
