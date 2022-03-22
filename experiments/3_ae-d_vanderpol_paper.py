@@ -14,7 +14,7 @@ sys.path.append(working_path)
 
 # Import KKL observer
 from learn_KKL.learner import Learner
-from learn_KKL.system import SaturatedVanDerPol
+from learn_KKL.system import VanDerPol
 from learn_KKL.luenberger_observer_jointly import LuenbergerObserverJointly
 from learn_KKL.utils import generate_mesh
 
@@ -40,12 +40,12 @@ if __name__ == "__main__":
     recon_lambda = 0.1
 
     # Define system
-    system = SaturatedVanDerPol()
+    system = VanDerPol()
 
     # Define data params
-    x_limits = np.array([[-1.5, 1.5], [-1.5, 1.5]])
-    num_samples = 50000
-    init_wc = 0.3
+    x_limits = np.array([[-2.7, 2.7], [-2.7, 2.7]])
+    num_samples = 100000
+    init_wc = 1.
 
     # Create the observer (autoencoder design)
     observer = LuenbergerObserverJointly(
@@ -63,7 +63,7 @@ if __name__ == "__main__":
     ##########################################################################
 
     # Trainer options
-    num_epochs = 30
+    num_epochs = 100
     trainer_options = {"max_epochs": num_epochs}
     batch_size = 100
     init_learning_rate = 1e-3
