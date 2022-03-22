@@ -107,13 +107,16 @@ class LuenbergerObserverNoise(LuenbergerObserver):
         k: int = 10,
         dt: float = 1e-2,
         method: str = "LHS",
+        z_0=None,
+        **kwargs
     ):
         return LuenbergerObserver.generate_data_svl(
-            self, limits, num_samples, k, dt, method)
+            self, limits, num_samples, k, dt, method, z_0, **kwargs)
 
     def generate_data_svl(self, limits: np.array, w_c: np.array,
                           num_datapoints: int, k: int = 10, dt: float = 1e-2,
-                          stack: bool = True, method: str = "LHS"):
+                          stack: bool = True, method: str = "LHS", z_0=None,
+                          **kwargs):
 
         num_samples = int(np.ceil(num_datapoints / len(w_c)))
 
@@ -122,7 +125,14 @@ class LuenbergerObserverNoise(LuenbergerObserver):
         for idx, w_c_i in np.ndenumerate(w_c):
             self.D, self.F = self.set_DF(w_c_i)
 
-            data = self.generate_data_mesh(limits, num_samples, k, dt, method)
+            # if z_0 is None:
+            #     data = self.generate_data_mesh(limits, num_samples, k, dt,
+            #                                    method)
+            # else:
+                # data = self.generate_data_mesh(limits, num_samples, k, dt,
+                #                                method, z_0=z_0[idx].view(-1, 1))
+            data = self.generate_data_mesh(limits, num_samples, k, dt,
+                                           method, z_0=z_0, w_c=w_c_i)
 
             wc_i_tensor = torch.tensor(w_c_i).repeat(num_samples).unsqueeze(1)
             data = torch.cat((data, wc_i_tensor), 1)
@@ -289,6 +299,7 @@ class LuenbergerObserverNoise(LuenbergerObserver):
         dt: int,
         w_c: float,
         out_z: bool = False,
+        z_0=None
     ) -> torch.tensor:
         """
         Forward function for autoencoder. Used for training the model.
@@ -314,7 +325,7 @@ class LuenbergerObserverNoise(LuenbergerObserver):
         """
         self.D, _ = self.set_DF(w_c)
 
-        _, sol = self.simulate(measurement, t_sim, dt)
+        _, sol = self.simulate(measurement, t_sim, dt, z_0)
 
         w_c_tensor = torch.tensor(w_c).repeat(sol.shape[0]).unsqueeze(1)
 

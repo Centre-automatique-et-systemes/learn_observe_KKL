@@ -188,7 +188,8 @@ class LearnerNoise(Learner):
             with open(os.path.join(traj_folder, filename), "w") as f:
                 print(traj_error / nb_trajs, file=f)
 
-    def save_trj(self, init_state, w_c_arr, nb_trajs, verbose, tsim, dt, var=0.2):
+    def save_trj(self, init_state, w_c_arr, nb_trajs, verbose, tsim, dt,
+                 var=0.2, z_0=None):
         with torch.no_grad():
             # Estimation over the test trajectories with T_star
             nb_trajs += w_c_arr.shape[0]
@@ -216,7 +217,11 @@ class LearnerNoise(Learner):
                 else:
                     w_c = rd.uniform(0.2, 1.5)
 
-                estimation = self.model.predict(y, tsim, dt, w_c).detach()
+                if z_0 is None:
+                    estimation = self.model.predict(y, tsim, dt, w_c).detach()
+                else:
+                    estimation = self.model.predict(y, tsim, dt, w_c,
+                                                    z_0=z_0[i].view(-1, 1)).detach()
                 error = RMSE(simulation, estimation)
                 traj_error += error
 
@@ -321,12 +326,17 @@ class LearnerNoise(Learner):
                 error = RMSE(x_mesh, x_hat_star, dim=1)
 
                 # TODO DELETE
+                x_0 = torch.tensor([1.5, 1.5])
                 tq, simulation = self.system.simulate(
-                    torch.tensor([1.5, 1.5]), (0, 60), 1e-2
+                    x_0, (0, 60), 1e-2
                 )
+                z_0 = self.model.encoder(
+                    torch.cat((x_0.expand(1, -1),
+                               torch.as_tensor(w_c).reshape(-1, 1)), dim=1)).t()
                 measurement = self.model.h(simulation)
                 y = torch.cat((tq.unsqueeze(1), measurement), dim=1)
-                estimation = self.model.predict(y, (0, 60), 1e-2, w_c).detach()
+                estimation = self.model.predict(y, (0, 60), 1e-2, w_c, z_0=z_0
+                                                ).detach()
 
                 for i in range(1, x_mesh.shape[1]):
                     # https://stackoverflow.com/questions/37822925/how-to-smooth-by-interpolation-when-using-pcolormesh

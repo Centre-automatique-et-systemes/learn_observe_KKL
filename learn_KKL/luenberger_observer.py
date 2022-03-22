@@ -594,12 +594,9 @@ class LuenbergerObserver(nn.Module):
         return torch.matmul(dTdx, msm)
 
     def simulate(self, y: torch.tensor, tsim: tuple, dt: float,
-                 method: str = "rk4") -> torch.tensor:
+                 z_0=None) -> torch.tensor:
         """
-        Runs and outputs the results from Luenberger observer system.
-        
-        Warning : Might not behave as intended because of interpolation_method
-        Prefer self.simulate_system
+        Simulates Luenberger observer driven by given measurement.
 
         Parameters
         ----------
@@ -611,6 +608,9 @@ class LuenbergerObserver(nn.Module):
 
         dt: float
             Step width of tsim.
+
+        z_0: torch.tensor
+            Initial value for observer state (default: 0).
 
         Returns
         ----------
@@ -627,7 +627,8 @@ class LuenbergerObserver(nn.Module):
         measurement = self.interpolate_func(y)
 
         # Zero initial value
-        z_0 = torch.zeros((self.dim_z, 1))
+        if z_0 is None:
+            z_0 = torch.zeros((self.dim_z, 1))
 
         def dydt(t, z: torch.tensor):
             if self.u_1 == self.u:
@@ -649,7 +650,8 @@ class LuenbergerObserver(nn.Module):
             self, y_0: torch.tensor, tsim: tuple, dt, only_x: bool = False
     ) -> torch.tensor:
         """
-        Simulate Luenberger observer driven by a dynamical system.
+        Simulate dynamical system and the corresponding Luenberger observer
+        jointly (if only_x is False).
 
         Parameters
         ----------
@@ -701,6 +703,8 @@ class LuenbergerObserver(nn.Module):
             k: int = 10,
             dt: float = 1e-2,
             method: str = "LHS",
+            z_0=None,
+            **kwargs,
     ):
         """
         Generate a grid of data points by simulating the system backward and
@@ -720,6 +724,13 @@ class LuenbergerObserver(nn.Module):
 
         dt: float
             Simulation step.
+
+        method: string
+            Method for sampling the initial conditions (uniform or LHS).
+
+        z_0: string
+            Initial value for observer state: default is 0 (None), options are
+            infty (initializes z at its value at t= - infinity) or encoder (initializes z(0) = self.encoder(x(0)).
 
         Returns
         ----------
@@ -744,6 +755,20 @@ class LuenbergerObserver(nn.Module):
         # from previous simulation
         tsim = (-self.t_c, 0)
         y_1[:, : self.dim_x] = data_bw[-1, :, : self.dim_x]
+        if z_0 == "infty":
+            # initialize z with it value at t = - infinity
+            y_1[:, self.dim_x:] = - torch.matmul(
+                torch.linalg.inv(self.D),
+                torch.matmul(self.F, self.h(data_bw[-1, :, : self.dim_x].t()))).t()
+        elif z_0 == "encoder":
+            if "noise" in self.method:
+                y_1[:, self.dim_x:] = self.encoder(
+                    torch.cat((y_1[:, : self.dim_x],
+                               torch.as_tensor(kwargs['w_c']).expand(len(y_1), 1)), dim=1))
+            else:
+                y_1[:, self.dim_x:] = self.encoder(y_1[:, : self.dim_x])
+        elif z_0 is not None:
+            raise NotImplementedError(f"Method {z_0} for initializing z_0 for backward-forward sampling is not implemented.")
         _, data_fw = self.simulate_system(y_1, tsim, dt)
 
         # Data contains (x_i, z_i) pairs in shape [dim_x + dim_z,
@@ -1020,7 +1045,7 @@ class LuenbergerObserver(nn.Module):
         return x_hat
 
     def predict(self, measurement: torch.tensor, tsim: tuple,
-                dt: int) -> torch.tensor:
+                dt: int, z_0=None) -> torch.tensor:
         """
         Forward function for autoencoder. Used for training the model.
         Computation follows as:
@@ -1043,7 +1068,7 @@ class LuenbergerObserver(nn.Module):
         x_hat: torch.tensor
             Estimation of the observer model.
         """
-        _, sol = self.simulate(measurement, tsim, dt)
+        _, sol = self.simulate(measurement, tsim, dt, z_0)
 
         x_hat = self.decoder(sol[:, :, 0])
 

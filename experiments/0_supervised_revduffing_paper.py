@@ -215,7 +215,7 @@ if __name__ == "__main__":
     # learner_T_star.save_pdf_training(learner_T_star.training_data[idx], verbose)
 
     path = "runs/Reversed_Duffing_Oscillator/Supervised_noise/T_star" \
-           "/exp_4/"  # TODO
+           "/exp_100_wc0.03-1_rk41e-3_k10_2/"  # TODO
     import dill as pkl
     learner_path = path + "/learner.pkl"
     with open(learner_path, "rb") as rb_file:
@@ -241,34 +241,21 @@ if __name__ == "__main__":
     # # learner_T_star.save_rmse_wc(mesh, wc_arr, verbose)
     # learner_T_star.plot_sensitiviy_wc(mesh, wc_arr, verbose, save=save, path=path)
 
-    # TODO
-    # from learn_KKL.utils import generate_mesh
-    # wc = 0.1
-    # xmesh = torch.cat((generate_mesh(x_limits, 10000, method="uniform"),
-    #                    wc * torch.ones((10000, 1))), dim=1)
-    # zmesh = torch.cat((learner_T_star.model.encoder(xmesh),
-    #                    torch.unsqueeze(xmesh[:, -1], 1)),
-    #                   dim=1)
-    # learner_T_star.save_invert_heatmap(xmesh[:, :-1],
-    #                                    learner_T_star.model.decoder(zmesh),
-    #                                    verbose=False, wc=wc)
-    # x_mesh = torch.tensor([[0.7, 0.7]] * (len(wc_arr) + 1))  # TODO
-    # print(wc_arr)
-    # learner_T_star.save_random_traj(x_mesh, wc_arr, 1, verbose, (0, 50),
-    #                                 1e-2)
-
     # Trajectories
     std_array = [0.0, 0.25, 0.5]
-    wc_arr = np.array([0.03, 0.15, 1.0])
+    wc_arr = np.array([0.03, 0.2, 1.0])
     tsim = (0, 50)
     dt = 1e-2
-    x_0 = torch.tensor([1.5, 1.5])
+    x_0 = torch.tensor([0.6, 0.6])
+    z_0 = learner_T_star.model.encoder(
+        torch.cat((x_0.expand(len(wc_arr), -1),
+                   torch.as_tensor(wc_arr).reshape(-1, 1)), dim=1))
 
     # learner_T_star.plot_rmse_error(x_0, wc_arr, verbose, tsim, dt, std=0.25)
 
     for std in std_array:
         learner_T_star.save_trj(
-            x_0, wc_arr, 0, verbose, tsim, dt, var=std
+            x_0, wc_arr, 0, verbose, tsim, dt, var=std, z_0=z_0
         )
         learner_T_star.plot_traj_error(
             x_0, wc_arr, 0, verbose, tsim, dt, var=std
@@ -276,9 +263,18 @@ if __name__ == "__main__":
 
     # Heatmap
     mesh = learner_T_star.model.generate_data_svl(
-        x_limits, wc_arr, 10000, method="uniform", stack=False
+        x_limits, wc_arr, 10000, method="uniform", stack=False, z_0="encoder"
     )
-
-    # learner.plot_sensitiviy_wc(mesh, wc_arr, verbose)
     learner_T_star.save_pdf_heatmap(mesh, verbose)
+
+    # Invertibility heatmap
+    for i in range(len(wc_arr)):
+        wc = wc_arr[i]
+        xmesh = mesh[:, learner_T_star.x_idx_in, i]
+        zmesh = torch.cat((learner_T_star.model.encoder(xmesh),
+                           torch.unsqueeze(mesh[:, -1, i], 1)),
+                          dim=1)
+        learner_T_star.save_invert_heatmap(xmesh[:, :-1],
+                                           learner_T_star.model.decoder(zmesh),
+                                           verbose=False, wc=wc)
 

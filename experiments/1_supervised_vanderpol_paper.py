@@ -234,43 +234,40 @@ if __name__ == "__main__":
     learner_T_star.results_folder = path
     x_limits = np.array([[-1., 1.], [-1., 1.]])
     wc_arr = np.linspace(0.03, 1., 100)
-    # wc_arr = np.array([0.6])
     verbose = False
 
-    # Gain criterion
-    print('Computing our gain-tuning criterion can take some time but saves '
-          'intermediary data in a subfolder zi_mesh: if you have already run '
-          'this script, set save to False and path to this subfolder.')
-    save = False
-    path = ''
-    if save:
-        mesh = learner_T_star.model.generate_data_svl(
-            x_limits, wc_arr, 10000 * len(wc_arr), method="uniform", stack=False
-        )
-    else:
-        mesh = torch.randn((10, learner_T_star.model.dim_x +
-                           learner_T_star.model.dim_z, 1))
-    learner_T_star.save_rmse_wc(mesh, wc_arr, verbose)
-    learner_T_star.plot_sensitiviy_wc(mesh, wc_arr, verbose, save=save,
-                                      path=path)
-
-    # x_mesh = torch.tensor([[1.0, 1.0]] * (len(wc_arr) + 1))  # TODO
-    # print(wc_arr)
-    # learner_T_star.save_random_traj(x_mesh, wc_arr, 1, verbose, (0, 20),
-    #                                 1e-2, std=0.5)
+    # # Gain criterion
+    # print('Computing our gain-tuning criterion can take some time but saves '
+    #       'intermediary data in a subfolder zi_mesh: if you have already run '
+    #       'this script, set save to False and path to this subfolder.')
+    # save = False
+    # path = ''
+    # if save:
+    #     mesh = learner_T_star.model.generate_data_svl(
+    #         x_limits, wc_arr, 10000 * len(wc_arr), method="uniform", stack=False
+    #     )
+    # else:
+    #     mesh = torch.randn((10, learner_T_star.model.dim_x +
+    #                        learner_T_star.model.dim_z, 1))
+    # learner_T_star.save_rmse_wc(mesh, wc_arr, verbose)
+    # learner_T_star.plot_sensitiviy_wc(mesh, wc_arr, verbose, save=save,
+    #                                   path=path)
 
     # Trajectories
     std_array = [0.0, 0.25, 0.5]
-    wc_arr = np.array([0.03, 0.25, 1.])
+    wc_arr = np.array([0.03, 0.3, 1.])
     tsim = (0, 20)
     dt = 1e-2
     x_0 = torch.tensor([0.1, 0.1])
+    z_0 = learner_T_star.model.encoder(
+        torch.cat((x_0.expand(len(wc_arr), -1),
+                   torch.as_tensor(wc_arr).reshape(-1, 1)), dim=1))
 
     # learner_T_star.plot_rmse_error(x_0, wc_arr, verbose, tsim, dt, std=0.25)
 
     for std in std_array:
         learner_T_star.save_trj(
-           x_0, wc_arr, 0, verbose, tsim, dt, var=std
+           x_0, wc_arr, 0, verbose, tsim, dt, var=std, z_0=z_0
         )
         learner_T_star.plot_traj_error(
             x_0, wc_arr, 0, verbose, tsim, dt, var=std
@@ -278,8 +275,18 @@ if __name__ == "__main__":
 
     # Heatmap
     mesh = learner_T_star.model.generate_data_svl(
-        x_limits, wc_arr, 10000, method="uniform", stack=False,
+        x_limits, wc_arr, 10000, method="uniform", stack=False, z_0="encoder"
     )
-
-    # learner.plot_sensitiviy_wc(mesh, wc_arr, verbose)
     learner_T_star.save_pdf_heatmap(mesh, verbose)
+
+    # Invertibility heatmap
+    for i in range(len(wc_arr)):
+        wc = wc_arr[i]
+        xmesh = mesh[:, learner_T_star.x_idx_in, i]
+        zmesh = torch.cat((learner_T_star.model.encoder(xmesh),
+                           torch.unsqueeze(mesh[:, -1, i], 1)),
+                          dim=1)
+        learner_T_star.save_invert_heatmap(xmesh[:, :-1],
+                                           learner_T_star.model.decoder(zmesh),
+                                           verbose=False, wc=wc)
+

@@ -5,17 +5,17 @@ clear all
 dx = 2;
 dy = 1;
 dz = 3;
-wc_arr = linspace(0.03, 1, 10);
+wc_arr = linspace(0.03, 1, 100);
 
-%path = "runs/SaturatedVanDerPol/Supervised_noise/T_star/exp_10_0.1-2_ok3/zi_mesh_-11/";
-path = "runs/Reversed_Duffing_Oscillator/Supervised_noise/T_star/exp_10_wc0.03-1_2/xzi_mesh_5000/";
+%path = "runs/VanDerPol/Supervised_noise/T_star/exp_100_wc0.03-1_-11+1cycle_rk41e-2/xzi_mesh/";
+path = "runs/Reversed_Duffing_Oscillator/Supervised_noise/T_star/exp_100_wc0.03-1_rk41e-3_k10_2/xzi_mesh/";
 Darr = table2array(readtable(append(path, 'D_arr.csv')));
 Darr = Darr(:, 2:end);
 
 %%
 
-% zbar = argsup(dT/dz (z_i))
-% Tmax = dT/dz (zbar)
+% zbar = argsup(dTstar/dz (z_i))
+% Tmax = dTstar/dz (zbar)
 
 % Criterion 1: norm(Tmax) * sup(G(jw))
 
@@ -44,19 +44,21 @@ end
 
 N = 5e5 / length(wc_arr);
 crit1 = hinf .* Tmax_norm;
-figure()
+h = figure()
 plot(wc_arr, hinf)
 hold on
 plot(wc_arr, Tmax_norm)
 hold on
 plot(wc_arr, crit1)
 legend('hinf','Tmax norm', 'crit1')
+savefig(h, append(path, 'crit1_old.fig'))
+
 
 figure()
 plot(wc_arr, crit1)
 legend('crit1')
 
-csvwrite(append(path, 'crit1.csv'), [wc_arr', Tmax_norm, hinf, crit1])
+csvwrite(append(path, 'crit1_old.csv'), [wc_arr', Tmax_norm, hinf, crit1])
 
 %%
 
@@ -104,7 +106,7 @@ csvwrite(append(path, 'crit2.csv'), [wc_arr', Tmax_norm, hinf, crit2])
 
 %%
 
-% Criterion 3: sup_{z_i, w} (dT/dz (z_i) G(jw))
+% Criterion 3: sup_{z_i, w} (dTstar/dz (z_i) G(jw))
 
 hinf = zeros(length(wc_arr), 1);
 
@@ -149,7 +151,7 @@ csvwrite(append(path, 'crit3.csv'), [wc_arr', hinf, crit3])
 
 %%
 
-% Criterion 4: norm(dTdz, 2) * sup(G(jw))
+% Criterion 4: norm(dTstar/dz, 2) * sup(G(jw))
 % Same as criterion 1 but norm l2 of whole dTdz over all z_i
 
 figure()
@@ -179,23 +181,24 @@ end
 
 N = 5e5 / length(wc_arr);
 crit4 = hinf .* Tmax_norm;
-figure()
+h = figure()
 plot(wc_arr, hinf)
 hold on
 plot(wc_arr, Tmax_norm)
 hold on
 plot(wc_arr, crit4)
 legend('hinf','Tmax norm', 'crit4')
+savefig(h, append(path, 'crit4_old.fig'))
 
 figure()
 plot(wc_arr, crit4)
 legend('crit4')
 
-csvwrite(append(path, 'crit4.csv'), [wc_arr', Tmax_norm, hinf, crit4])
+csvwrite(append(path, 'crit4_old.csv'), [wc_arr', Tmax_norm, hinf, crit4])
 
 %%
 
-% Criterion 5: norm(dTdz, 2) * norm(G(jw), 2)
+% Criterion 5: norm(dTstar/dz, 2) * norm(G(jw), 2)
 % Same as criterion 1 but norm l2 of whole dTdz over all z_i and norm 2 of
 % linear system
 

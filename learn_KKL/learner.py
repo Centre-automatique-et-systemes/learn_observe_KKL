@@ -386,7 +386,7 @@ class Learner(pl.LightningModule):
             plt.clf()
             plt.close("all")
 
-    def save_trj(self, init_state, verbose, tsim, dt, var=0.2):
+    def save_trj(self, init_state, verbose, tsim, dt, var=0.2, z_0=None):
         # Estimation over the test trajectories with T_star
         traj_folder = os.path.join(self.results_folder, "Test_trajectories")
         tq, simulation = self.system.simulate(init_state, tsim, dt)
@@ -406,7 +406,7 @@ class Learner(pl.LightningModule):
         # trajectories!!!
         y = torch.cat((tq.unsqueeze(1), measurement), dim=1)
 
-        estimation = self.model.predict(y, tsim, dt).detach()
+        estimation = self.model.predict(y, tsim, dt, z_0=z_0).detach()
         error = RMSE(simulation, estimation)
         traj_error += error
 
@@ -474,7 +474,8 @@ class Learner(pl.LightningModule):
             print(traj_error, file=f)
 
 
-    def save_random_traj(self, x_mesh, num_samples, nb_trajs, verbose, tsim, dt, std=0.):
+    def save_random_traj(self, x_mesh, num_samples, nb_trajs, verbose, tsim,
+                         dt, std=0., z_0=None):
         with torch.no_grad():
             # Estimation over the test trajectories with T_star
             random_idx = np.random.choice(np.arange(num_samples),
@@ -497,7 +498,7 @@ class Learner(pl.LightningModule):
                 # Need to figure out how to interpolate y in parallel for all
                 # trajectories!!!
                 y = torch.cat((tq.unsqueeze(1), measurement[:, i]), dim=1)
-                estimation = self.model.predict(y, tsim, dt).detach()
+                estimation = self.model.predict(y, tsim, dt, z_0=z_0).detach()
                 rmse = RMSE(simulation[:, i], estimation)
                 traj_error += rmse
 
@@ -565,7 +566,10 @@ class Learner(pl.LightningModule):
             # Invertibility heatmap
             error = RMSE(x_mesh, x_hat_AE, dim=1)
             for i in range(1, x_mesh.shape[1]):
-                name = "Invertibility_heatmap" + str(i) + ".pdf"
+                if wc is not None:
+                    name = f"Invertibility_heatmap_wc{wc:0.2g}_{i}.pdf"
+                else:
+                    name = "Invertibility_heatmap" + str(i) + ".pdf"
                 plt.scatter(
                     x_mesh[:, i - 1],
                     x_mesh[:, i],

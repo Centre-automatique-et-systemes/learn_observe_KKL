@@ -6,7 +6,7 @@ dz = 3;
 wc_arr = linspace(0.03, 1, 100);
 
 %path = "runs/VanDerPol/Supervised_noise/T_star/exp_100_wc0.03-1_-11+1cycle_rk41e-2/xzi_mesh/";
-path = "runs/Reversed_Duffing_Oscillator/Supervised_noise/T_star/exp_100_wc0.03-1_rk41e-3_k10/xzi_mesh/";
+path = "runs/Reversed_Duffing_Oscillator/Supervised_noise/T_star/exp_100_wc0.03-1_rk41e-3_k10_2/xzi_mesh/";
 Darr = table2array(readtable(append(path, 'D_arr.csv')));
 Darr = Darr(:, 2:end);
 
@@ -164,3 +164,55 @@ plot(wc_arr, crit3)
 legend('crit3')
 
 csvwrite(append(path, 'crit3.csv'), [wc_arr', Tmax_norm, Tstar_max_norm, crit3])
+
+%%
+
+% Criterion 4 (analogy from transfer function of linear KKL):
+% mean_{x,z} (norm (G(jw, z, x) =  (jwI - dTstar/dz(z) D dT/dx(x))^-1 dTstar/dz(z) F, infty))
+
+hinf = zeros(length(wc_arr), 1);
+Tmax_norm = zeros(length(wc_arr), 1);
+Tstar_max_norm = zeros(length(wc_arr), 1);
+
+for i = 1:length(wc_arr)
+    wc = wc_arr(i);
+    dTstardz = table2array(readtable(append(path, 'dTstar_dz_wc', sprintf('%0.2g', wc), '.csv')));
+    dTstardz = dTstardz(:, 2:end);
+    dTstardz = reshape(dTstardz, [length(dTstardz), dz, dx]);
+    dTstardz = permute(dTstardz, [1, 3, 2]);
+    Tstar_max_norm(i) = norm(dTstardz(:), 2);
+    dTdx = table2array(readtable(append(path, 'dTdx_wc', sprintf('%0.2g', wc), '.csv')));
+    dTdx = dTdx(:, 2:end);
+    dTdx = reshape(dTdx, [length(dTdx), dx, dz]);
+    dTdx = permute(dTdx, [1, 3, 2]);
+    Tmax_norm(i) = norm(dTdx(:), 2);
+    D = reshape(Darr(i, :), [dz, dz]).'
+    F = ones(dz, dy);
+    for j = 1:length(dTdx)
+        current_dTstardz = squeeze(dTstardz(j, :, :));
+        current_dTdx = squeeze(dTdx(j, :, :));
+        eigvals = eig(current_dTstardz * D * current_dTdx);  % Not stable?
+        sys = ss(current_dTstardz * D * current_dTdx, current_dTstardz * F, eye(dx), zeros(dx, dy));
+        ninf = norm(sys, inf);
+        hinf_z(j) = ninf;
+    end
+    eigvals
+    hinf(i) = mean(hinf_z);
+end
+
+N = 5e5 / length(wc_arr);
+crit4 = hinf;
+h = figure();
+plot(wc_arr, Tmax_norm)
+hold 
+plot(wc_arr, Tstar_max_norm)
+hold on
+plot(wc_arr, crit4)
+legend('T norm', 'Tstar norm', 'crit4')
+savefig(h, append(path, 'crit4.fig'))
+
+figure()
+plot(wc_arr, crit4)
+legend('crit4')
+
+csvwrite(append(path, 'crit4.csv'), [wc_arr', Tmax_norm, Tstar_max_norm, crit4])
