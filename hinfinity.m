@@ -5,10 +5,12 @@ clear all
 dx = 2;
 dy = 1;
 dz = 3;
-wc_arr = linspace(0.03, 1, 100);
+wc_arr = linspace(0.03, 1., 100);
+%wc_arr = wc_arr(1:74);
 
-%path = "runs/VanDerPol/Supervised_noise/T_star/exp_100_wc0.03-1_-11+1cycle_rk41e-2/xzi_mesh/";
-path = "runs/Reversed_Duffing_Oscillator/Supervised_noise/T_star/exp_100_wc0.03-1_rk41e-3_k10_2/xzi_mesh/";
+path = "runs/VanDerPol/Supervised_noise/T_star/exp_100_wc0.03-1_-11+1cycle_rk41e-2/xzi_mesh/";
+%path = "runs/Reversed_Duffing_Oscillator/Supervised_noise/T_star/exp_100_wc0.03-1_rk41e-3_k10_2/xzi_mesh/";
+%path = "runs/SaturatedVanDerPol/Supervised_noise/T_star/exp_0/xzi_mesh/";
 Darr = table2array(readtable(append(path, 'D_arr.csv')));
 Darr = Darr(:, 2:end);
 
@@ -154,7 +156,7 @@ csvwrite(append(path, 'crit3.csv'), [wc_arr', hinf, crit3])
 % Criterion 4: norm(dTstar/dz, 2) * sup(G(jw))
 % Same as criterion 1 but norm l2 of whole dTdz over all z_i
 
-figure()
+figure() 
 hinf = zeros(length(wc_arr), 1);
 Tmax_norm = zeros(length(wc_arr), 1);
 
@@ -284,3 +286,105 @@ plot(wc_arr, crit6)
 legend('crit6')
 
 csvwrite(append(path, 'crit6.csv'), [wc_arr', Tmax_norm, hinf, crit6])
+
+%%
+
+% Criterion 7: mean_{z_i} norm(dTstar/dz(z_i), 2) * sup(G(jw))
+% Same as criterion 1 but mean (instead of max) of norm l2 of gradient over all z_i
+
+figure()
+hinf = zeros(length(wc_arr), 1);
+Tmean_norm = zeros(length(wc_arr), 1);
+
+for i = 1:length(wc_arr)
+    wc = wc_arr(i);
+    dTdz = table2array(readtable(append(path, 'dTstar_dz_wc', sprintf('%0.2g', wc), '.csv')));
+    %dTdz = table2array(readtable(append(path, 'dTdz_wc', sprintf('%0.2g', wc), '.csv')));
+    %dTdz = table2array(readtable(append(path, 'dTdz_wc', sprintf('%0.2g', round(wc, 2)), '.csv')));
+    %dTdz = table2array(readtable(append(path, 'dTdz_wc', sprintf('%0.3g', round(wc, 2)), '.csv')));
+    %dTdz = table2array(readtable(append(path, 'dTdz_wc', sprintf('%0.3g', wc), '.csv')));
+    dTdz = dTdz(:, 2:end);
+    dTdz = reshape(dTdz, [length(dTdz), dz, dx]);
+    dTdz = permute(dTdz, [1, 3, 2]);
+    dTdz_norm = zeros(length(dTdz), 1);
+    for j = 1:length(dTdz)
+        dTdz_norm(j) = norm(squeeze(dTdz(j, :, :)), 2);
+    end
+    Tmean_norm(i) = mean(dTdz_norm);
+    D = reshape(Darr(i, :), [dz, dz]).'
+    F = ones(dz, dy); 
+    sys = ss(D, F, eye(length(D)), zeros(dz, dy));
+    bode(sys)
+    hold on
+%     [ninf,fpeak] = hinfnorm(sys);
+    ninf = norm(sys, inf);
+    hinf(i) = ninf;
+end
+
+N = 5e5 / length(wc_arr);
+crit7 = hinf .* Tmean_norm;
+h = figure()
+plot(wc_arr, hinf)
+hold on
+plot(wc_arr, Tmean_norm)
+hold on
+plot(wc_arr, crit7)
+legend('hinf','Tmax norm', 'crit7')
+savefig(h, append(path, 'crit7_old.fig'))
+
+figure()
+plot(wc_arr, crit7)
+legend('crit7')
+
+csvwrite(append(path, 'crit7_old.csv'), [wc_arr', Tmean_norm, hinf, crit7])
+
+%%
+
+% Criterion 8: norm(vector(norm(dTstar/dz(z_i), 2)_i, 2) * sup(G(jw))
+% Same as criterion 1 but norm l2 (instad of infinity norm) of vector(norm(dTstar/dz(z_i), 2)_i
+
+figure()
+hinf = zeros(length(wc_arr), 1);
+dTdz_norm = zeros(length(wc_arr), 1);
+N = 10000;
+
+for i = 1:length(wc_arr)
+    wc = wc_arr(i);
+    dTdz = table2array(readtable(append(path, 'dTstar_dz_wc', sprintf('%0.2g', wc), '.csv')));
+    %dTdz = table2array(readtable(append(path, 'dTdz_wc', sprintf('%0.2g', wc), '.csv')));
+    %dTdz = table2array(readtable(append(path, 'dTdz_wc', sprintf('%0.2g', round(wc, 2)), '.csv')));
+    %dTdz = table2array(readtable(append(path, 'dTdz_wc', sprintf('%0.3g', round(wc, 2)), '.csv')));
+    %dTdz = table2array(readtable(append(path, 'dTdz_wc', sprintf('%0.3g', wc), '.csv')));
+    dTdz = dTdz(:, 2:end);
+    dTdz = reshape(dTdz, [length(dTdz), dz, dx]);
+    dTdz = permute(dTdz, [1, 3, 2]);
+    vector_dTdz_norm = zeros(length(dTdz), 1);
+    for j = 1:length(dTdz)
+        vector_dTdz_norm(j) = norm(squeeze(dTdz(j, :, :)), 2);
+    end
+    dTdz_norm(i) = norm(vector_dTdz_norm, 2);
+    D = reshape(Darr(i, :), [dz, dz]).'
+    F = ones(dz, dy); 
+    sys = ss(D, F, eye(length(D)), zeros(dz, dy));
+    bode(sys)
+    hold on
+%     [ninf,fpeak] = hinfnorm(sys);
+    ninf = norm(sys, inf);
+    hinf(i) = ninf;
+end
+
+crit8 = hinf .* dTdz_norm;
+h = figure()
+plot(wc_arr, hinf)
+hold on
+plot(wc_arr, dTdz_norm)
+hold on
+plot(wc_arr, crit8)
+legend('hinf','dTdz norm', 'crit8')
+savefig(h, append(path, 'crit8_old.fig'))
+
+figure()
+plot(wc_arr, crit8)
+legend('crit8')
+
+csvwrite(append(path, 'crit8_old.csv'), [wc_arr', dTdz_norm, hinf, crit8])

@@ -548,7 +548,7 @@ class QuanserQubeServo2(System):
     def __repr__(self):
         return "QuanserQubeServo2"
 
-class SaturatedVanDerPol(System):
+class OldSaturatedVanDerPol(System):
     """ See https://en.wikipedia.org/wiki/Van_der_Pol_oscillator for detailed
     reference for this system.
     """
@@ -570,6 +570,58 @@ class SaturatedVanDerPol(System):
         idx = torch.gt(a, self.limit)
         g = torch.ones_like(a)
         g[idx] = 1 - torch.exp(-.1 / (a[idx] - self.limit))
+        xdot[..., 0] = x[..., 1]
+        xdot[..., 1] = self.eps * (1 - torch.pow(x[..., 0], 2)) * x[..., 1] - x[..., 0]
+        return xdot * torch.unsqueeze(g, dim=-1)
+
+    def h(self, x):
+        return torch.unsqueeze(x[..., 0], dim=-1)
+
+    def g(self, x):
+        xdot = torch.zeros_like(x)
+        xdot[..., 1] = torch.ones_like(x[..., 1])
+        return xdot
+
+    def __repr__(self):
+        return "OldSaturatedVanDerPol"
+
+class SaturatedVanDerPol(System):
+    """ See https://en.wikipedia.org/wiki/Van_der_Pol_oscillator for detailed
+    reference for this system.
+    """
+
+    def __init__(self, eps: float = 1.0, r: float = 3., d: float = 7.):
+        super().__init__()
+        self.dim_x = 2
+        self.dim_y = 1
+
+        self.eps = eps
+        self.r = r  # for saturation = 1 if norm(x) <= r
+        self.d = d  # for saturation = 0 if norm(x) >= r+d
+        self.coef = self.set_coef()  # saturation = polynomial(coef) between
+
+        self.u = self.null_controller
+        self.u_1 = self.null_controller
+
+    def set_coef(self):
+        A = torch.tensor(
+            [[0, 0, 0, 1.],
+             [0, 0, 1., 0],
+             [self.d ** 3, self.d ** 2, self.d, 1],
+             [3 * self.d ** 2, 2 * self.d, 1, 0]])
+        B = torch.tensor([[1.], [0], [0], [0]])
+        return torch.linalg.solve(A, B)
+
+    def p(self, x):
+        return self.coef[0] * x ** 3 + self.coef[1] * x ** 2 + self.coef[
+            2] * x + self.coef[3]
+
+    def f(self, x):
+        xdot = torch.zeros_like(x)
+        xnorm = torch.linalg.norm(x, 2, dim=-1)
+        g = torch.where(xnorm <= self.r, 1.,
+                        torch.where(xnorm < self.r + self.d,
+                                    self.p(xnorm - self.r), 0.))
         xdot[..., 0] = x[..., 1]
         xdot[..., 1] = self.eps * (1 - torch.pow(x[..., 0], 2)) * x[..., 1] - x[..., 0]
         return xdot * torch.unsqueeze(g, dim=-1)

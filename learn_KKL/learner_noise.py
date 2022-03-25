@@ -326,7 +326,7 @@ class LearnerNoise(Learner):
                 error = RMSE(x_mesh, x_hat_star, dim=1)
 
                 # TODO DELETE
-                x_0 = torch.tensor([1.5, 1.5])
+                x_0 = torch.tensor([0.6, 0.6])
                 tq, simulation = self.system.simulate(
                     x_0, (0, 60), 1e-2
                 )
