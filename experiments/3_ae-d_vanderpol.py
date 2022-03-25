@@ -3,6 +3,7 @@
 # Import base utils
 from mimetypes import init
 import torch
+import os
 from torch import nn
 import numpy as np
 import pathlib
@@ -14,9 +15,9 @@ sys.path.append(working_path)
 
 # Import KKL observer
 from learn_KKL.learner import Learner
-from learn_KKL.system import RevDuffing
+from learn_KKL.system import SaturatedVanDerPol
 from learn_KKL.luenberger_observer_jointly import LuenbergerObserverJointly
-from learn_KKL.utils import generate_mesh
+from learn_KKL.utils import generate_mesh, RMSE
 
 # Import learner utils
 import pytorch_lightning as pl
@@ -40,15 +41,15 @@ if __name__ == "__main__":
     recon_lambda = 0.1
 
     # Define system
-    system = RevDuffing()
+    system = SaturatedVanDerPol()  # saturation only used for heatmap
 
     # Define data params
-    x_limits = np.array([[-1.0, 1.0], [-1.0, 1.0]])
+    x_limits = np.array([[-2.7, 2.7], [-2.7, 2.7]])
     num_samples = 70000
-    init_wc = 0.3
+    init_wc = 1.
 
     # Solver options
-    solver_options = {'method': 'rk4', 'options': {'step_size': 1e-3}}
+    solver_options = {'method': 'rk4', 'options': {'step_size': 1e-2}}
 
     # Create the observer (autoencoder design)
     observer = LuenbergerObserverJointly(
@@ -76,11 +77,11 @@ if __name__ == "__main__":
     num_epochs = 100
     trainer_options = {"max_epochs": num_epochs}
     batch_size = 100
-    init_learning_rate = 1e-3
+    init_learning_rate = 5e-4
 
     # Optim options
     optim_method = optim.Adam
-    optimizer_options = {"weight_decay": 1e-8}
+    optimizer_options = {}
 
     # Scheduler options
     scheduler_method = optim.lr_scheduler.ReduceLROnPlateau
@@ -92,7 +93,7 @@ if __name__ == "__main__":
         "verbose": True,
     }
     stopper = pl.callbacks.early_stopping.EarlyStopping(
-        monitor="val_loss", min_delta=5e-4, patience=3, verbose=False,
+        monitor="val_loss", min_delta=1e-4, patience=3, verbose=False,
         mode="min"
     )
 
@@ -136,13 +137,24 @@ if __name__ == "__main__":
     ##########################################################################
 
     learner.save_results(
-         limits=np.array([[-1, 1.0], [-1.0, 1.0]]),
+         limits=x_limits,
          nb_trajs=10,
-         tsim=(0, 50),
+         tsim=(0, 20),
          dt=1e-2,
          fast=True,
          checkpoint_path=checkpoint_callback.best_model_path,
      )
+
+    # path = "runs/VanDerPol/Autoencoder_jointly/Lukas1"  # TODO
+    # import dill as pkl
+    #
+    # learner_path = path + "/learner.pkl"
+    # with open(learner_path, "rb") as rb_file:
+    #     learner = pkl.load(rb_file)
+    # learner.results_folder = path
+    # limits = np.array([[-2.7, 2.7], [-2.7, 2.7]])
+    # num_samples = 100000
+    # verbose = False
 
     # Trajectories
     std_array = [0.0, 0.25, 0.5]
@@ -156,6 +168,6 @@ if __name__ == "__main__":
         #                          nb_trajs=10, verbose=verbose,
         #                          tsim=(0, 40), dt=1e-2, std=0.5)
         for std in std_array:
-            init_state = torch.tensor([0.6, 0.6])
+            init_state = torch.tensor([2.5, 2.5])
             learner.save_trj(init_state=init_state, verbose=False,
                              tsim=(0, 50), dt=1e-2, var=std)

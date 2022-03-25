@@ -6,11 +6,10 @@ dx = 2;
 dy = 1;
 dz = 3;
 wc_arr = linspace(0.03, 1., 100);
-%wc_arr = wc_arr(1:74);
 
-path = "runs/VanDerPol/Supervised_noise/T_star/exp_100_wc0.03-1_-11+1cycle_rk41e-2/xzi_mesh/";
+%path = "runs/VanDerPol/Supervised_noise/T_star/exp_100_wc0.03-1_-11+1cycle_rk41e-2/xzi_mesh/";
 %path = "runs/Reversed_Duffing_Oscillator/Supervised_noise/T_star/exp_100_wc0.03-1_rk41e-3_k10_2/xzi_mesh/";
-%path = "runs/SaturatedVanDerPol/Supervised_noise/T_star/exp_0/xzi_mesh/";
+path = "runs/SaturatedVanDerPol/Supervised_noise/T_star/exp_0/xzi_mesh/";
 Darr = table2array(readtable(append(path, 'D_arr.csv')));
 Darr = Darr(:, 2:end);
 
@@ -364,8 +363,10 @@ for i = 1:length(wc_arr)
     end
     dTdz_norm(i) = norm(vector_dTdz_norm, 2);
     D = reshape(Darr(i, :), [dz, dz]).'
-    F = ones(dz, dy); 
-    sys = ss(D, F, eye(length(D)), zeros(dz, dy));
+    F = ones(dz, dy);
+    G0 = -inv(D) * F;
+    sys = ss(D, F, eye(length(D)) ./ G0, zeros(length(D), dy));
+    %sys = ss(D, F, eye(length(D)), zeros(dz, dy));
     bode(sys)
     hold on
 %     [ninf,fpeak] = hinfnorm(sys);
@@ -374,10 +375,11 @@ for i = 1:length(wc_arr)
 end
 
 crit8 = hinf .* dTdz_norm;
-h = figure()
+h = figure
 plot(wc_arr, hinf)
 hold on
 plot(wc_arr, dTdz_norm)
+
 hold on
 plot(wc_arr, crit8)
 legend('hinf','dTdz norm', 'crit8')

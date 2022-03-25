@@ -348,6 +348,8 @@ class Learner(pl.LightningModule):
                 plt.savefig(os.path.join(self.results_folder, name), bbox_inches="tight")
                 if verbose:
                     plt.show()
+                plt.clf()
+                plt.close('all')
         error = RMSE(x_mesh, x_hat_star, dim=1)
 
         # TODO DELETE
@@ -382,7 +384,6 @@ class Learner(pl.LightningModule):
             plt.savefig(os.path.join(self.results_folder, name), bbox_inches="tight")
             if verbose:
                 plt.show()
-
             plt.clf()
             plt.close("all")
 
@@ -531,7 +532,6 @@ class Learner(pl.LightningModule):
                     )
                     if verbose:
                         plt.show()
-
                     plt.clf()
                     plt.close("all")
 
@@ -634,7 +634,6 @@ class Learner(pl.LightningModule):
                     )
                     if verbose:
                         plt.show()
-
                     plt.clf()
                     plt.close("all")
 

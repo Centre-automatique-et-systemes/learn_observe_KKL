@@ -5,7 +5,6 @@ dx = 2;
 dy = 1;
 dz = 3;
 wc_arr = linspace(0.03, 1., 100);
-wc_arr = wc_arr(1:68);
 
 %path = "runs/VanDerPol/Supervised_noise/T_star/exp_100_wc0.03-1_-11+1cycle_rk41e-2/xzi_mesh/";
 %path = "runs/Reversed_Duffing_Oscillator/Supervised_noise/T_star/exp_100_wc0.03-1_rk41e-3_k10_2/xzi_mesh/";

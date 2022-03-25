@@ -226,7 +226,7 @@ if __name__ == "__main__":
         learner_T_star = pkl.load(rb_file)
     learner_T_star.results_folder = path
     x_limits = np.array([[-2.7, 2.7], [-2.7, 2.7]])
-    wc_arr = np.linspace(0.03, 1., 100)[:74]
+    wc_arr = np.linspace(0.03, 1., 100)[:87]
     verbose = False
 
     # Gain criterion
@@ -260,7 +260,7 @@ if __name__ == "__main__":
     #
     # for std in std_array:
     #     learner_T_star.save_trj(
-    #        x_0, wc_arr, 0, verbose, tsim, dt, var=std#, z_0=z_0
+    #        x_0, wc_arr, 0, verbose, tsim, dt, var=std, z_0=z_0
     #     )
     #     # learner_T_star.plot_traj_error(
     #     #     x_0, wc_arr, 0, verbose, tsim, dt, var=std
@@ -268,7 +268,7 @@ if __name__ == "__main__":
     #
     # # Heatmap
     # mesh = learner_T_star.model.generate_data_svl(
-    #     x_limits, wc_arr, 10000, method="uniform", stack=False#, z_0="encoder"
+    #     x_limits, wc_arr, 10000, method="uniform", stack=False, z_0="encoder"
     # )
     # learner_T_star.save_pdf_heatmap(mesh, verbose)
     #
