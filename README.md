@@ -38,9 +38,10 @@ py` for the reverse Duffing oscillator or `python experiments/3_ae-d_vanderpol.
 py` for the Saturated Van der Pol.
 
 ### If you use this toolbox, please cite:
-
+```
 @article{paper,  
-author={M. {Buisson-Fenet} and L. {Bahr} and S. {Trimpe} and F. {Di 
+author={M. {Buisson-Fenet} and L. {Bahr} and and F. {Di 
 Meglio}},  
 title={Towards gain tuning for numerical KKL observers}
 }
+```
