@@ -40,8 +40,7 @@ py` for the Saturated Van der Pol.
 ### If you use this toolbox, please cite:
 ```
 @article{paper,  
-author={M. {Buisson-Fenet} and L. {Bahr} and and F. {Di 
-Meglio}},  
+author={M. {Buisson-Fenet} and L. {Bahr} and and F. {Di Meglio}},  
 title={Towards gain tuning for numerical KKL observers}
 }
 ```
