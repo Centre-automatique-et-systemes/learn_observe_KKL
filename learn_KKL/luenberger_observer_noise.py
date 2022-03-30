@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 
+import os
 import numpy as np
+import pandas as pd
 from seaborn import utils
 import torch
 from scipy import linalg
@@ -21,14 +23,15 @@ class LuenbergerObserverNoise(LuenbergerObserver):
         self,
         dim_x: int,
         dim_y: int,
-        method: str = "Autoencoder",
+        method: str = "Supervised_noise",
         dim_z: int = None,
-        wc: float = 1.0,
+        wc_array=np.array([1.0]),
         num_hl: int = 5,
         size_hl: int = 50,
         activation=nn.ReLU(),
         recon_lambda: float = 1.0,
         D="block_diag",
+        solver_options=None,
     ):
 
         LuenbergerObserver.__init__(
@@ -37,20 +40,46 @@ class LuenbergerObserverNoise(LuenbergerObserver):
             dim_y,
             method,
             dim_z,
-            wc,
+            wc_array[0],
             num_hl,
             size_hl,
             activation,
             recon_lambda,
             D,
+            solver_options,
         )
 
-        self.encoder = MLPn(num_hl=self.num_hl, n_in=self.dim_x,
-                            n_hl=self.size_hl, n_out=self.dim_z + 1,
+        self.wc_array = wc_array
+        self.encoder = MLPn(num_hl=self.num_hl, n_in=self.dim_x + 1,
+                            n_hl=self.size_hl, n_out=self.dim_z,
                             activation=self.activation)
         self.decoder = MLPn(num_hl=self.num_hl, n_in=self.dim_z + 1,
                             n_hl=self.size_hl, n_out=self.dim_x,
                             activation=self.activation)
+
+    def set_scalers(self, scaler_xin, scaler_xout, scaler_zin, scaler_zout):
+        """
+        Set the scaler objects for input and output data. Then, the internal
+        NN will normalize every input and denormalize every output. These
+        scalers are different for the encoder and the decoder due to wc being
+        an extra input to each NN.
+
+        Parameters
+        ----------
+        scaler_X :
+            Input scaler.
+
+        scaler_out :
+            Output scaler.
+        """
+        self.scaler_xin = scaler_xin
+        self.scaler_xout = scaler_xout
+        self.scaler_zin = scaler_zin
+        self.scaler_zout = scaler_zout
+        self.encoder.set_scalers(scaler_X=self.scaler_xin,
+                                 scaler_Y=self.scaler_zout)
+        self.decoder.set_scalers(scaler_X=self.scaler_zin,
+                                 scaler_Y=self.scaler_xout)
 
     def __repr__(self):
         return "\n".join(
@@ -59,13 +88,15 @@ class LuenbergerObserverNoise(LuenbergerObserver):
                 "dim_x " + str(self.dim_x),
                 "dim_y " + str(self.dim_y),
                 "dim_z " + str(self.dim_z),
-                "wc " + str(self.wc),
+                "wc_array " + str(self.wc_array),
+                "nb_wc " + str(len(self.wc_array)),
                 "D " + str(self.D),
                 "F " + str(self.F),
                 "encoder " + str(self.encoder),
                 "decoder " + str(self.decoder),
                 "method " + self.method,
                 "recon_lambda " + str(self.recon_lambda),
+                "solver_options " + str(self.solver_options)
             ]
         )
 
@@ -76,59 +107,16 @@ class LuenbergerObserverNoise(LuenbergerObserver):
         k: int = 10,
         dt: float = 1e-2,
         method: str = "LHS",
+        z_0=None,
+        **kwargs
     ):
-        """
-        Generate a grid of data points by simulating the system backward and
-        forward in time.
-
-        Parameters
-        ----------
-        limits: np.array
-            Array for the limits of all axes, used for sampling with LHS.
-            Form np.array([[min_1, max_1], ..., [min_n, max_n]]).
-
-        num_samples: int
-            Number of samples in compact set.
-
-        k: int
-            Parameter for t_c = k/min(lambda)
-
-        dt: float
-            Simulation step.
-
-        Returns
-        ----------
-        data: torch.tensor
-            Pairs of (x, z) data points.
-        """
-        mesh = generate_mesh(limits=limits, num_samples=num_samples,
-                             method=method)
-        num_samples = mesh.shape[0]  # in case regular grid: changed
-        self.k = k
-        self.t_c = self.k / min(abs(linalg.eig(self.D)[0].real))
-
-        y_0 = torch.zeros((num_samples, self.dim_x + self.dim_z))  # TODO
-        y_1 = y_0.clone()
-
-        # Simulate only x system backward in time
-        tsim = (0, -self.t_c)
-        y_0[:, : self.dim_x] = mesh
-        _, data_bw = self.simulate_system(y_0, tsim, -dt, only_x=True)
-
-        # Simulate both x and z forward in time starting from the last point
-        # from previous simulation
-        tsim = (-self.t_c, 0)
-        y_1[:, : self.dim_x] = data_bw[-1, :, : self.dim_x]
-        _, data_fw = self.simulate_system(y_1, tsim, dt)
-
-        # Data contains (x_i, z_i) pairs in shape [dim_x + dim_z,
-        # number_simulations]
-        data = data_fw[-1]
-        return data
+        return LuenbergerObserver.generate_data_svl(
+            self, limits, num_samples, k, dt, method, z_0, **kwargs)
 
     def generate_data_svl(self, limits: np.array, w_c: np.array,
                           num_datapoints: int, k: int = 10, dt: float = 1e-2,
-                          stack: bool = True, method: str = "LHS"):
+                          stack: bool = True, method: str = "LHS", z_0=None,
+                          **kwargs):
 
         num_samples = int(np.ceil(num_datapoints / len(w_c)))
 
@@ -137,7 +125,8 @@ class LuenbergerObserverNoise(LuenbergerObserver):
         for idx, w_c_i in np.ndenumerate(w_c):
             self.D, self.F = self.set_DF(w_c_i)
 
-            data = self.generate_data_mesh(limits, num_samples, k, dt, method)
+            data = self.generate_data_mesh(limits, num_samples, k, dt,
+                                           method, z_0=z_0, w_c=w_c_i)
 
             wc_i_tensor = torch.tensor(w_c_i).repeat(num_samples).unsqueeze(1)
             data = torch.cat((data, wc_i_tensor), 1)
@@ -149,37 +138,169 @@ class LuenbergerObserverNoise(LuenbergerObserver):
         else:
             return df
 
-    def dTdz(self, z):
-        dTdh = torch.autograd.functional.jacobian(self.decoder, z)
+    def generate_data_forward(self, init: torch.tensor, w_c: np.array,
+                              tsim: tuple, num_datapoints: int, k: int = 10,
+                              dt: float = 1e-2, stack: bool = True):
+        """
+        Generate data points by simulating the system forward in time from
+        some initial conditions, then cutting the beginning of the trajectory.
+        Parameters
+        ----------
+        init: torch.tensor
+            Initial conditions (x0, z0) from which to simulate.
+        w_c: np.array
+            Array of w_c values for which to simulate.
+        tsim: tuple
+            Simulation time.
+        num_datapoints: int
+            Number of samples to take along trajectory * len(w_c) (convention).
+        k: int
+           Parameter for time t_c = k/min(lambda) before which to cut.
+        dt: float
+            Simulation step.
+        Returns
+        ----------
+        df: torch.tensor
+            Pairs of (x, z, wc) data points.
+        """
+        num_samples = int(np.ceil(num_datapoints / len(w_c)))
 
-        dTdz = torch.zeros((dTdh.shape[0], dTdh.shape[1], dTdh.shape[3]))
+        df = torch.zeros(size=(num_samples, self.dim_x + self.dim_z + 1, len(w_c)))
 
-        # [5000, 2, 5000, 4] --> [5000, 2, 4] --> [2, 20 000]
-        for i in range(dTdz.shape[0]):
-            for j in range(dTdz.shape[1]):
-                dTdz[i, j, :] = dTdh[i, j, i, :]
+        for idx, w_c_i in np.ndenumerate(w_c):
+            self.D, self.F = self.set_DF(w_c_i)
 
-        return dTdz
+            tq, data = self.simulate_system(init, tsim, dt)
+            self.k = k
+            self.t_c = self.k / min(
+                abs(linalg.eig(self.D.detach().numpy())[0].real))
+            data = data[(tq >= self.t_c)]  # cut trajectory before t_c
+            random_idx = np.random.choice(np.arange(len(data)),
+                                          size=(num_samples,), replace=False)
+            data = torch.squeeze(data[random_idx])
 
-    def sensitivity_norm(self, z):
-        dTdh = torch.autograd.functional.jacobian(
-            self.decoder, z, create_graph=False, strict=False, vectorize=False
-        )
-        dTdz = torch.transpose(
-            torch.transpose(torch.diagonal(dTdh, dim1=0, dim2=2), 1, 2), 0, 1
-        )
-        dTdz = dTdz[:, :, : self.dim_z]
+            wc_i_tensor = torch.tensor(w_c_i).repeat(num_samples).unsqueeze(1)
+            data = torch.cat((data, wc_i_tensor), 1)
 
-        C = np.eye(self.D.shape[0])
-        sv = torch.tensor(compute_h_infinity(self.D.numpy(), self.F.numpy(), C, 1e-3))
+            df[..., idx] = data.unsqueeze(-1)
 
-        dTdz_norm = max(torch.linalg.matrix_norm(dTdz, ord=2))/(z.shape[0]*z.shape[1])
+        if stack:
+            return torch.cat(torch.unbind(df, dim=-1), dim=0)
+        else:
+            return df
 
-        product = dTdz_norm * sv
+    def sensitivity_norm(self, x, z, save=True, path='', version=9):
+        print('Python version of our gain-tuning criterion: the estimation of '
+              'the H-infinity norm is not very smooth and we have replaced '
+              'the H-2 norm by a second H-infinity norm, hence, the Matlab '
+              'script criterion.m should be used instead to compute the final '
+              'criterion as it was in the paper.')
+        if save:
+            # Compute dTdx over grid
+            dTdh = torch.autograd.functional.jacobian(
+                self.encoder, x, create_graph=False, strict=False, vectorize=False
+            )
+            dTdx = torch.transpose(
+                torch.transpose(torch.diagonal(dTdh, dim1=0, dim2=2), 1, 2), 0, 1
+            )
+            dTdx = dTdx[:, :, : self.dim_x]
+            idx_max = torch.argmax(torch.linalg.matrix_norm(dTdx, ord=2))
+            Tmax = dTdx[idx_max]
 
-        return torch.cat(
-            (dTdz_norm.unsqueeze(0), sv.unsqueeze(0), product.unsqueeze(0)), dim=0
-        )
+            # Compute dTstar_dz over grid
+            dTstar_dh = torch.autograd.functional.jacobian(
+                self.decoder, z, create_graph=False, strict=False,
+                vectorize=False
+            )
+            dTstar_dz = torch.transpose(
+                torch.transpose(torch.diagonal(dTstar_dh, dim1=0, dim2=2), 1, 2), 0,
+                1
+            )
+            dTstar_dz = dTstar_dz[:, :, : self.dim_z]
+            idxstar_max = torch.argmax(torch.linalg.matrix_norm(dTstar_dz, ord=2))
+            Tstar_max = dTstar_dz[idxstar_max]
+
+            # Save this data
+            wc = z[0, -1].item()
+            file = pd.DataFrame(Tmax)
+            file.to_csv(os.path.join(path, f'Tmax_wc{wc:0.2g}.csv'),
+                        header=False)
+            file = pd.DataFrame(Tstar_max)
+            file.to_csv(os.path.join(path, f'Tstar_max_wc{wc:0.2g}.csv'),
+                        header=False)
+            file = pd.DataFrame(dTdx.flatten(1, -1))
+            file.to_csv(os.path.join(path, f'dTdx_wc{wc:0.2g}.csv'),
+                        header=False)
+            file = pd.DataFrame(dTstar_dz.flatten(1, -1))
+            file.to_csv(os.path.join(path, f'dTstar_dz_wc{wc:0.2g}.csv'),
+                        header=False)
+        else:
+            # Load intermediary data
+            wc = z[0, -1].item()
+            df = pd.read_csv(os.path.join(path, f'Tmax_wc{wc:0.2g}.csv'),
+                             sep=',', header=None)
+            Tmax = torch.from_numpy(df.drop(df.columns[0], axis=1).values)
+            df = pd.read_csv(os.path.join(path, f'dTdx_wc{wc:0.2g}.csv'),
+                             sep=',', header=None)
+            dTdx = torch.from_numpy(
+                df.drop(df.columns[0], axis=1).values).reshape(
+                (-1, Tmax.shape[0], Tmax.shape[1]))
+            df = pd.read_csv(os.path.join(path, f'Tstar_max_wc{wc:0.2g}.csv'),
+                             sep=',', header=None)
+            Tstar_max = torch.from_numpy(df.drop(df.columns[0], axis=1).values)
+            df = pd.read_csv(os.path.join(path, f'dTstar_dz_wc{wc:0.2g}.csv'),
+                             sep=',', header=None)
+            dTstar_dz = torch.from_numpy(
+                df.drop(df.columns[0], axis=1).values).reshape(
+                (-1, Tstar_max.shape[0], Tstar_max.shape[1]))
+
+        if version == 1:
+            C = np.eye(self.dim_z)
+            sv = torch.tensor(
+                compute_h_infinity(self.D.numpy(), self.F.numpy(), C, 1e-10))
+            product = torch.linalg.matrix_norm(Tstar_max, ord=2) * sv
+            return torch.cat(
+                (torch.linalg.matrix_norm(Tstar_max, ord=2).unsqueeze(0),
+                 sv.unsqueeze(0), product.unsqueeze(0)), dim=0
+            )
+        elif version == 2:
+            C = np.eye(self.dim_z)
+            sv = torch.tensor(compute_h_infinity(
+                self.D.numpy(), self.F.numpy(), np.dot(Tstar_max.detach().numpy(),
+                                                       C), 1e-3))
+            product = sv
+            return torch.cat(
+                (torch.linalg.matrix_norm(Tstar_max, ord=2).unsqueeze(0),
+                 sv.unsqueeze(0), product.unsqueeze(0)), dim=0
+            )
+        elif version == 3:
+            C = np.eye(self.dim_x)
+            sv = torch.tensor(compute_h_infinity(
+                np.dot(np.dot(Tstar_max.detach().numpy(),
+                              self.D.numpy()), Tmax.numpy()),
+                np.dot(Tstar_max.detach().numpy(), self.F.numpy()),
+                C, 1e-3))
+            return torch.cat(
+                (torch.linalg.matrix_norm(Tmax, ord=2).unsqueeze(0),
+                 torch.linalg.matrix_norm(Tstar_max, ord=2).unsqueeze(0),
+                 sv.unsqueeze(0)), dim=0
+            )
+        elif version == 9:
+            C = np.eye(self.dim_z)
+            l2_norm = torch.linalg.norm(
+                torch.linalg.matrix_norm(dTstar_dz, dim=(1, 2), ord=2))
+            sv1 = torch.tensor(
+                compute_h_infinity(self.D.numpy(), self.F.numpy(), C, 1e-10))
+            sv2 = torch.tensor(  # TODO implement H2 norm instead!
+                compute_h_infinity(self.D.numpy(), np.eye(self.dim_z), C, 1e-10))
+            product = l2_norm * (sv1 + sv2)
+            return torch.cat(
+                (l2_norm.unsqueeze(0), sv1.unsqueeze(0),
+                 product.unsqueeze(0)), dim=0
+            )
+        else:
+            raise NotImplementedError(f'Gain-tuning criterion version '
+                                      f'{version} is not implemented.')
 
     def predict(
         self,
@@ -188,6 +309,7 @@ class LuenbergerObserverNoise(LuenbergerObserver):
         dt: int,
         w_c: float,
         out_z: bool = False,
+        z_0=None
     ) -> torch.tensor:
         """
         Forward function for autoencoder. Used for training the model.
@@ -213,7 +335,7 @@ class LuenbergerObserverNoise(LuenbergerObserver):
         """
         self.D, _ = self.set_DF(w_c)
 
-        _, sol = self.simulate(measurement, t_sim, dt)
+        _, sol = self.simulate(measurement, t_sim, dt, z_0)
 
         w_c_tensor = torch.tensor(w_c).repeat(sol.shape[0]).unsqueeze(1)
 

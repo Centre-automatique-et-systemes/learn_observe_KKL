@@ -34,3 +34,6 @@ jupyter_notebook/runs/
 *egg-info
 build/
 dist/
+
+# Matlab files
+*.asv

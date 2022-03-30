@@ -34,20 +34,21 @@ def generate_mesh(
         Mesh in shape (num_samples, 2).
     """
 
-    # Sample either a uniformly grid or use latin hypercube sampling
-    if method == "uniform":
-        # Linspace upper bound and cut additional samples
-        # TODO Enhancement
-        axes = np.linspace(
-            limits[:, 0],
-            limits[:, 1],
-            int(np.ceil(np.power(num_samples, 1 / len(limits)))),
-        )
+    # Sample either a uniform grid or use latin hypercube sampling
+    if method == 'uniform':
+        # Linspace upper bound and cut additional samples at random (
+        # otherwise all cut in the same region!)
+        axes = np.linspace(limits[:, 0], limits[:, 1], int(np.ceil(np.power(
+            num_samples, 1/len(limits)))))
         axes_list = [axes[:, i] for i in range(axes.shape[1])]
         mesh = np.array(np.meshgrid(*axes_list)).T.reshape(-1, axes.shape[1])
-        mesh = mesh[
-            :num_samples,
-        ]
+        idx = np.random.choice(np.arange(len(mesh)), size=(num_samples,),
+                               replace=False)
+        print(f'Computed the smallest possible uniform grid for the '
+              f'given dimensions, then deleted {len(mesh) - num_samples} '
+              f'samples randomly to match the desired number of samples'
+              f' {num_samples}.')
+        mesh = mesh[idx]
     elif method == "LHS":
         sampling = LHS(xlimits=limits)
         mesh = sampling(num_samples)
@@ -143,8 +144,8 @@ def RMSE(x, y, dim=None):
 # https://discuss.pytorch.org/t/pytorch-tensor-scaling/38576
 class StandardScaler:
     def __init__(self, X, device):
-        self._mean = torch.mean(X, dim=0).to(device)
-        self._var = torch.var(X, dim=0, unbiased=False).to(device)
+        self._mean = torch.mean(X, dim=0)#.to(device)
+        self._var = torch.var(X, dim=0, unbiased=False)#.to(device)
         # If var = 0., i.e. values all same, make it 1 so unchanged!
         idx = torch.nonzero(self._var == 0.0)
         self._var[idx] += 1.0
