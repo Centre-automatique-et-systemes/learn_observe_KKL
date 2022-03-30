@@ -8,7 +8,7 @@
 - install interpolation repo: `git clone https://github.com/aliutkus/torchinterp1d` into dir, `cd torchinterp1d`, `pip install -e .`
 - go to the repo, then run `pip install -e .` to install the package
 
-### Contents
+### Content
 The directory `learn_KKL` contains the main files: `system.py` contains the 
 dynamical systems considered (Van der Pol...), `luenberger_observer.py` 
 contains the KKL observer (architecture of the encoder and decoder, forward 
@@ -18,16 +18,29 @@ encouraged to add their dynamical systems in `system.py`, and to write their
 own learner class if they need more advanced functionalities.
 
 **Tutorials** are provided in the directory `jupyter_notebooks`. It contains 
-four base cases: two systems (Van der Pol and the inverse Duffing oscillator)
+four base cases: two systems (Van der Pol and the reverse Duffing oscillator)
 and two designs for the observer (autoencoder and supervised learning). The 
 user is encouraged to first run the tutorials in order to understand how the 
 toolbox is structured.
 
 ### To reproduce the results of the paper:
-Supervised learning with dependency on w_c: run 
+Supervised learning with dependency on w_c: run `python 
+experiments/0_supervised_revduffing.py` for the reverse Duffing experiments, `python 
+experiments/1_supervised_saturated_vanderpol.py` for the Saturated Van der 
+Pol experiments.
 The final plots for our gain tuning criterion were obtained in Matlab by 
-running 
+running `criterion.m` on the data obtained from the previous scripts, since 
+there are no native python functions for computing the H-infinity and H-2 
+norms in our criterion (the plot given by python is only an approximation).
 
-Autoencoder with D learned jointly: run 
+Autoencoder with D optimized jointly: run `python experiments/2_ae-d_revduffing.
+py` for the reverse Duffing oscillator or `python experiments/3_ae-d_vanderpol.
+py` for the Saturated Van der Pol.
 
 ### If you use this toolbox, please cite:
+
+@article{paper,  
+author={M. {Buisson-Fenet} and L. {Bahr} and S. {Trimpe} and F. {Di 
+Meglio}},  
+title={Towards gain tuning for numerical KKL observers}
+}
