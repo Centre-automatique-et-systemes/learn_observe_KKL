@@ -12,6 +12,6 @@ setup(
                       'pytorch-lightning', 'dill'],
     version='0.1.0',
     license='MIT',
-    description='Implementation of the paper: "Learning to observe with KKL '
-                'observers"',
+    description='Implementation of the paper: "Towards gain tuning for '
+                'numerical KKL observers"',
 )
