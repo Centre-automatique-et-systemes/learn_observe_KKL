@@ -145,7 +145,7 @@ if __name__ == "__main__":
      )
 
     # Trajectories
-    std_array = [0.0, 0.25, 0.5]
+    std_array = [0., 0.25, 0.5]
     with torch.no_grad():
         # mesh = learner.model.generate_data_svl(
         #     limits=limits, num_samples=num_samples, k= 10, dt= 1e-2,
@@ -154,8 +154,8 @@ if __name__ == "__main__":
         # z_mesh = mesh[:, learner.model.dim_x:]
         # learner.save_random_traj(x_mesh=x_mesh, num_samples=num_samples,
         #                          nb_trajs=10, verbose=verbose,
-        #                          tsim=(0, 40), dt=1e-2, std=0.5)
+        #                          tsim=(0, 50), dt=1e-2, std=0.5)
         for std in std_array:
             init_state = torch.tensor([0.6, 0.6])
             learner.save_trj(init_state=init_state, verbose=False,
-                             tsim=(0, 50), dt=1e-2, var=std)
+                             tsim=(0, 50), dt=1e-2, var=std)#, z_0=z_0.view(-1,1))

@@ -8,11 +8,18 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import numpy as np
 import pandas as pd
+import seaborn as sb
 import torch
 from torch.nn import functional
 import torch.optim as optim
 
 from .utils import RMSE, StandardScaler
+
+# To avoid Type 3 fonts for submission https://tex.stackexchange.com/questions/18687/how-to-generate-pdf-without-any-type3-fonts
+plt.rc('text', usetex=True)
+plt.rc('font', family='serif')
+
+sb.set_style("whitegrid")
 
 # Set double precision by default
 torch.set_default_tensor_type(torch.DoubleTensor)
@@ -111,9 +118,7 @@ class LearnerNoise(Learner):
                 else:
                     w_c = rd.uniform(0.5, 1.5)
 
-                # estimation = self.model.predict(y, tsim, dt, w_c).detach()
-                estimation, z = self.model.predict(y, tsim, dt, w_c, out_z=True)
-                # TODO delete
+                estimation = self.model.predict(y, tsim, dt, w_c).detach()
                 rmse = RMSE(simulation[:, i], estimation)
                 traj_error += rmse
 
@@ -147,41 +152,7 @@ class LearnerNoise(Learner):
                     )
                     if verbose:
                         plt.show()
-                    plt.close("all")
-                # TODO delete
-                name = "Phase_portrait.pdf"
-                plt.plot(
-                    simulation[:, i, 0].detach().numpy(), simulation[:, i,
-                                                          1].detach().numpy(), label=rf"True"
-                )
-                plt.plot(
-                    estimation[:, 0].detach().numpy(), estimation[:, 1].detach().numpy(),
-                    label=rf"Predicted"
-                )
-                plt.legend(loc=1)
-                plt.title(rf"Random trajectory for $\omega_c$ {w_c:0.2g}, "
-                          rf"RMSE = "rf"{rmse:0.2g}")
-                plt.xlabel(rf"$x_1$")
-                plt.ylabel(rf"$x_2$")
-                plt.savefig(
-                    os.path.join(current_traj_folder, name), bbox_inches="tight"
-                )
-                plt.close("all")
-                for j in range(z.shape[1]-1):
-                    name = "Traj_z" + str(j) + ".pdf"
-                    plt.plot(
-                        tq, z[:, j].detach().numpy(), label=rf"$z_{j + 1}$"
-                    )
-                    plt.legend(loc=1)
-                    plt.title(rf"Random trajectory for $\omega_c$ {w_c:0.2g}, "
-                              rf"RMSE = "rf"{rmse:0.2g}")
-                    plt.xlabel(rf"$t$")
-                    plt.ylabel(rf"$z_{j + 1}$")
-                    plt.savefig(
-                        os.path.join(current_traj_folder, name), bbox_inches="tight"
-                    )
-                    if verbose:
-                        plt.show()
+                    plt.clf()
                     plt.close("all")
 
             filename = "RMSE_traj.txt"
@@ -325,19 +296,6 @@ class LearnerNoise(Learner):
 
                 error = RMSE(x_mesh, x_hat_star, dim=1)
 
-                # TODO DELETE
-                x_0 = torch.tensor([2.5, 2.5])
-                tq, simulation = self.system.simulate(
-                    x_0, (0, 60), 1e-2
-                )
-                z_0 = self.model.encoder(
-                    torch.cat((x_0.expand(1, -1),
-                               torch.as_tensor(w_c).reshape(-1, 1)), dim=1)).t()
-                measurement = self.model.h(simulation)
-                y = torch.cat((tq.unsqueeze(1), measurement), dim=1)
-                estimation = self.model.predict(y, (0, 60), 1e-2, w_c, z_0=z_0
-                                                ).detach()
-
                 for i in range(1, x_mesh.shape[1]):
                     # https://stackoverflow.com/questions/37822925/how-to-smooth-by-interpolation-when-using-pcolormesh
                     name = "RMSE_heatmap" + str(j) + ".pdf"
@@ -352,8 +310,6 @@ class LearnerNoise(Learner):
                     cbar = plt.colorbar()
                     cbar.set_label("Log estimation error")
                     # cbar.set_label("Log estimation error")
-                    plt.plot(simulation[:,0], simulation[:,1])
-                    plt.plot(estimation[:, 0], estimation[:, 1], '--')
 
                     plt.title(
                         r"RMSE between $x$ and $\hat{x}$"
@@ -410,7 +366,7 @@ class LearnerNoise(Learner):
                 z_mesh = mesh[:, self.z_idx_in]
 
             errors[j] = self.model.sensitivity_norm(x_mesh, z_mesh, save=save,
-                                                    path=path, version=3)
+                                                    path=path)
             D_arr = torch.cat((D_arr, torch.unsqueeze(self.model.D, 0)))
 
         # errors = functional.normalize(errors)
@@ -446,10 +402,11 @@ class LearnerNoise(Learner):
 
         ax2 = ax1.twinx()
 
+        N = 10000
         line_3 = ax1.plot(
             w_c_array,
-            errors[:, 2],
-            label=r"$\max_{z_i} \left| \frac{\partial \mathcal{T}^*}{\partial z} (z_i) \right| \left| G_{\epsilon} \right|_\infty$",
+            errors[:, -1] / N,
+            label=r"$\frac{\alpha(\omega_c)}{n}$",
             color=orange,
         )
         ax2.tick_params(axis='y')
@@ -468,13 +425,13 @@ class LearnerNoise(Learner):
 
         if verbose:
             plt.show()
-            plt.close("all")
 
         plt.clf()
         plt.close("all")
 
     def plot_traj_error(
-        self, init_state, w_c_arr, nb_trajs, verbose, tsim, dt, var=0.0
+        self, init_state, w_c_arr, nb_trajs, verbose, tsim, dt, var=0.0,
+            z_0=None
     ):
         with torch.no_grad():
             # Estimation over the test trajectories with T_star
@@ -507,7 +464,11 @@ class LearnerNoise(Learner):
                 else:
                     w_c = rd.uniform(0.2, 1.5)
 
-                estimation = self.model.predict(y, tsim, dt, w_c).detach()
+                if z_0 is None:
+                    estimation = self.model.predict(y, tsim, dt, w_c).detach()
+                else:
+                    estimation = self.model.predict(
+                        y, tsim, dt, w_c, z_0=z_0[i].view(-1, 1)).detach()
                 error = RMSE(simulation, estimation)
                 traj_error += error
 
@@ -536,7 +497,8 @@ class LearnerNoise(Learner):
                 name = "Traj" + str(1) + ".pdf"
                 plt.plot(
                     tq,
-                    estimation[:, 1].cpu().numpy() - simulation[:, 1].cpu().numpy(),
+                    # estimation[:, 1].cpu().numpy() - simulation[:, 1].cpu().numpy(),
+                    np.sum(estimation.cpu().numpy() - simulation.cpu().numpy(), axis=1),
                     plot_style[i],
                     linewidth=0.8,
                     markersize=1,
@@ -547,7 +509,8 @@ class LearnerNoise(Learner):
             plt.grid(visible=True)
             plt.title(rf"Test trajectory error")
             plt.xlabel(rf"$t$")
-            plt.ylabel(rf"$\hat{{x}}_{1 + 1}-x_{1+1}$")
+            # plt.ylabel(rf"$\hat{{x}}_{2}-x_{2}$")
+            plt.ylabel(rf"$\hat{{x}}-x$")
             plt.savefig(os.path.join(current_traj_folder, name), bbox_inches="tight")
             if verbose:
                 plt.show()

@@ -771,8 +771,8 @@ class LuenbergerObserver(nn.Module):
             raise NotImplementedError(f"Method {z_0} for initializing z_0 for backward-forward sampling is not implemented.")
         _, data_fw = self.simulate_system(y_1, tsim, dt)
 
-        # Data contains (x_i, z_i) pairs in shape [dim_x + dim_z,
-        # number_simulations]
+        # Data contains (x_i, z_i) pairs in shape [number_simulations,
+        # dim_x + dim_z]
         data = data_fw[-1]
         return data
 

@@ -125,12 +125,6 @@ class LuenbergerObserverNoise(LuenbergerObserver):
         for idx, w_c_i in np.ndenumerate(w_c):
             self.D, self.F = self.set_DF(w_c_i)
 
-            # if z_0 is None:
-            #     data = self.generate_data_mesh(limits, num_samples, k, dt,
-            #                                    method)
-            # else:
-                # data = self.generate_data_mesh(limits, num_samples, k, dt,
-                #                                method, z_0=z_0[idx].view(-1, 1))
             data = self.generate_data_mesh(limits, num_samples, k, dt,
                                            method, z_0=z_0, w_c=w_c_i)
 
@@ -195,11 +189,12 @@ class LuenbergerObserverNoise(LuenbergerObserver):
         else:
             return df
 
-    def sensitivity_norm(self, x, z, save=True, path='', version=1):
+    def sensitivity_norm(self, x, z, save=True, path='', version=9):
         print('Python version of our gain-tuning criterion: the estimation of '
-              'the H-infinity norm is not very smooth, hence, the Matlab '
-              'script criterion.m was used instead to generate the final plots '
-              'in the paper.')
+              'the H-infinity norm is not very smooth and we have replaced '
+              'the H-2 norm by a second H-infinity norm, hence, the Matlab '
+              'script criterion.m should be used instead to compute the final '
+              'criterion as it was in the paper.')
         if save:
             # Compute dTdx over grid
             dTdh = torch.autograd.functional.jacobian(
@@ -257,7 +252,7 @@ class LuenbergerObserverNoise(LuenbergerObserver):
                              sep=',', header=None)
             dTstar_dz = torch.from_numpy(
                 df.drop(df.columns[0], axis=1).values).reshape(
-                (-1, Tmax.shape[0], Tmax.shape[1]))
+                (-1, Tstar_max.shape[0], Tstar_max.shape[1]))
 
         if version == 1:
             C = np.eye(self.dim_z)
@@ -280,17 +275,32 @@ class LuenbergerObserverNoise(LuenbergerObserver):
             )
         elif version == 3:
             C = np.eye(self.dim_x)
-            # sv = torch.tensor(compute_h_infinity(
-            #     np.dot(np.dot(Tstar_max.detach().numpy(),
-            #                   self.D.numpy()), Tmax.numpy()),
-            #     np.dot(Tstar_max.detach().numpy(), self.F.numpy()),
-            #     C, 1e-3))
-            sv = torch.tensor(0.)
+            sv = torch.tensor(compute_h_infinity(
+                np.dot(np.dot(Tstar_max.detach().numpy(),
+                              self.D.numpy()), Tmax.numpy()),
+                np.dot(Tstar_max.detach().numpy(), self.F.numpy()),
+                C, 1e-3))
             return torch.cat(
                 (torch.linalg.matrix_norm(Tmax, ord=2).unsqueeze(0),
                  torch.linalg.matrix_norm(Tstar_max, ord=2).unsqueeze(0),
                  sv.unsqueeze(0)), dim=0
             )
+        elif version == 9:
+            C = np.eye(self.dim_z)
+            l2_norm = torch.linalg.norm(
+                torch.linalg.matrix_norm(dTstar_dz, dim=(1, 2), ord=2))
+            sv1 = torch.tensor(
+                compute_h_infinity(self.D.numpy(), self.F.numpy(), C, 1e-10))
+            sv2 = torch.tensor(  # TODO implement H2 norm instead!
+                compute_h_infinity(self.D.numpy(), np.eye(self.dim_z), C, 1e-10))
+            product = l2_norm * (sv1 + sv2)
+            return torch.cat(
+                (l2_norm.unsqueeze(0), sv1.unsqueeze(0),
+                 product.unsqueeze(0)), dim=0
+            )
+        else:
+            raise NotImplementedError(f'Gain-tuning criterion version '
+                                      f'{version} is not implemented.')
 
     def predict(
         self,

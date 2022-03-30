@@ -49,7 +49,7 @@ if __name__ == "__main__":
     init_wc = 1.
 
     # Solver options
-    solver_options = {'method': 'rk4', 'options': {'step_size': 1e-2}}
+    solver_options = {'method': 'rk4', 'options': {'step_size': 1e-3}}
 
     # Create the observer (autoencoder design)
     observer = LuenbergerObserverJointly(
@@ -145,17 +145,6 @@ if __name__ == "__main__":
          checkpoint_path=checkpoint_callback.best_model_path,
      )
 
-    # path = "runs/VanDerPol/Autoencoder_jointly/Lukas1"  # TODO
-    # import dill as pkl
-    #
-    # learner_path = path + "/learner.pkl"
-    # with open(learner_path, "rb") as rb_file:
-    #     learner = pkl.load(rb_file)
-    # learner.results_folder = path
-    # limits = np.array([[-2.7, 2.7], [-2.7, 2.7]])
-    # num_samples = 100000
-    # verbose = False
-
     # Trajectories
     std_array = [0.0, 0.25, 0.5]
     with torch.no_grad():
@@ -166,8 +155,10 @@ if __name__ == "__main__":
         # z_mesh = mesh[:, learner.model.dim_x:]
         # learner.save_random_traj(x_mesh=x_mesh, num_samples=num_samples,
         #                          nb_trajs=10, verbose=verbose,
-        #                          tsim=(0, 40), dt=1e-2, std=0.5)
+        #                          tsim=(0, 20), dt=1e-2, std=0.5)
         for std in std_array:
-            init_state = torch.tensor([2.5, 2.5])
+            init_state = torch.tensor([0.1, 0.1])
+            z_0 = learner.model.encoder(init_state)
+            print(z_0, learner.model.decoder(z_0))
             learner.save_trj(init_state=init_state, verbose=False,
-                             tsim=(0, 50), dt=1e-2, var=std)
+                             tsim=(0, 20), dt=1e-2, var=std)#, z_0=z_0.view(-1,1))

@@ -5,6 +5,7 @@ import dill as pkl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sb
 import pytorch_lightning as pl
 import torch
 import torch.optim as optim
@@ -12,9 +13,16 @@ from torch.utils.data import DataLoader
 
 from .utils import RMSE, StandardScaler
 
+# To avoid Type 3 fonts for submission https://tex.stackexchange.com/questions/18687/how-to-generate-pdf-without-any-type3-fonts
+plt.rc('text', usetex=True)
+plt.rc('font', family='serif')
+
+sb.set_style("whitegrid")
+
 # Set double precision by default
 torch.set_default_tensor_type(torch.DoubleTensor)
 torch.set_default_dtype(torch.float64)
+
 
 
 class Learner(pl.LightningModule):
@@ -352,13 +360,6 @@ class Learner(pl.LightningModule):
                 plt.close('all')
         error = RMSE(x_mesh, x_hat_star, dim=1)
 
-        # TODO DELETE
-        tq, simulation = self.system.simulate(torch.tensor([0.7, 0.7]),
-                                                  (0, 60), 1e-2)
-        measurement = self.model.h(simulation)
-        y = torch.cat((tq.unsqueeze(1), measurement), dim=1)
-        estimation = self.model.predict(y,  (0, 60), 1e-2).detach()
-
         error = error.detach()
 
         for i in range(1, x_mesh.shape[1]):
@@ -373,9 +374,6 @@ class Learner(pl.LightningModule):
             cbar = plt.colorbar()
             cbar.set_label("Log estimation error")
             cbar.set_label("Log estimation error")
-
-            plt.plot(simulation[:,0], simulation[:,1])
-            plt.plot(estimation[:, 0], estimation[:, 1], '--')
 
             plt.title(r"RMSE between $x$ and $\hat{x}$")
             plt.xlabel(rf"$x_{i}$")
@@ -448,28 +446,6 @@ class Learner(pl.LightningModule):
             plt.clf()
             plt.close("all")
 
-            # TODO DELETE
-            name = "Phase_portrait.pdf"
-            plt.plot(simulation[:, 0].detach().numpy(), simulation[:,
-                                                        1].detach().numpy(),
-                     '--', label=rf"True")
-            plt.plot(estimation[:, 0].detach().numpy(), estimation[:,
-                                                        1].detach().numpy(),
-                     '--', label=rf"Estimated")
-            plt.legend(loc=1)
-            plt.grid(visible=True)
-            plt.title(
-                rf"Test trajectory, RMSE = {np.round(error.numpy(), 4)}")
-            plt.xlabel(rf"$x_{1}$")
-            plt.ylabel(rf"$x_{2}$")
-            plt.savefig(
-                os.path.join(current_traj_folder, name), bbox_inches="tight"
-            )
-            if verbose:
-                plt.show()
-            plt.clf()
-            plt.close("all")
-
         filename = "RMSE_traj.txt"
         with open(os.path.join(traj_folder, filename), "w") as f:
             print(traj_error, file=f)
@@ -534,28 +510,6 @@ class Learner(pl.LightningModule):
                         plt.show()
                     plt.clf()
                     plt.close("all")
-
-                name = "Phase_portrait.pdf"  # TODO DELETE
-                plt.plot(simulation[:, i, 0].detach().numpy(), simulation[:, i,
-                                                            1].detach().numpy(),
-                         label=rf"True")
-                plt.plot(estimation[:, 0].detach().numpy(), estimation[:,
-                                                            1].detach().numpy(),
-                         '--', label=rf"Estimated")
-                plt.legend(loc=1)
-                plt.grid(visible=True)
-                plt.title(
-                    rf"Test trajectory for $\sigma =$ {std:0.2g}, RMSE = "
-                    rf"{rmse.numpy():0.2g}")
-                plt.xlabel(rf"$x_{1}$")
-                plt.ylabel(rf"$x_{2}$")
-                plt.savefig(
-                    os.path.join(current_traj_folder, name), bbox_inches="tight"
-                )
-                if verbose:
-                    plt.show()
-                plt.clf()
-                plt.close("all")
 
             filename = "RMSE_traj.txt"
             with open(os.path.join(traj_folder, filename), "w") as f:
