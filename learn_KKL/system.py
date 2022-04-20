@@ -478,23 +478,23 @@ class QuanserQubeServo2(System):
             * self.mp
             * (
                 -8.0 * self.Dp * alpha_dot
-                + self.Lp ** 2 * self.mp * theta_dot ** 2 * np.sin(2.0 * alpha)
-                + 4.0 * self.Lp * self.gravity * self.mp * np.sin(alpha)
+                + self.Lp ** 2 * self.mp * theta_dot ** 2 * torch.sin(2.0 * alpha)
+                + 4.0 * self.Lp * self.gravity * self.mp * torch.sin(alpha)
             )
-            * np.cos(alpha)
+            * torch.cos(alpha)
             + (4.0 * self.Jp + self.Lp ** 2 * self.mp)
             * (
                 4.0 * self.Dr * theta_dot
-                + self.Lp ** 2 * alpha_dot * self.mp * theta_dot * np.sin(2.0 * alpha)
-                + 2.0 * self.Lp * self.Lr * alpha_dot ** 2 * self.mp * np.sin(alpha)
+                + self.Lp ** 2 * alpha_dot * self.mp * theta_dot * torch.sin(2.0 * alpha)
+                + 2.0 * self.Lp * self.Lr * alpha_dot ** 2 * self.mp * torch.sin(alpha)
                 - 4.0 * tau
             )
         ) / (
-            4.0 * self.Lp ** 2 * self.Lr ** 2 * self.mp ** 2 * np.cos(alpha) ** 2
+            4.0 * self.Lp ** 2 * self.Lr ** 2 * self.mp ** 2 * torch.cos(alpha) ** 2
             - (4.0 * self.Jp + self.Lp ** 2 * self.mp)
             * (
                 4.0 * self.Jr
-                + self.Lp ** 2 * self.mp * np.sin(alpha) ** 2
+                + self.Lp ** 2 * self.mp * torch.sin(alpha) ** 2
                 + 4.0 * self.Lr ** 2 * self.mp
             )
         )
@@ -506,28 +506,28 @@ class QuanserQubeServo2(System):
             * self.mp
             * (
                 4.0 * self.Dr * theta_dot
-                + self.Lp ** 2 * alpha_dot * self.mp * theta_dot * np.sin(2.0 * alpha)
-                + 2.0 * self.Lp * self.Lr * alpha_dot ** 2 * self.mp * np.sin(alpha)
+                + self.Lp ** 2 * alpha_dot * self.mp * theta_dot * torch.sin(2.0 * alpha)
+                + 2.0 * self.Lp * self.Lr * alpha_dot ** 2 * self.mp * torch.sin(alpha)
                 - 4.0 * tau
             )
-            * np.cos(alpha)
+            * torch.cos(alpha)
             - 0.5
             * (
                 4.0 * self.Jr
-                + self.Lp ** 2 * self.mp * np.sin(alpha) ** 2
+                + self.Lp ** 2 * self.mp * torch.sin(alpha) ** 2
                 + 4.0 * self.Lr ** 2 * self.mp
             )
             * (
                 -8.0 * self.Dp * alpha_dot
-                + self.Lp ** 2 * self.mp * theta_dot ** 2 * np.sin(2.0 * alpha)
-                + 4.0 * self.Lp * self.gravity * self.mp * np.sin(alpha)
+                + self.Lp ** 2 * self.mp * theta_dot ** 2 * torch.sin(2.0 * alpha)
+                + 4.0 * self.Lp * self.gravity * self.mp * torch.sin(alpha)
             )
         ) / (
-            4.0 * self.Lp ** 2 * self.Lr ** 2 * self.mp ** 2 * np.cos(alpha) ** 2
+            4.0 * self.Lp ** 2 * self.Lr ** 2 * self.mp ** 2 * torch.cos(alpha) ** 2
             - (4.0 * self.Jp + self.Lp ** 2 * self.mp)
             * (
                 4.0 * self.Jr
-                + self.Lp ** 2 * self.mp * np.sin(alpha) ** 2
+                + self.Lp ** 2 * self.mp * torch.sin(alpha) ** 2
                 + 4.0 * self.Lr ** 2 * self.mp
             )
         )
@@ -535,10 +535,7 @@ class QuanserQubeServo2(System):
         return xdot
 
     def h(self, x):
-        x_dot = torch.zeros((x.shape[0], self.dim_y))
-        x_dot[..., 0] = x[...,1]
-        # x_dot[..., 1] = x[...,1]
-        return x_dot
+        return torch.unsqueeze(x[..., 1], 1)
 
     def g(self, x):
         xdot = torch.zeros_like(x)
@@ -547,6 +544,26 @@ class QuanserQubeServo2(System):
 
     def __repr__(self):
         return "QuanserQubeServo2"
+
+    # Useful functions for EKF
+    def __call__(self, t, x, u, t0, init_control, process_noise_var, kwargs,
+                 impose_init_control=False):
+        return self.f(x)
+
+    def call_deriv(self, t, x, u, t0, init_control, process_noise_var,
+                   kwargs, impose_init_control=False):
+        return self.predict_deriv(x, self.f)
+
+    # Jacobian of function that predicts xt+dt (or other) from xt and the
+    # function u. Useful for EKF!
+    def predict_deriv(self, x, f):
+        # Compute Jacobian of f with respect to input x
+        dfdh = torch.autograd.functional.jacobian(
+            f, x, create_graph=False, strict=False, vectorize=False)
+        dfdx = torch.squeeze(dfdh)
+        return dfdx
+
+
 
 class OldSaturatedVanDerPol(System):
     """ See https://en.wikipedia.org/wiki/Van_der_Pol_oscillator for detailed
