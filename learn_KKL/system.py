@@ -430,7 +430,10 @@ class HO_unknown_freq(System):
 class QuanserQubeServo2(System):
     """ See https://www.quanser.com/products/qube-servo-2/ QUBE SERVO 2 and for a detailed 
     reference for this system 
-    https://github.com/BlueRiverTech/quanser-openai-driver/blob/main/gym_brt/quanser/qube_simulator.py. 
+    https://github.com/BlueRiverTech/quanser-openai-driver/blob/main/gym_brt/quanser/qube_simulator.py.
+
+    State: (theta, alpha, theta_dot, alpha_dot)
+    Measurement: alpha
     """
 
     def __init__(self):
@@ -535,7 +538,7 @@ class QuanserQubeServo2(System):
         return xdot
 
     def h(self, x):
-        return torch.unsqueeze(x[..., 1], 1)
+        return torch.unsqueeze(x[..., 1], dim=-1)
 
     def g(self, x):
         xdot = torch.zeros_like(x)
@@ -562,6 +565,21 @@ class QuanserQubeServo2(System):
             f, x, create_graph=False, strict=False, vectorize=False)
         dfdx = torch.squeeze(dfdh)
         return dfdx
+
+
+class QuanserQubeServo2_meas2(QuanserQubeServo2):
+    """
+    Same as QuanserQubeServo2 except we measure both theta and alpha.
+    """
+    def __init__(self):
+        super().__init__()
+        self.dim_y = 2
+
+    def h(self, x):
+        return x[..., :2]
+
+    def __repr__(self):
+        return "QuanserQubeServo2_meas2"
 
 
 

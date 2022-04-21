@@ -474,6 +474,7 @@ class Learner(pl.LightningModule):
                 # TODO run predictions in parallel for all test trajectories!!!
                 # Need to figure out how to interpolate y in parallel for all
                 # trajectories!!!
+                # y = torch.cat((tq.unsqueeze(1), measurement[..., i]), dim=1)
                 y = torch.cat((tq.unsqueeze(1), measurement[:, i]), dim=1)
                 estimation = self.model.predict(y, tsim, dt, z_0=z_0).detach()
                 rmse = RMSE(simulation[:, i], estimation)

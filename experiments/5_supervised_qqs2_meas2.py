@@ -15,7 +15,7 @@ sys.path.append(working_path)
 
 # Import KKL observer
 from learn_KKL.learner import Learner
-from learn_KKL.system import QuanserQubeServo2
+from learn_KKL.system import QuanserQubeServo2_meas2
 from learn_KKL.luenberger_observer import LuenbergerObserver
 from learn_KKL.utils import generate_mesh, RMSE
 from learn_KKL.filter_utils import EKF_ODE, interpolate_func, \
@@ -40,7 +40,7 @@ import matplotlib.pyplot as plt
 # managed to train KKL for angles that stay in this range! Rigorously should
 # take extended state (x1, x2) = (cos(theta), sin(theta)) and (x3, x4) = (
 # cos(alpha), sin(alpha)) to avoid this issue and (hopefully) train on whole
-# state-space. Numerical results are only partial for now.
+# state-space. Numerical results are only local for now.
 
 if __name__ == "__main__":
 
@@ -50,20 +50,20 @@ if __name__ == "__main__":
     # Learning method
     learning_method = "Supervised"
     num_hl = 5
-    size_hl = 100
+    size_hl = 50
     activation = nn.ReLU()
     recon_lambda = 0.1
 
     # Define system
-    system = QuanserQubeServo2()
+    system = QuanserQubeServo2_meas2()
 
     # Define data params (same characteristics as experimental data)
     dt = 0.004
     tsim = (0, 2000 * dt)
-    num_initial_conditions = 100
-    init_wc = 5.
-    x_limits = np.array([[0., 0.1], [0., 0.1], [0., 0.1], [0., 0.1]])
-    # x_limits = np.array([[0.0, 0.001], [0.05, 0.1], [0.0, 0.001], [0.0, 0.001]])
+    num_initial_conditions = 20
+    init_wc = 3.
+    # x_limits = np.array([[-1., 1.], [-1., 1.], [-1., 1.], [-1., 1.]])
+    x_limits = np.array([[0.0, 0.001], [0.05, 0.1], [0.0, 0.001], [0.0, 0.001]])
 
     # Solver options
     solver_options = {'method': 'rk4', 'options': {'step_size': 1e-3}}
@@ -216,13 +216,16 @@ if __name__ == "__main__":
         learner.save_plot(
             "Val_loss.pdf", "Validation loss over time", "log", learner.val_loss.detach(),
         )
+        xmesh = generate_mesh(x_limits, 10, method="uniform")
+        learner.save_random_traj(x_mesh=xmesh, num_samples=10, nb_trajs=10,
+                                 verbose=False, tsim=tsim, dt=dt)
 
     ##########################################################################
     # Test trajectory ########################################################
     ##########################################################################
 
     # # Load learner  # TODO
-    # path = "runs/QuanserQubeServo2/Supervised/T_star/x0_00.1_moreNN"
+    # path = "runs/QuanserQubeServo2_meas2/Supervised/T_star/exp_0"
     # learner_path = path + "/learner.pkl"
     # import dill as pkl
     # with open(learner_path, "rb") as rb_file:
@@ -231,7 +234,7 @@ if __name__ == "__main__":
     # observer = learner.model
 
     # Experiment
-    fileName = 'example_csv_fin2'
+    fileName = 'example_csv_fin4'
     filepath = '../Data/QQS2_data_diffx0/' + fileName + '.csv'
     exp = np.genfromtxt(filepath, delimiter=',')
     exp = exp[1:2001, 1:-1]
@@ -243,9 +246,9 @@ if __name__ == "__main__":
     exp = torch.from_numpy(exp)
 
     # Observer
-    measurement = torch.unsqueeze(exp[..., 1], 1)
+    measurement = exp[..., :2]
     tq = torch.arange(tsim[0], tsim[1], dt)
-    y = torch.cat((tq.unsqueeze(1), measurement[:, 0].unsqueeze(1)), dim=1)
+    y = torch.cat((tq.unsqueeze(1), measurement), dim=1)
     estimation = observer.predict(y, tsim, dt).detach()
     theta = estimation[..., 0]
     alpha = estimation[..., 1]
@@ -280,7 +283,8 @@ if __name__ == "__main__":
     x0 = exp[0].unsqueeze(0)
     dyn_config = {'prior_kwargs': {
         'n': x0.shape[1],
-        'observation_matrix': torch.tensor([[0., 1., 0., 0.]]),
+        'observation_matrix': torch.tensor([[1., 0., 0., 0.],
+                                            [0., 1., 0., 0.]]),
         'EKF_process_covar': 1e-1 * torch.eye(x0.shape[1]),
         'EKF_init_covar': torch.tensor([1e-4, 1e-3, 1e-2, 1e-1]) * torch.eye(
             x0.shape[1]),
@@ -289,7 +293,7 @@ if __name__ == "__main__":
     y_func = interpolate_func(x=y, t0=tq[0], init_value=measurement[0])
     controller = lambda t, kwargs, t0, init_control, impose_init: 0.
     x0_estim = torch.cat((
-        torch.zeros(1, 1), measurement[0].unsqueeze(1), torch.zeros(1, 2),
+        measurement[0].unsqueeze(0), torch.zeros(1, 2),
         torch.unsqueeze(torch.flatten(dyn_config['prior_kwargs'][
                                           'EKF_init_covar']), 0)), dim=1)
     xtraj = dynamics_traj_observer(
