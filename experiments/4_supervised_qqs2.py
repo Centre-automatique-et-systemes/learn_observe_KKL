@@ -34,13 +34,15 @@ import matplotlib.pyplot as plt
 
 # Script to learn a KKL observer from simulations of the Quanser Qube 2,
 # test it on experimental data, and compare with EKF.
-# Quanser Qube: state (theta, alpha, thetadot, alphadot)
+# Quanser Qube: state (theta, alpha, thetadot, alphadot),
+# measurement (alpha)
 
 # For continuous data need theta in [-pi, pi] and alpha in [0, 2pi]: only
 # managed to train KKL for angles that stay in this range! Rigorously should
 # take extended state (x1, x2) = (cos(theta), sin(theta)) and (x3, x4) = (
 # cos(alpha), sin(alpha)) to avoid this issue and (hopefully) train on whole
-# state-space. Numerical results are only local for now.
+# state-space. Numerical results are only local for now and data generation
+# should be made more systematic and rigorous.
 
 if __name__ == "__main__":
 
@@ -60,13 +62,25 @@ if __name__ == "__main__":
     # Define data params (same characteristics as experimental data)
     dt = 0.004
     tsim = (0, 2000 * dt)
-    num_initial_conditions = 20
-    init_wc = 3.
-    # x_limits = np.array([[0., 0.1], [0., 0.1], [0., 0.1], [0., 0.1]])
-    x_limits = np.array([[0.0, 0.001], [0.05, 0.1], [0.0, 0.001], [0.0, 0.001]])
+    # tsim = (0, 1.)
+    init_wc = 4.
+    traj_data = True  # whether to generate data on grid or from trajectories
+    add_forward = True
+    if traj_data:  # TODO
+        num_initial_conditions = 10000  # 20
+        x_limits = np.array([[-0.5, 0.5], [0., 1.], [-0.1, 0.1], [-0.1, 0.1]])
+        # x_limits = np.array(
+        #     [[0.0, 0.001], [0.05, 0.1], [0.0, 0.001], [0.0, 0.001]])
+    else:
+        num_samples = int(1e5)
+        # x_limits = np.array([[-np.pi, np.pi], [0, 2 * np.pi],
+        #                      [-10., 10.], [-10., 10.]])
+        x_limits = np.array([[-0.5, 0.5], [0., 1.],
+                             [-1., 1.], [-1., 1.]])
 
     # Solver options
     solver_options = {'method': 'rk4', 'options': {'step_size': 1e-3}}
+    # solver_options = {'method': 'dopri5'}
 
     # Create the observer
     observer = LuenbergerObserver(
@@ -76,22 +90,58 @@ if __name__ == "__main__":
     observer.set_dynamics(system)
 
     # Generate data
-    data = observer.generate_trajectory_data(
-        x_limits, num_initial_conditions, method="LHS", tsim=tsim,
-        stack=False, dt=dt
-    )
-    theta = data[:, :, 0]
-    alpha = data[:, :, 1]
-    # Map to [-pi,pi]
-    theta = ((theta + np.pi) % (2 * np.pi)) - np.pi
-    # alpha = ((alpha + np.pi) % (2 * np.pi)) - np.pi
-    # Map to [0, 2pi]
-    # theta = theta % (2 * np.pi)
-    alpha = alpha % (2 * np.pi)
-    data[:, :, 0] = theta
-    data[:, :, 1] = alpha
-    data_ordered = copy.deepcopy(data)
-    data = torch.cat(torch.unbind(data, dim=1), dim=0)
+    if traj_data:
+        data = observer.generate_trajectory_data(
+            x_limits, num_initial_conditions, method="LHS", tsim=tsim,
+            stack=False, dt=dt
+        )
+        theta = data[..., 0]
+        alpha = data[..., 1]
+        # Map to [-pi,pi]
+        theta = ((theta + np.pi) % (2 * np.pi)) - np.pi
+        # alpha = ((alpha + np.pi) % (2 * np.pi)) - np.pi
+        # Map to [0, 2pi]
+        # theta = theta % (2 * np.pi)
+        alpha = alpha % (2 * np.pi)
+        data[..., 0] = theta
+        data[..., 1] = alpha
+        data_ordered = copy.deepcopy(data)
+        data = torch.cat(torch.unbind(data, dim=1), dim=0)
+        if add_forward:  # TODO add forward trajectory to have stable data
+            init = torch.tensor([0., 0.1, 0., 0.] + [0.] * observer.dim_z)
+            data_forward = observer.generate_data_forward(
+                init=init, tsim=(0, 10),
+                num_datapoints=2000, k=10, dt=dt, stack=True)
+            theta_forward = data_forward[..., 0]
+            alpha_forward = data_forward[..., 1]
+            # Map to [-pi,pi]
+            theta_forward = ((theta_forward + np.pi) % (2 * np.pi)) - np.pi
+            # alpha_forward = ((alpha_forward + np.pi) % (2 * np.pi)) - np.pi
+            # Map to [0, 2pi]
+            # theta_forward = theta_forward % (2 * np.pi)
+            alpha_forward = alpha_forward % (2 * np.pi)
+            data_forward[..., 0] = theta_forward
+            data_forward[..., 1] = alpha_forward
+            data = torch.cat((data, data_forward), dim=0)
+    else:
+        data = observer.generate_data_svl(
+            x_limits, num_samples, method="LHS", k=10)
+        if add_forward:  # TODO add forward trajectory to have stable data
+            init = torch.tensor([0., 0.1, 0., 0.] + [0.] * observer.dim_z)
+            data_forward = observer.generate_data_forward(
+                init=init, tsim=(0, 10),
+                num_datapoints=2000, k=10, dt=dt, stack=True)
+            data = torch.cat((data, data_forward), dim=0)
+        theta = data[..., 0]
+        alpha = data[..., 1]
+        # Map to [-pi,pi]
+        theta = ((theta + np.pi) % (2 * np.pi)) - np.pi
+        # alpha = ((alpha + np.pi) % (2 * np.pi)) - np.pi
+        # Map to [0, 2pi]
+        # theta = theta % (2 * np.pi)
+        alpha = alpha % (2 * np.pi)
+        data[..., 0] = theta
+        data[..., 1] = alpha
     data, val_data = train_test_split(data, test_size=0.3, shuffle=False)
 
     print(data.shape)
@@ -103,12 +153,19 @@ if __name__ == "__main__":
     # Trainer options
     num_epochs = 100
     trainer_options = {"max_epochs": num_epochs}
-    batch_size = 20
-    init_learning_rate = 1e-2
+    if traj_data:
+        batch_size = 20
+        init_learning_rate = 1e-2
+    else:
+        batch_size = 20
+        init_learning_rate = 1e-2
 
     # Optim options
     optim_method = optim.Adam
-    optimizer_options = {"weight_decay": 1e-6}
+    if traj_data:
+        optimizer_options = {"weight_decay": 1e-6}
+    else:
+        optimizer_options = {"weight_decay": 1e-6}
 
     # Scheduler options
     scheduler_method = optim.lr_scheduler.ReduceLROnPlateau
@@ -138,6 +195,9 @@ if __name__ == "__main__":
         scheduler=scheduler_method,
         scheduler_options=scheduler_options,
     )
+    learner.traj_data = traj_data  # TODO to keep track
+    learner.x0_limits = x_limits
+    learner.add_forward = add_forward
 
     # Define logger and checkpointing
     logger = TensorBoardLogger(save_dir=learner.results_folder + "/tb_logs")
@@ -167,46 +227,36 @@ if __name__ == "__main__":
     print(f"Logs stored in {learner.results_folder}/tb_logs")
 
     # Plot training data (as trajectories)
-    plt.plot(data_ordered[..., 0], 'x')
-    plt.title(r'Training data: $\theta$')
-    plt.savefig(os.path.join(learner.results_folder, 'Train_theta.pdf'))
-    plt.clf()
-    plt.close('all')
-    plt.plot(data_ordered[..., 1], 'x')
-    plt.title(r'Training data: $\alpha$')
-    plt.savefig(os.path.join(learner.results_folder, 'Train_alpha.pdf'))
-    plt.clf()
-    plt.close('all')
-    plt.plot(data_ordered[..., 2], 'x')
-    plt.title(r'Training data: $\dot{\theta}$')
-    plt.savefig(os.path.join(learner.results_folder, 'Train_thetadot.pdf'))
-    plt.clf()
-    plt.close('all')
-    plt.plot(data_ordered[..., 3], 'x')
-    plt.title(r'Training data: $\dot{\alpha}$')
-    plt.savefig(os.path.join(learner.results_folder, 'Train_alphadot.pdf'))
-    plt.clf()
-    plt.close('all')
+    if traj_data:
+        n = 10000
+        N = data_ordered.shape[0]
+        data_ordered = data_ordered[::int(np.ceil(N / n)), :, :]
+        plt.plot(data_ordered[..., 0], 'x')
+        plt.title(r'Training data: $\theta$')
+        plt.savefig(os.path.join(learner.results_folder, 'Train_theta.pdf'))
+        plt.clf()
+        plt.close('all')
+        plt.plot(data_ordered[..., 1], 'x')
+        plt.title(r'Training data: $\alpha$')
+        plt.savefig(os.path.join(learner.results_folder, 'Train_alpha.pdf'))
+        plt.clf()
+        plt.close('all')
+        plt.plot(data_ordered[..., 2], 'x')
+        plt.title(r'Training data: $\dot{\theta}$')
+        plt.savefig(os.path.join(learner.results_folder, 'Train_thetadot.pdf'))
+        plt.clf()
+        plt.close('all')
+        plt.plot(data_ordered[..., 3], 'x')
+        plt.title(r'Training data: $\dot{\alpha}$')
+        plt.savefig(os.path.join(learner.results_folder, 'Train_alphadot.pdf'))
+        plt.clf()
+        plt.close('all')
 
+    tsim = (0, 2000 * dt)  # for test trajectories
     with torch.no_grad():
-        # Save training and validation data
-        idx = np.random.choice(
-            np.arange(len(learner.training_data)), size=(10000,)
-        )  # subsampling for plots
-
-        specs_file = learner.save_specifications()
-
-        learner.save_pkl("/learner.pkl", learner)
-
-        learner.save_csv(
-            learner.training_data.cpu().numpy(),
-            os.path.join(learner.results_folder, "training_data.csv"),
-        )
-        learner.save_csv(
-            learner.validation_data.cpu().numpy(),
-            os.path.join(learner.results_folder, "validation_data.csv"),
-        )
-        # Loss plot over time
+        learner.save_results(
+            limits=x_limits, nb_trajs=10, tsim=tsim, dt=dt, fast=True,
+            method='LHS', checkpoint_path=checkpoint_callback.best_model_path)
         learner.save_plot(
             "Train_loss.pdf",
             "Training loss over time",
@@ -214,11 +264,11 @@ if __name__ == "__main__":
             learner.train_loss.detach(),
         )
         learner.save_plot(
-            "Val_loss.pdf", "Validation loss over time", "log", learner.val_loss.detach(),
+            "Val_loss.pdf",
+            "Validation loss over time",
+            "log",
+            learner.val_loss.detach(),
         )
-        xmesh = generate_mesh(x_limits, 10, method="uniform")
-        learner.save_random_traj(x_mesh=xmesh, num_samples=10, nb_trajs=10,
-                                 verbose=False, tsim=tsim, dt=dt)
 
     ##########################################################################
     # Test trajectory ########################################################
@@ -241,23 +291,35 @@ if __name__ == "__main__":
     exp_copy = copy.deepcopy(exp)
     exp[:, 0], exp[:, 1] = exp_copy[:, 1], exp_copy[:, 0]
     exp[:, 2], exp[:, 3] = exp_copy[:, 3], exp_copy[:, 2]
-    # Map to [0, 2pi]
-    exp[:, 1] = exp[:, 1] % (2 * np.pi)
+    if traj_data:
+        # Map to [0, 2pi]
+        exp[:, 1] = exp[:, 1] % (2 * np.pi)
+    else:
+        # Map to [0, 2pi]
+        exp[:, 1] = exp[:, 1] % (2 * np.pi)
     exp = torch.from_numpy(exp)
 
     # Observer
     measurement = torch.unsqueeze(exp[..., 1], 1)
     tq = torch.arange(tsim[0], tsim[1], dt)
-    y = torch.cat((tq.unsqueeze(1), measurement[:, 0].unsqueeze(1)), dim=1)
+    y = torch.cat((tq.unsqueeze(1), measurement), dim=1)
     estimation = observer.predict(y, tsim, dt).detach()
     theta = estimation[..., 0]
     alpha = estimation[..., 1]
-    # Map to [-pi,pi]
-    theta = ((theta + np.pi) % (2 * np.pi)) - np.pi
-    # alpha = ((alpha + np.pi) % (2 * np.pi)) - np.pi
-    # Map to [0, 2pi]
-    # theta = theta % (2 * np.pi)
-    alpha = alpha % (2 * np.pi)
+    if traj_data:
+        # Map to [-pi,pi]
+        theta = ((theta + np.pi) % (2 * np.pi)) - np.pi
+        # alpha = ((alpha + np.pi) % (2 * np.pi)) - np.pi
+        # Map to [0, 2pi]
+        # theta = theta % (2 * np.pi)
+        alpha = alpha % (2 * np.pi)
+    else:
+        # Map to [-pi,pi]
+        theta = ((theta + np.pi) % (2 * np.pi)) - np.pi
+        # alpha = ((alpha + np.pi) % (2 * np.pi)) - np.pi
+        # Map to [0, 2pi]
+        # theta = theta % (2 * np.pi)
+        alpha = alpha % (2 * np.pi)
     estimation[..., 0] = theta
     estimation[..., 1] = alpha
 

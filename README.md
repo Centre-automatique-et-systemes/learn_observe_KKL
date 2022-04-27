@@ -2,6 +2,7 @@
 
 ### To run the code:
 - create a directory (further named dir), `cd dir`
+- unpack Data.zip in dir/Data
 - clone the repo in dir/repo
 - create a virtual environment for this directory (with pip: `python3 -m venv 
   venv`), source it (`source venv/bin/activate`)

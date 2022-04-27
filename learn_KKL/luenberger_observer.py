@@ -745,10 +745,9 @@ class LuenbergerObserver(nn.Module):
         _, data = self.simulate_system(y_0, tsim, dt)
         # Fix issue with grad tensor in pipeline
         if stack:
-            return torch.tensor(torch.cat(torch.unbind(data, dim=1), dim=0),
-                                requires_grad=False)
+            return torch.cat(torch.unbind(data, dim=1), dim=0)
         else:
-            return torch.tensor(data, requires_grad=False)
+            return data
 
     def generate_data_svl(
             self,
@@ -858,9 +857,10 @@ class LuenbergerObserver(nn.Module):
         self.t_c = self.k / min(
             abs(linalg.eig(self.D.detach().numpy())[0].real))
         data = data[(tq >= self.t_c)]  # cut trajectory before t_c
-        random_idx = np.random.choice(np.arange(len(data)),
-                                      size=(num_datapoints,), replace=False)
-        data = torch.squeeze(data[random_idx])
+        if len(data) > num_datapoints:
+            random_idx = np.random.choice(np.arange(len(data)),
+                                          size=(num_datapoints,), replace=False)
+            data = torch.squeeze(data[random_idx])
 
         return data
 

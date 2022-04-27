@@ -582,6 +582,20 @@ class QuanserQubeServo2_meas2(QuanserQubeServo2):
         return "QuanserQubeServo2_meas2"
 
 
+class QuanserQubeServo2_meas1(QuanserQubeServo2):
+    """
+    Same as QuanserQubeServo2 except we measure only theta.
+    """
+    def __init__(self):
+        super().__init__()
+
+    def h(self, x):
+        return torch.unsqueeze(x[..., 0], dim=-1)
+
+    def __repr__(self):
+        return "QuanserQubeServo2_meas1"
+
+
 
 class OldSaturatedVanDerPol(System):
     """ See https://en.wikipedia.org/wiki/Van_der_Pol_oscillator for detailed

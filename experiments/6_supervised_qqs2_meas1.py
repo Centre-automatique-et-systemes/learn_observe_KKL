@@ -15,7 +15,7 @@ sys.path.append(working_path)
 
 # Import KKL observer
 from learn_KKL.learner import Learner
-from learn_KKL.system import QuanserQubeServo2_meas2
+from learn_KKL.system import QuanserQubeServo2_meas1
 from learn_KKL.luenberger_observer import LuenbergerObserver
 from learn_KKL.utils import generate_mesh, RMSE
 from learn_KKL.filter_utils import EKF_ODE, interpolate_func, \
@@ -35,7 +35,7 @@ import matplotlib.pyplot as plt
 # Script to learn a KKL observer from simulations of the Quanser Qube 2,
 # test it on experimental data, and compare with EKF.
 # Quanser Qube: state (theta, alpha, thetadot, alphadot),
-# measurement (theta, alpha)
+# measurement (theta)
 
 # For continuous data need theta in [-pi, pi] and alpha in [0, 2pi]: only
 # managed to train KKL for angles that stay in this range! Rigorously should
@@ -57,17 +57,17 @@ if __name__ == "__main__":
     recon_lambda = 0.1
 
     # Define system
-    system = QuanserQubeServo2_meas2()
+    system = QuanserQubeServo2_meas1()
 
     # Define data params (same characteristics as experimental data)
     dt = 0.004
     tsim = (0, 2000 * dt)
     # tsim = (0, 1.)
-    init_wc = 3.
+    init_wc = 4.
     traj_data = True  # whether to generate data on grid or from trajectories
     add_forward = True
     if traj_data:  # TODO
-        num_initial_conditions = 100  # 20
+        num_initial_conditions = 10000  # 20
         x_limits = np.array([[-0.5, 0.5], [0., 1.], [-0.1, 0.1], [-0.1, 0.1]])
         # x_limits = np.array(
         #     [[0.0, 0.001], [0.05, 0.1], [0.0, 0.001], [0.0, 0.001]])
@@ -78,7 +78,6 @@ if __name__ == "__main__":
         x_limits = np.array([[-0.5, 0.5], [0., 1.],
                              [-1., 1.], [-1., 1.]])
 
-
     # Solver options
     solver_options = {'method': 'rk4', 'options': {'step_size': 1e-3}}
     # solver_options = {'method': 'dopri5'}
@@ -86,7 +85,8 @@ if __name__ == "__main__":
     # Create the observer
     observer = LuenbergerObserver(
         dim_x=system.dim_x, dim_y=system.dim_y, method=learning_method,
-        wc=init_wc, recon_lambda=recon_lambda
+        D='diag', wc=5  # TODO
+        # wc=init_wc, recon_lambda=recon_lambda
     )
     observer.set_dynamics(system)
 
@@ -156,10 +156,10 @@ if __name__ == "__main__":
     trainer_options = {"max_epochs": num_epochs}
     if traj_data:
         batch_size = 20
-        init_learning_rate = 1e-2  # 1e-2
+        init_learning_rate = 1e-3
     else:
         batch_size = 20
-        init_learning_rate = 1e-2
+        init_learning_rate = 1e-3
 
     # Optim options
     optim_method = optim.Adam
@@ -199,7 +199,6 @@ if __name__ == "__main__":
     learner.traj_data = traj_data  # TODO to keep track
     learner.x0_limits = x_limits
     learner.add_forward = add_forward
-    learner.x0_limits = x_limits
 
     # Define logger and checkpointing
     logger = TensorBoardLogger(save_dir=learner.results_folder + "/tb_logs")
@@ -232,7 +231,7 @@ if __name__ == "__main__":
     if traj_data:
         n = 10000
         N = data_ordered.shape[0]
-        data_ordered = data_ordered[::int(np.ceil(N/n)), :, :]
+        data_ordered = data_ordered[::int(np.ceil(N / n)), :, :]
         plt.plot(data_ordered[..., 0], 'x')
         plt.title(r'Training data: $\theta$')
         plt.savefig(os.path.join(learner.results_folder, 'Train_theta.pdf'))
@@ -277,18 +276,13 @@ if __name__ == "__main__":
     ##########################################################################
 
     # # Load learner  # TODO
-    # path = "runs/QuanserQubeServo2_meas2/Supervised/T_star/exp_4"
+    # path = "runs/QuanserQubeServo2_meas1/Supervised/T_star/exp_3"
     # learner_path = path + "/learner.pkl"
     # import dill as pkl
     # with open(learner_path, "rb") as rb_file:
     #     learner = pkl.load(rb_file)
     # learner.results_folder = path
     # observer = learner.model
-    #
-    # mesh = learner.model.generate_data_svl(x_limits, 15, method="uniform")
-    # x_mesh = mesh[:, learner.x_idx_out]
-    # z_mesh = mesh[:, learner.z_idx_out]
-    # learner.save_random_traj(x_mesh, 15, 10, False, tsim, dt)
 
     # Experiment
     fileName = 'example_csv_fin4'
@@ -307,7 +301,7 @@ if __name__ == "__main__":
     exp = torch.from_numpy(exp)
 
     # Observer
-    measurement = exp[..., :2]
+    measurement = torch.unsqueeze(exp[..., 0], 1)
     tq = torch.arange(tsim[0], tsim[1], dt)
     y = torch.cat((tq.unsqueeze(1), measurement), dim=1)
     estimation = observer.predict(y, tsim, dt).detach()
@@ -352,8 +346,7 @@ if __name__ == "__main__":
     x0 = exp[0].unsqueeze(0)
     dyn_config = {'prior_kwargs': {
         'n': x0.shape[1],
-        'observation_matrix': torch.tensor([[1., 0., 0., 0.],
-                                            [0., 1., 0., 0.]]),
+        'observation_matrix': torch.tensor([[1., 0., 0., 0.]]),
         'EKF_process_covar': 1e-1 * torch.eye(x0.shape[1]),
         'EKF_init_covar': torch.tensor([1e-4, 1e-3, 1e-2, 1e-1]) * torch.eye(
             x0.shape[1]),
@@ -362,7 +355,7 @@ if __name__ == "__main__":
     y_func = interpolate_func(x=y, t0=tq[0], init_value=measurement[0])
     controller = lambda t, kwargs, t0, init_control, impose_init: 0.
     x0_estim = torch.cat((
-        measurement[0].unsqueeze(0), torch.zeros(1, 2),
+        measurement[0].unsqueeze(1), torch.zeros(1, 3),
         torch.unsqueeze(torch.flatten(dyn_config['prior_kwargs'][
                                           'EKF_init_covar']), 0)), dim=1)
     xtraj = dynamics_traj_observer(

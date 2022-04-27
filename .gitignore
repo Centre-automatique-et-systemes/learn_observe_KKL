@@ -37,3 +37,6 @@ dist/
 
 # Matlab files
 *.asv
+
+# Data files
+Data.zip

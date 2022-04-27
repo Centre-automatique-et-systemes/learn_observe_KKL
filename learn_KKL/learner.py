@@ -300,6 +300,12 @@ class Learner(pl.LightningModule):
                 print(key, ": ", val, file=f)
             for key, val in vars(self).items():
                 print(key, ": ", val, file=f)
+            try:
+                # Add t_c to specifications
+                print(f'k {self.model.k}', file=f)
+                print(f't_c {self.model.t_c}', file=f)
+            except NameError:
+                print('No value of t_c in observer model.')
 
         if 'jointly' in self.method:
             eig0 = torch.linalg.eigvals(self.model.D_0)
@@ -358,32 +364,6 @@ class Learner(pl.LightningModule):
                     plt.show()
                 plt.clf()
                 plt.close('all')
-        error = RMSE(x_mesh, x_hat_star, dim=1)
-
-        error = error.detach()
-
-        for i in range(1, x_mesh.shape[1]):
-            # https://stackoverflow.com/questions/37822925/how-to-smooth-by-interpolation-when-using-pcolormesh
-            name = "RMSE_heatmap" + str(i) + ".pdf"
-            plt.scatter(
-                x_mesh[:, i - 1].detach().numpy(),
-                x_mesh[:, i].detach().numpy(),
-                cmap="jet",
-                c=np.log(error.detach().numpy()),
-            )
-            cbar = plt.colorbar()
-            cbar.set_label("Log estimation error")
-            cbar.set_label("Log estimation error")
-
-            plt.title(r"RMSE between $x$ and $\hat{x}$")
-            plt.xlabel(rf"$x_{i}$")
-            plt.ylabel(rf"$x_{i + 1}$")
-            plt.legend()
-            plt.savefig(os.path.join(self.results_folder, name), bbox_inches="tight")
-            if verbose:
-                plt.show()
-            plt.clf()
-            plt.close("all")
 
     def save_trj(self, init_state, verbose, tsim, dt, var=0.2, z_0=None):
         # Estimation over the test trajectories with T_star
@@ -599,6 +579,7 @@ class Learner(pl.LightningModule):
         tsim=(0, 60),
         dt=1e-2,
         num_samples=10000,
+        method="uniform",
         checkpoint_path=None,
         verbose=False,
         fast=False,
@@ -679,7 +660,8 @@ class Learner(pl.LightningModule):
                 return 0
 
             # Heatmap of RMSE(x, x_hat) with T_star
-            mesh = self.model.generate_data_svl(limits, num_samples, method="uniform")
+            mesh = self.model.generate_data_svl(limits, num_samples,
+                                                method=method)
             x_mesh = mesh[:, self.x_idx_out]
             z_mesh = mesh[:, self.z_idx_out]
             x_hat_star = self.model("T_star", z_mesh)
@@ -688,11 +670,6 @@ class Learner(pl.LightningModule):
             num_samples = len(mesh)  # update num_samples from uniform grid
 
             print(f"Shape of mesh for evaluation: {mesh.shape}")
-
-            # Add t_c to specifications
-            with open(specs_file, 'a') as f:
-                print(f'k {self.model.k}', file=f)
-                print(f't_c {self.model.t_c}', file=f)
 
             self.save_pdf_heatmap(x_mesh, x_hat_star, verbose)
             self.save_random_traj(x_mesh, num_samples, nb_trajs, verbose, tsim, dt)
