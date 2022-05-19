@@ -304,7 +304,7 @@ class Learner(pl.LightningModule):
                 # Add t_c to specifications
                 print(f'k {self.model.k}', file=f)
                 print(f't_c {self.model.t_c}', file=f)
-            except NameError:
+            except AttributeError:
                 print('No value of t_c in observer model.')
 
         if 'jointly' in self.method:
@@ -354,8 +354,8 @@ class Learner(pl.LightningModule):
                 )
                 cbar = plt.colorbar()
                 cbar.set_label("Log estimation error")
-                cbar.set_label("Log estimation error")
-                plt.title(r"RMSE between $x$ and $\hat{x}$")
+                plt.title(rf"RMSE between $x$ and $\hat{{x}}$: "
+                          rf"{np.mean(error.detach().numpy())}")
                 plt.xlabel(rf"$x_{i}$")
                 plt.ylabel(rf"$x_{i + 1}$")
                 plt.legend()

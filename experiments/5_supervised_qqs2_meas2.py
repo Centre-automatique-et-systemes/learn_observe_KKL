@@ -61,13 +61,13 @@ if __name__ == "__main__":
 
     # Define data params (same characteristics as experimental data)
     dt = 0.004
-    tsim = (0, 2000 * dt)
-    # tsim = (0, 1.)
-    init_wc = 3.
+    # tsim = (0, 2000 * dt)
+    tsim = (0, 1.)
+    init_wc = 5.
     traj_data = True  # whether to generate data on grid or from trajectories
     add_forward = True
     if traj_data:  # TODO
-        num_initial_conditions = 100  # 20
+        num_initial_conditions = 10000  # 20
         x_limits = np.array([[-0.5, 0.5], [0., 1.], [-0.1, 0.1], [-0.1, 0.1]])
         # x_limits = np.array(
         #     [[0.0, 0.001], [0.05, 0.1], [0.0, 0.001], [0.0, 0.001]])
@@ -78,7 +78,6 @@ if __name__ == "__main__":
         x_limits = np.array([[-0.5, 0.5], [0., 1.],
                              [-1., 1.], [-1., 1.]])
 
-
     # Solver options
     solver_options = {'method': 'rk4', 'options': {'step_size': 1e-3}}
     # solver_options = {'method': 'dopri5'}
@@ -86,7 +85,8 @@ if __name__ == "__main__":
     # Create the observer
     observer = LuenbergerObserver(
         dim_x=system.dim_x, dim_y=system.dim_y, method=learning_method,
-        wc=init_wc, recon_lambda=recon_lambda
+        D='diag', wc=5  # TODO
+        # wc=init_wc, recon_lambda=recon_lambda
     )
     observer.set_dynamics(system)
 
@@ -156,7 +156,7 @@ if __name__ == "__main__":
     trainer_options = {"max_epochs": num_epochs}
     if traj_data:
         batch_size = 20
-        init_learning_rate = 1e-2  # 1e-2
+        init_learning_rate = 1e-2
     else:
         batch_size = 20
         init_learning_rate = 1e-2
@@ -199,7 +199,6 @@ if __name__ == "__main__":
     learner.traj_data = traj_data  # TODO to keep track
     learner.x0_limits = x_limits
     learner.add_forward = add_forward
-    learner.x0_limits = x_limits
 
     # Define logger and checkpointing
     logger = TensorBoardLogger(save_dir=learner.results_folder + "/tb_logs")

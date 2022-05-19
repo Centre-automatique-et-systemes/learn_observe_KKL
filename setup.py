@@ -9,7 +9,7 @@ setup(
     packages=['learn_KKL'],
     install_requires=['numpy', 'torch', 'scipy', 'matplotlib==3.5.1', 'torchdiffeq',
                       'smt', 'jupyter', 'tensorboard', 'seaborn',
-                      'pytorch-lightning', 'dill'],
+                      'pytorch-lightning', 'dill', 'findiff'],
     version='0.1.0',
     license='MIT',
     description='Implementation of the paper: "Towards gain tuning for '

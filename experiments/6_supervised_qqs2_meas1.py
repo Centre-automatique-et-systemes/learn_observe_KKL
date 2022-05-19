@@ -63,11 +63,11 @@ if __name__ == "__main__":
     dt = 0.004
     tsim = (0, 2000 * dt)
     # tsim = (0, 1.)
-    init_wc = 4.
+    init_wc = 2.
     traj_data = True  # whether to generate data on grid or from trajectories
     add_forward = True
     if traj_data:  # TODO
-        num_initial_conditions = 10000  # 20
+        num_initial_conditions = 1000  # 20
         x_limits = np.array([[-0.5, 0.5], [0., 1.], [-0.1, 0.1], [-0.1, 0.1]])
         # x_limits = np.array(
         #     [[0.0, 0.001], [0.05, 0.1], [0.0, 0.001], [0.0, 0.001]])

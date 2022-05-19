@@ -198,10 +198,12 @@ class LuenbergerObserverNoise(LuenbergerObserver):
         if save:
             # Compute dTdx over grid
             dTdh = torch.autograd.functional.jacobian(
-                self.encoder, x, create_graph=False, strict=False, vectorize=False
+                self.encoder, x, create_graph=False, strict=False,
+                vectorize=False
             )
             dTdx = torch.transpose(
-                torch.transpose(torch.diagonal(dTdh, dim1=0, dim2=2), 1, 2), 0, 1
+                torch.transpose(
+                    torch.diagonal(dTdh, dim1=0, dim2=2), 1, 2), 0, 1
             )
             dTdx = dTdx[:, :, : self.dim_x]
             idx_max = torch.argmax(torch.linalg.matrix_norm(dTdx, ord=2))
@@ -213,8 +215,8 @@ class LuenbergerObserverNoise(LuenbergerObserver):
                 vectorize=False
             )
             dTstar_dz = torch.transpose(
-                torch.transpose(torch.diagonal(dTstar_dh, dim1=0, dim2=2), 1, 2), 0,
-                1
+                torch.transpose(
+                    torch.diagonal(dTstar_dh, dim1=0, dim2=2), 1, 2), 0, 1
             )
             dTstar_dz = dTstar_dz[:, :, : self.dim_z]
             idxstar_max = torch.argmax(torch.linalg.matrix_norm(dTstar_dz, ord=2))
