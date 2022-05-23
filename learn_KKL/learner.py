@@ -5,8 +5,8 @@ import dill as pkl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import seaborn as sb
 import pytorch_lightning as pl
+import seaborn as sb
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
@@ -22,7 +22,6 @@ sb.set_style("whitegrid")
 # Set double precision by default
 torch.set_default_tensor_type(torch.DoubleTensor)
 torch.set_default_dtype(torch.float64)
-
 
 
 class Learner(pl.LightningModule):
@@ -84,18 +83,18 @@ class Learner(pl.LightningModule):
     """
 
     def __init__(
-        self,
-        observer,
-        system,
-        training_data,
-        validation_data,
-        method="Autoencoder",
-        batch_size=10,
-        lr=1e-3,
-        optimizer=optim.Adam,
-        optimizer_options=None,
-        scheduler=optim.lr_scheduler.ReduceLROnPlateau,
-        scheduler_options=None,
+            self,
+            observer,
+            system,
+            training_data,
+            validation_data,
+            method="Autoencoder",
+            batch_size=10,
+            lr=1e-3,
+            optimizer=optim.Adam,
+            optimizer_options=None,
+            scheduler=optim.lr_scheduler.ReduceLROnPlateau,
+            scheduler_options=None,
     ):
         super(Learner, self).__init__()
         # General parameters
@@ -137,7 +136,8 @@ class Learner(pl.LightningModule):
 
         # Folder to save results
         i = 0
-        params = os.path.join(os.getcwd(), "runs", str(self.system), self.model.method)
+        params = os.path.join(os.getcwd(), "runs", str(self.system),
+                              self.model.method)
         if "Supervised" in self.model.method:
             params += "/" + self.method
         while os.path.isdir(os.path.join(params, f"exp_{i}")):
@@ -181,7 +181,8 @@ class Learner(pl.LightningModule):
                 parameters_to_optim -= {param}
             parameters = list(parameters_to_optim)
 
-        optimizer = self.optimizer(parameters, self.optim_lr, **optimizer_options)
+        optimizer = self.optimizer(parameters, self.optim_lr,
+                                   **optimizer_options)
         if self.scheduler:
             if self.scheduler_options:
                 scheduler_options = self.scheduler_options
@@ -220,7 +221,8 @@ class Learner(pl.LightningModule):
 
     def train_dataloader(self):
         train_loader = DataLoader(
-            self.training_data, batch_size=self.batch_size, shuffle=True, num_workers=0
+            self.training_data, batch_size=self.batch_size, shuffle=True,
+            num_workers=0
         )
         return train_loader
 
@@ -228,15 +230,22 @@ class Learner(pl.LightningModule):
         # Compute transformation and loss depending on the method
         if self.method == "Autoencoder":
             z_hat, x_hat = self.forward(batch)
-            loss, loss1, loss2 = self.model.loss(self.method, batch, x_hat, z_hat)
-            self.log("train_loss1", loss1, on_step=True, prog_bar=False, logger=True)
-            self.log("train_loss2", loss2, on_step=True, prog_bar=False, logger=True)
+            loss, loss1, loss2 = self.model.loss(self.method, batch, x_hat,
+                                                 z_hat)
+            self.log("train_loss1", loss1, on_step=True, prog_bar=False,
+                     logger=True)
+            self.log("train_loss2", loss2, on_step=True, prog_bar=False,
+                     logger=True)
         elif self.method == "Autoencoder_jointly":
             z_hat, x_hat = self.forward(batch)
-            loss, loss1, loss2, loss3 = self.model.loss(self.method, batch, x_hat, z_hat)
-            self.log("train_loss1", loss1, on_step=True, prog_bar=False, logger=True)
-            self.log("train_loss2", loss2, on_step=True, prog_bar=False, logger=True)
-            self.log("train_loss3", loss3, on_step=True, prog_bar=False, logger=True)
+            loss, loss1, loss2, loss3 = self.model.loss(self.method, batch,
+                                                        x_hat, z_hat)
+            self.log("train_loss1", loss1, on_step=True, prog_bar=False,
+                     logger=True)
+            self.log("train_loss2", loss2, on_step=True, prog_bar=False,
+                     logger=True)
+            self.log("train_loss3", loss3, on_step=True, prog_bar=False,
+                     logger=True)
         elif self.method == "T":
             z = batch[:, self.z_idx_out]
             z_hat = self.forward(batch)
@@ -265,15 +274,22 @@ class Learner(pl.LightningModule):
         with torch.no_grad():
             if self.method == "Autoencoder":
                 z_hat, x_hat = self.forward(batch)
-                loss, loss1, loss2 = self.model.loss(self.method, batch, x_hat, z_hat)
-                self.log("val_loss1", loss1, on_step=True, prog_bar=False, logger=True)
-                self.log("val_loss2", loss2, on_step=True, prog_bar=False, logger=True)
+                loss, loss1, loss2 = self.model.loss(self.method, batch, x_hat,
+                                                     z_hat)
+                self.log("val_loss1", loss1, on_step=True, prog_bar=False,
+                         logger=True)
+                self.log("val_loss2", loss2, on_step=True, prog_bar=False,
+                         logger=True)
             elif self.method == "Autoencoder_jointly":
                 z_hat, x_hat = self.forward(batch)
-                loss, loss1, loss2, loss3 = self.model.loss(self.method, batch, x_hat, z_hat)
-                self.log("val_loss1", loss1, on_step=True, prog_bar=False, logger=True)
-                self.log("val_loss2", loss2, on_step=True, prog_bar=False, logger=True)
-                self.log("val_loss3", loss3, on_step=True, prog_bar=False, logger=True)
+                loss, loss1, loss2, loss3 = self.model.loss(self.method, batch,
+                                                            x_hat, z_hat)
+                self.log("val_loss1", loss1, on_step=True, prog_bar=False,
+                         logger=True)
+                self.log("val_loss2", loss2, on_step=True, prog_bar=False,
+                         logger=True)
+                self.log("val_loss3", loss3, on_step=True, prog_bar=False,
+                         logger=True)
             elif self.method == "T":
                 z = batch[:, self.z_idx_out]
                 z_hat = self.forward(batch)
@@ -333,7 +349,8 @@ class Learner(pl.LightningModule):
             plt.title("Training data")
             plt.xlabel(rf"$x_{i}$")
             plt.ylabel(rf"$x_{i + 1}$")
-            plt.savefig(os.path.join(self.results_folder, name), bbox_inches="tight")
+            plt.savefig(os.path.join(self.results_folder, name),
+                        bbox_inches="tight")
             if verbose:
                 plt.show()
 
@@ -355,19 +372,23 @@ class Learner(pl.LightningModule):
                 cbar = plt.colorbar()
                 cbar.set_label("Log estimation error")
                 plt.title(rf"RMSE between $x$ and $\hat{{x}}$: "
-                          rf"{np.mean(error.detach().numpy())}")
+                          rf"{np.mean(error.detach().numpy()):0.2g}")
                 plt.xlabel(rf"$x_{i}$")
                 plt.ylabel(rf"$x_{i + 1}$")
                 plt.legend()
-                plt.savefig(os.path.join(self.results_folder, name), bbox_inches="tight")
+                plt.savefig(os.path.join(self.results_folder, name),
+                            bbox_inches="tight")
                 if verbose:
                     plt.show()
                 plt.clf()
                 plt.close('all')
 
-    def save_trj(self, init_state, verbose, tsim, dt, var=0.2, z_0=None):
+    def save_trj(self, init_state, verbose, tsim, dt, var=0.2,
+                 traj_folder=None, z_0=None):
         # Estimation over the test trajectories with T_star
-        traj_folder = os.path.join(self.results_folder, "Test_trajectories")
+        if traj_folder is None:
+            traj_folder = os.path.join(self.results_folder,
+                                       "Test_trajectories/Traj_{var}")
         tq, simulation = self.system.simulate(init_state, tsim, dt)
 
         noise = torch.normal(0, var, size=(simulation.shape))
@@ -383,43 +404,43 @@ class Learner(pl.LightningModule):
         # TODO run predictions in parallel for all test trajectories!!!
         # Need to figure out how to interpolate y in parallel for all
         # trajectories!!!
-        y = torch.cat((tq.unsqueeze(1), measurement), dim=1)
+        y = torch.cat((tq.unsqueeze(1), measurement), dim=-1)
 
         estimation = self.model.predict(y, tsim, dt, z_0=z_0).detach()
         error = RMSE(simulation, estimation)
         traj_error += error
 
-        current_traj_folder = os.path.join(traj_folder, f"Traj_{var}")
-        os.makedirs(current_traj_folder, exist_ok=True)
-
         filename = f"RMSE.txt"
-        with open(os.path.join(current_traj_folder, filename), "w") as f:
+        with open(os.path.join(traj_folder, filename), "w") as f:
             print(error.cpu().numpy(), file=f)
 
         self.save_csv(
             simulation.cpu().numpy(),
-            os.path.join(current_traj_folder, f"True_traj.csv"),
+            os.path.join(traj_folder, f"True_traj.csv"),
         )
         self.save_csv(
             estimation.cpu().numpy(),
-            os.path.join(current_traj_folder, f"Estimated_traj.csv"),
+            os.path.join(traj_folder, f"Estimated_traj.csv"),
         )
 
         for j in range(estimation.shape[1]):
             name = "Traj" + str(j) + ".pdf"
             if j == 0:
-                plt.plot(tq, simulation_noise[:, j].detach().numpy(), '-', label=r"$y$")
-            plt.plot(tq, simulation[:, j].detach().numpy(), '--', label=rf"$x_{j + 1}$")
+                plt.plot(tq, simulation_noise[:, j].detach().numpy(), '-',
+                         label=r"$y$")
+            plt.plot(tq, simulation[:, j].detach().numpy(), '--',
+                     label=rf"$x_{j + 1}$")
             plt.plot(
-                tq, estimation[:, j].detach().numpy(), '-.', label=rf"$\hat{{x}}_{j + 1}$"
+                tq, estimation[:, j].detach().numpy(), '-.',
+                label=rf"$\hat{{x}}_{j + 1}$"
             )
             plt.legend(loc=1)
             plt.grid(visible=True)
-            plt.title(rf"Test trajectory, RMSE = {np.round(error.numpy(),4)}")
+            plt.title(rf"Test trajectory, RMSE = {np.round(error.numpy(), 4)}")
             plt.xlabel(rf"$t$")
             plt.ylabel(rf"$x_{j + 1}$")
             plt.savefig(
-                os.path.join(current_traj_folder, name), bbox_inches="tight"
+                os.path.join(traj_folder, name), bbox_inches="tight"
             )
             if verbose:
                 plt.show()
@@ -430,15 +451,26 @@ class Learner(pl.LightningModule):
         with open(os.path.join(traj_folder, filename), "w") as f:
             print(traj_error, file=f)
 
-
     def save_random_traj(self, x_mesh, num_samples, nb_trajs, verbose, tsim,
-                         dt, std=0., z_0=None):
+                         dt, std=0., traj_folder=None, z_0=None):
         with torch.no_grad():
             # Estimation over the test trajectories with T_star
-            random_idx = np.random.choice(np.arange(num_samples),
-                                          size=(nb_trajs,), replace=False)
-            trajs_init = x_mesh[random_idx]
-            traj_folder = os.path.join(self.results_folder, "Test_trajectories")
+            if traj_folder is None:
+                random_idx = np.random.choice(np.arange(num_samples),
+                                              size=(nb_trajs,), replace=False)
+                trajs_init = x_mesh[random_idx]
+                traj_folder = os.path.join(self.results_folder,
+                                           "Test_trajectories")
+            else:
+                nb_traj = len(next(os.walk(traj_folder))[1])
+                trajs_init = torch.zeros((nb_traj, self.model.dim_x))
+                for i in range(nb_traj):
+                    current_traj_folder = os.path.join(traj_folder, f'Traj_{i}')
+                    df = pd.read_csv(os.path.join(
+                        current_traj_folder, f'True_traj_{i}.csv'), sep=',',
+                        header=None)
+                    trajs_init[i] = torch.from_numpy(
+                        df.drop(df.columns[0], axis=1).values)[0]
             tq, simulation = self.system.simulate(trajs_init, tsim, dt)
 
             noise = torch.normal(0, std, size=(simulation.shape))
@@ -469,23 +501,28 @@ class Learner(pl.LightningModule):
                 )
                 self.save_csv(
                     estimation.cpu().numpy(),
-                    os.path.join(current_traj_folder, f"Estimated_traj_{i}.csv"),
+                    os.path.join(current_traj_folder,
+                                 f"Estimated_traj_{i}.csv"),
                 )
 
                 for j in range(estimation.shape[1]):
                     name = "Traj" + str(j) + ".pdf"
                     if j == 0:
-                        plt.plot(tq, simulation_noise[:,i, j].detach().numpy(), '-', label=r"$y$")
-                    plt.plot(tq, simulation[:,i, j].detach().numpy(), '--', label=rf"$x_{j + 1}$")
+                        plt.plot(tq, simulation_noise[:, i, j].detach().numpy(),
+                                 '-', label=r"$y$")
+                    plt.plot(tq, simulation[:, i, j].detach().numpy(), '--',
+                             label=rf"$x_{j + 1}$")
                     plt.plot(
-                        tq, estimation[:, j].detach().numpy(), '-.', label=rf"$\hat{{x}}_{j + 1}$"
+                        tq, estimation[:, j].detach().numpy(), '-.',
+                        label=rf"$\hat{{x}}_{j + 1}$"
                     )
                     plt.legend()
                     plt.grid(visible=True)
                     plt.xlabel(rf"$t$")
                     plt.ylabel(rf"$x_{j + 1}$")
                     plt.savefig(
-                        os.path.join(current_traj_folder, name), bbox_inches="tight"
+                        os.path.join(current_traj_folder, name),
+                        bbox_inches="tight"
                     )
                     if verbose:
                         plt.show()
@@ -514,13 +551,15 @@ class Learner(pl.LightningModule):
                 cbar = plt.colorbar()
                 cbar.set_label("Log estimation error")
                 if wc is not None:
-                    plt.title(rf"RMSE between $x$ and $T^*(T(x))$, $\omega_c$ = {wc:0.2g}")
+                    plt.title(
+                        rf"RMSE between $x$ and $T^*(T(x))$, $\omega_c$ = {wc:0.2g}")
                 else:
                     plt.title(r"RMSE between $x$ and $T^*(T(x))$")
                 plt.xlabel(rf"$x_{i}$")
                 plt.ylabel(rf"$x_{i + 1}$")
                 plt.legend()
-                plt.savefig(os.path.join(self.results_folder, name), bbox_inches="tight")
+                plt.savefig(os.path.join(self.results_folder, name),
+                            bbox_inches="tight")
                 if verbose:
                     plt.show()
 
@@ -532,7 +571,8 @@ class Learner(pl.LightningModule):
         plt.title(title)
         plt.yscale(y_scale)
         plt.legend()
-        plt.savefig(os.path.join(self.results_folder, name), bbox_inches="tight")
+        plt.savefig(os.path.join(self.results_folder, name),
+                    bbox_inches="tight")
         plt.clf()
         plt.close("all")
 
@@ -565,7 +605,8 @@ class Learner(pl.LightningModule):
                     plt.ylabel(rf"$x_{i + 1}$")
                     plt.legend()
                     plt.savefig(
-                        os.path.join(self.results_folder, name), bbox_inches="tight"
+                        os.path.join(self.results_folder, name),
+                        bbox_inches="tight"
                     )
                     if verbose:
                         plt.show()
@@ -573,16 +614,16 @@ class Learner(pl.LightningModule):
                     plt.close("all")
 
     def save_results(
-        self,
-        limits: np.array,
-        nb_trajs=10,
-        tsim=(0, 60),
-        dt=1e-2,
-        num_samples=10000,
-        method="uniform",
-        checkpoint_path=None,
-        verbose=False,
-        fast=False,
+            self,
+            limits: np.array,
+            nb_trajs=10,
+            tsim=(0, 60),
+            dt=1e-2,
+            num_samples=10000,
+            method='uniform',
+            checkpoint_path=None,
+            verbose=False,
+            fast=False,
     ):
         """
         Save the model, the training and validation data. Also saving several
@@ -672,12 +713,13 @@ class Learner(pl.LightningModule):
             print(f"Shape of mesh for evaluation: {mesh.shape}")
 
             self.save_pdf_heatmap(x_mesh, x_hat_star, verbose)
-            self.save_random_traj(x_mesh, num_samples, nb_trajs, verbose, tsim, dt)
+            self.save_random_traj(x_mesh, num_samples, nb_trajs, verbose, tsim,
+                                  dt)
 
             # Invertibility heatmap
             self.save_invert_heatmap(x_mesh, x_hat_AE, verbose)
 
             # Loss heatmap over space
             if not fast:  # Computing loss over grid is slow, most of all for AE
-                self.save_loss_grid(x_mesh, x_hat_AE, z_hat_T, x_hat_star, verbose)
-
+                self.save_loss_grid(x_mesh, x_hat_AE, z_hat_T, x_hat_star,
+                                    verbose)

@@ -40,8 +40,8 @@ if __name__ == "__main__":
 
     # Define data params
     x_limits = np.array([[-2.7, 2.7], [-2.7, 2.7]])
-    num_samples = 5000
-    init_wc = 0.5
+    num_samples = 70000
+    init_wc = 2.
 
     # Solver options
     solver_options = {'method': 'rk4', 'options': {'step_size': 1e-3}}
@@ -55,6 +55,7 @@ if __name__ == "__main__":
         num_hl=num_hl,
         size_hl=size_hl,
         solver_options=solver_options,
+        # D='diag',  # TODO
         wc=init_wc,
         recon_lambda=recon_lambda
     )

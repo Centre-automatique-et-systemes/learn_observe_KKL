@@ -158,4 +158,4 @@ if __name__ == "__main__":
         for std in std_array:
             init_state = torch.tensor([0.6, 0.6])
             learner.save_trj(init_state=init_state, verbose=False,
-                             tsim=(0, 50), dt=1e-2, var=std)#, z_0=z_0.view(-1,1))
+                             tsim=(0, 50), dt=1e-2, var=std)#, z_0=z_0.view(1,-1))

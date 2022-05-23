@@ -93,15 +93,14 @@ for more information.
 Copyright 2021 Lukas Bahr.
 """
 
-from xmlrpc.client import boolean
 import numpy as np
 import torch
 from scipy import linalg
 from scipy import signal
 from torch import nn
 from torchdiffeq import odeint
-from torchinterp1d import Interp1d
 
+from torchinterp1d import Interp1d
 from .utils import MSE, generate_mesh, MLPn
 
 # Set double precision by default
@@ -302,7 +301,8 @@ class LuenbergerObserver(nn.Module):
             self.F = torch.ones((self.dim_z, self.dim_y))
 
         # Model params
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device(
+            "cuda:0" if torch.cuda.is_available() else "cpu")
         self.recon_lambda = recon_lambda
 
         # Define encoder and decoder architecture
@@ -417,7 +417,8 @@ class LuenbergerObserver(nn.Module):
         (in order to avoid information loss you should strive for rankF = dim_y"""
         self.F = F
 
-    def set_DF(self, wc: float = 1.0, method: str = "block_diag") -> torch.tensor:
+    def set_DF(self, wc: float = 1.0,
+               method: str = "block_diag") -> torch.tensor:
         """
         Returns a matrix from the eigenvalues of a dim_z order
         bessel filter with a given cutoff frequency for a given
@@ -453,7 +454,8 @@ class LuenbergerObserver(nn.Module):
             # Indirect method to place poles of D with Bessel filter
             _, pO, _ = filter(self.dim_z, wc, analog=True, output="zpk")
             pO = np.sort(pO)
-            A = -np.array([[i] for i in range(1, self.dim_z + 1)]) * np.eye(self.dim_z)
+            A = -np.array([[i] for i in range(1, self.dim_z + 1)]) * np.eye(
+                self.dim_z)
             B = np.ones((self.dim_z, 1))
             whole_D = signal.place_poles(A, B, pO)
             if whole_D.rtol == 0 and B.shape[1] != 1:
@@ -532,7 +534,8 @@ class LuenbergerObserver(nn.Module):
                     ignore_next = False
                 else:
                     D[complex_idx - 1, complex_idx - 1] = 0.0
-                    D[complex_idx - 1, complex_idx] = -(v.real ** 2 + v.imag ** 2)
+                    D[complex_idx - 1, complex_idx] = -(
+                                v.real ** 2 + v.imag ** 2)
                     D[complex_idx, complex_idx - 1] = 1.0
                     D[complex_idx, complex_idx] = 2 * v.real
                     F[complex_idx] = torch.ones(self.dim_y)
@@ -634,16 +637,24 @@ class LuenbergerObserver(nn.Module):
 
         # Zero initial value
         if z_0 is None:
-            z_0 = torch.zeros((self.dim_z, 1))
+            # z_0 = torch.zeros((self.dim_z, 1))
+            z_0 = torch.zeros((1, self.dim_z))
 
         def dydt(t, z: torch.tensor):
             if self.u_1 == self.u:
-                z_dot = torch.matmul(self.D, z) + torch.matmul(self.F, measurement(t).t())
+                # z_dot = torch.matmul(self.D, z) + torch.matmul(self.F, measurement(t).t())
+                z_dot = torch.matmul(z, self.D.t()) + torch.matmul(
+                    measurement(t), self.F.t()
+                )
             else:
-                z_dot = (
-                    torch.matmul(self.D, z)
-                    + torch.matmul(self.F, measurement(t).t())
-                    + torch.mul(self.phi(z), self.u_1(t) - self.u(t))
+                # z_dot = (
+                #     torch.matmul(self.D, z)
+                #     + torch.matmul(self.F, measurement(t).t())
+                #     + torch.mul(self.phi(z), self.u_1(t) - self.u(t))
+                # )
+                z_dot = torch.matmul(z, self.D.t()) + torch.matmul(
+                    measurement(t), self.F.t() + torch.mul(
+                        self.phi(z), self.u_1(t) - self.u(t))
                 )
             return z_dot
 
@@ -653,7 +664,7 @@ class LuenbergerObserver(nn.Module):
         return tq, z
 
     def simulate_system(
-        self, y_0: torch.tensor, tsim: tuple, dt, only_x: bool = False
+            self, y_0: torch.tensor, tsim: tuple, dt, only_x: bool = False
     ) -> torch.tensor:
         """
         Simulate dynamical system and the corresponding Luenberger observer
@@ -683,8 +694,8 @@ class LuenbergerObserver(nn.Module):
         """
 
         def dydt(t, y):  # TODO only simulate x backward, z forward (interpol y)
-            x = y[..., : self.dim_x]  # TODO change notation y
-            z = y[..., self.dim_x :]
+            x = y[..., :self.dim_x]  # TODO change notation y
+            z = y[..., self.dim_x:]
             x_dot = self.f(x) + self.g(x) * self.u(t)
             if only_x:
                 z_dot = torch.zeros_like(z)
@@ -790,10 +801,12 @@ class LuenbergerObserver(nn.Module):
         data: torch.tensor
             Pairs of (x, z) data points.
         """
-        mesh = generate_mesh(limits=limits, num_samples=num_samples, method=method)
+        mesh = generate_mesh(limits=limits, num_samples=num_samples,
+                             method=method)
         num_samples = mesh.shape[0]  # in case regular grid: changed
         self.k = k
-        self.t_c = self.k / min(abs(linalg.eig(self.D.detach().numpy())[0].real))
+        self.t_c = self.k / min(
+            abs(linalg.eig(self.D.detach().numpy())[0].real))
 
         y_0 = torch.zeros((num_samples, self.dim_x + self.dim_z))  # TODO
         y_1 = y_0.clone()
@@ -811,16 +824,21 @@ class LuenbergerObserver(nn.Module):
             # initialize z with it value at t = - infinity
             y_1[:, self.dim_x:] = - torch.matmul(
                 torch.linalg.inv(self.D),
-                torch.matmul(self.F, self.h(data_bw[-1, :, : self.dim_x].t()))).t()
+                torch.matmul(self.F,
+                             self.h(data_bw[-1, :, : self.dim_x].t()))).t()
         elif z_0 == "encoder":
             if "noise" in self.method:
                 y_1[:, self.dim_x:] = self.encoder(
-                    torch.cat((y_1[:, : self.dim_x],
-                               torch.as_tensor(kwargs['w_c']).expand(len(y_1), 1)), dim=1))
+                    torch.cat((
+                        y_1[:, : self.dim_x],
+                        torch.as_tensor(kwargs['w_c']).expand(len(y_1), 1)),
+                        dim=1))
             else:
                 y_1[:, self.dim_x:] = self.encoder(y_1[:, : self.dim_x])
         elif z_0 is not None:
-            raise NotImplementedError(f"Method {z_0} for initializing z_0 for backward-forward sampling is not implemented.")
+            raise NotImplementedError(
+                f"Method {z_0} for initializing z_0 for backward-forward "
+                f"sampling is not implemented.")
         _, data_fw = self.simulate_system(y_1, tsim, dt)
 
         # Data contains (x_i, z_i) pairs in shape [number_simulations,
@@ -912,7 +930,8 @@ class LuenbergerObserver(nn.Module):
         return interp
 
     def loss_autoencoder(
-        self, x: torch.tensor, x_hat: torch.tensor, z_hat: torch.tensor, dim=None
+            self, x: torch.tensor, x_hat: torch.tensor, z_hat: torch.tensor,
+            dim=None
     ) -> torch.tensor:
         """
         Loss function for training the observer model with the autoencoder
@@ -967,7 +986,8 @@ class LuenbergerObserver(nn.Module):
 
         return loss_1 + loss_2, loss_1, loss_2
 
-    def loss_T(self, z: torch.tensor, z_hat: torch.tensor, dim=None) -> torch.tensor:
+    def loss_T(self, z: torch.tensor, z_hat: torch.tensor,
+               dim=None) -> torch.tensor:
         """
         Loss function for training only the forward transformation T.
 
@@ -992,7 +1012,7 @@ class LuenbergerObserver(nn.Module):
         return loss
 
     def loss_T_star(
-        self, x: torch.tensor, x_hat: torch.tensor, dim=None
+            self, x: torch.tensor, x_hat: torch.tensor, dim=None
     ) -> torch.tensor:
         """
         Loss function for training only the forward transformation T.
@@ -1121,6 +1141,7 @@ class LuenbergerObserver(nn.Module):
         """
         _, sol = self.simulate(measurement, tsim, dt, z_0)
 
-        x_hat = self.decoder(sol[:, :, 0])
+        # x_hat = self.decoder(sol[:, :, 0])
+        x_hat = self.decoder(sol[:, 0, :])
 
         return x_hat

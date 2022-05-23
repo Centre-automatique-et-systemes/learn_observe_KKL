@@ -1,18 +1,14 @@
 import os
-
 import random as rd
 
-from learn_KKL.learner import Learner
-
 import matplotlib.pyplot as plt
-import matplotlib as mpl
 import numpy as np
 import pandas as pd
 import seaborn as sb
 import torch
-from torch.nn import functional
 import torch.optim as optim
 
+from learn_KKL.learner import Learner
 from .utils import RMSE, StandardScaler
 
 # To avoid Type 3 fonts for submission https://tex.stackexchange.com/questions/18687/how-to-generate-pdf-without-any-type3-fonts
@@ -28,18 +24,18 @@ torch.set_default_dtype(torch.float64)
 
 class LearnerNoise(Learner):
     def __init__(
-        self,
-        observer,
-        system,
-        training_data,
-        validation_data,
-        method="Autoencoder",
-        batch_size=10,
-        lr=1e-3,
-        optimizer=optim.Adam,
-        optimizer_options=None,
-        scheduler=optim.lr_scheduler.ReduceLROnPlateau,
-        scheduler_options=None
+            self,
+            observer,
+            system,
+            training_data,
+            validation_data,
+            method="Autoencoder",
+            batch_size=10,
+            lr=1e-3,
+            optimizer=optim.Adam,
+            optimizer_options=None,
+            scheduler=optim.lr_scheduler.ReduceLROnPlateau,
+            scheduler_options=None
     ):
 
         super(LearnerNoise, self).__init__(
@@ -83,7 +79,7 @@ class LearnerNoise(Learner):
                                scaler_xout=self.scaler_xout,
                                scaler_zin=self.scaler_zin,
                                scaler_zout=self.scaler_zout)
-    
+
     def save_random_traj(self, x_mesh, w_c_arr, nb_trajs, verbose, tsim, dt,
                          std=0.01):
         with torch.no_grad():
@@ -98,8 +94,8 @@ class LearnerNoise(Learner):
             measurement = self.model.h(simulation)
             noise = (
                 torch.normal(0, std, size=(measurement.shape[0], 1))
-                .repeat(1, nb_trajs)
-                .unsqueeze(2)
+                    .repeat(1, nb_trajs)
+                    .unsqueeze(2)
             )
             measurement = measurement.add(noise)
 
@@ -131,16 +127,19 @@ class LearnerNoise(Learner):
                 )
                 self.save_csv(
                     estimation.cpu().numpy(),
-                    os.path.join(current_traj_folder, f"Estimated_traj_{i}.csv"),
+                    os.path.join(current_traj_folder,
+                                 f"Estimated_traj_{i}.csv"),
                 )
 
                 for j in range(estimation.shape[1]):
                     name = "Traj" + str(j) + ".pdf"
                     plt.plot(
-                        tq, simulation[:, i, j].detach().numpy(), label=rf"$x_{j + 1}$"
+                        tq, simulation[:, i, j].detach().numpy(),
+                        label=rf"$x_{j + 1}$"
                     )
                     plt.plot(
-                        tq, estimation[:, j].detach().numpy(), label=rf"$\hat{{x}}_{j + 1}$"
+                        tq, estimation[:, j].detach().numpy(),
+                        label=rf"$\hat{{x}}_{j + 1}$"
                     )
                     plt.legend(loc=1)
                     plt.title(rf"Random trajectory for $\omega_c$ {w_c:0.2g}, "
@@ -148,7 +147,8 @@ class LearnerNoise(Learner):
                     plt.xlabel(rf"$t$")
                     plt.ylabel(rf"$x_{j + 1}$")
                     plt.savefig(
-                        os.path.join(current_traj_folder, name), bbox_inches="tight"
+                        os.path.join(current_traj_folder, name),
+                        bbox_inches="tight"
                     )
                     if verbose:
                         plt.show()
@@ -164,7 +164,8 @@ class LearnerNoise(Learner):
         with torch.no_grad():
             # Estimation over the test trajectories with T_star
             nb_trajs += w_c_arr.shape[0]
-            traj_folder = os.path.join(self.results_folder, "Test_trajectories_{}".format(str(var)))
+            traj_folder = os.path.join(self.results_folder,
+                                       "Test_trajectories_{}".format(str(var)))
             tq, simulation = self.system.simulate(init_state, tsim, dt)
 
             noise = torch.normal(0, var, size=(simulation.shape))
@@ -191,8 +192,8 @@ class LearnerNoise(Learner):
                 if z_0 is None:
                     estimation = self.model.predict(y, tsim, dt, w_c).detach()
                 else:
-                    estimation = self.model.predict(y, tsim, dt, w_c,
-                                                    z_0=z_0[i].view(-1, 1)).detach()
+                    estimation = self.model.predict(
+                        y, tsim, dt, w_c, z_0=z_0[i].view(1, -1)).detach()
                 error = RMSE(simulation, estimation)
                 traj_error += error
 
@@ -200,7 +201,8 @@ class LearnerNoise(Learner):
                 os.makedirs(current_traj_folder, exist_ok=True)
 
                 filename = f"RMSE_{i}.txt"
-                with open(os.path.join(current_traj_folder, filename), "w") as f:
+                with open(os.path.join(current_traj_folder, filename),
+                          "w") as f:
                     print(error.cpu().numpy(), file=f)
 
                 self.save_csv(
@@ -209,17 +211,20 @@ class LearnerNoise(Learner):
                 )
                 self.save_csv(
                     estimation.cpu().numpy(),
-                    os.path.join(current_traj_folder, f"Estimated_traj_{i}.csv"),
+                    os.path.join(current_traj_folder,
+                                 f"Estimated_traj_{i}.csv"),
                 )
 
                 for j in range(estimation.shape[1]):
                     name = "Traj" + str(j) + ".pdf"
                     if j == 0:
                         plt.plot(
-                            tq, measurement[:, j].detach().numpy(), "-", label=r"$y$"
+                            tq, measurement[:, j].detach().numpy(), "-",
+                            label=r"$y$"
                         )
                     plt.plot(
-                        tq, simulation[:, j].detach().numpy(), "--", label=rf"$x_{j + 1}$"
+                        tq, simulation[:, j].detach().numpy(), "--",
+                        label=rf"$x_{j + 1}$"
                     )
                     plt.plot(
                         tq,
@@ -236,7 +241,8 @@ class LearnerNoise(Learner):
                     plt.xlabel(rf"$t$")
                     plt.ylabel(rf"$x_{j + 1}$")
                     plt.savefig(
-                        os.path.join(current_traj_folder, name), bbox_inches="tight"
+                        os.path.join(current_traj_folder, name),
+                        bbox_inches="tight"
                     )
                     if verbose:
                         plt.show()
@@ -267,7 +273,8 @@ class LearnerNoise(Learner):
             name = "RMSE_w_c.pdf"
             self.save_csv(
                 np.concatenate(
-                    (np.expand_dims(w_c_array, 1), np.expand_dims(errors, 1)), axis=1
+                    (np.expand_dims(w_c_array, 1), np.expand_dims(errors, 1)),
+                    axis=1
                 ),
                 os.path.join(self.results_folder, "RMSE.csv"),
             )
@@ -276,7 +283,8 @@ class LearnerNoise(Learner):
             plt.title(r"RMSE between $x$ and $\hat{x}$")
             plt.xlabel(rf"$\omega_c$")
             plt.ylabel(r"RMSE($x$, $\hat{x}$)")
-            plt.savefig(os.path.join(self.results_folder, name), bbox_inches="tight")
+            plt.savefig(os.path.join(self.results_folder, name),
+                        bbox_inches="tight")
             if verbose:
                 plt.show()
                 plt.close("all")
@@ -319,7 +327,8 @@ class LearnerNoise(Learner):
                     plt.xlabel(rf"$x_{i}$")
                     plt.ylabel(rf"$x_{i + 1}$")
                     plt.savefig(
-                        os.path.join(self.results_folder, name), bbox_inches="tight"
+                        os.path.join(self.results_folder, name),
+                        bbox_inches="tight"
                     )
                     if verbose:
                         plt.show()
@@ -353,7 +362,7 @@ class LearnerNoise(Learner):
                         path, f'xzi_data_wc{wc:0.2g}_{i}.pdf'),
                         bbox_inches='tight')
                     plt.xlabel(rf'$x_{i}$')
-                    plt.xlabel(rf'$x_{i+1}$')
+                    plt.xlabel(rf'$x_{i + 1}$')
                     plt.clf()
                     plt.close('all')
             else:
@@ -421,7 +430,8 @@ class LearnerNoise(Learner):
 
         plt.title("Gain tuning criterion")
 
-        plt.savefig(os.path.join(self.results_folder, name), bbox_inches="tight")
+        plt.savefig(os.path.join(self.results_folder, name),
+                    bbox_inches="tight")
 
         if verbose:
             plt.show()
@@ -430,14 +440,16 @@ class LearnerNoise(Learner):
         plt.close("all")
 
     def plot_traj_error(
-        self, init_state, w_c_arr, nb_trajs, verbose, tsim, dt, var=0.0,
+            self, init_state, w_c_arr, nb_trajs, verbose, tsim, dt, var=0.0,
             z_0=None
     ):
         with torch.no_grad():
             # Estimation over the test trajectories with T_star
 
             nb_trajs += w_c_arr.shape[0]
-            traj_folder = os.path.join(self.results_folder, "Test_trajectories_error_{}".format(str(var)))
+            traj_folder = os.path.join(self.results_folder,
+                                       "Test_trajectories_error_{}".format(
+                                           str(var)))
             tq, simulation = self.system.simulate(init_state, tsim, dt)
 
             noise = torch.normal(0, var, size=(simulation.shape[0], 2))
@@ -468,7 +480,7 @@ class LearnerNoise(Learner):
                     estimation = self.model.predict(y, tsim, dt, w_c).detach()
                 else:
                     estimation = self.model.predict(
-                        y, tsim, dt, w_c, z_0=z_0[i].view(-1, 1)).detach()
+                        y, tsim, dt, w_c, z_0=z_0[i].view(1, -1)).detach()
                 error = RMSE(simulation, estimation)
                 traj_error += error
 
@@ -476,7 +488,8 @@ class LearnerNoise(Learner):
                 os.makedirs(current_traj_folder, exist_ok=True)
 
                 filename = f"RMSE_{i}.txt"
-                with open(os.path.join(current_traj_folder, filename), "w") as f:
+                with open(os.path.join(current_traj_folder, filename),
+                          "w") as f:
                     print(error.cpu().numpy(), file=f)
 
                 self.save_csv(
@@ -485,7 +498,8 @@ class LearnerNoise(Learner):
                 )
                 self.save_csv(
                     estimation.cpu().numpy(),
-                    os.path.join(current_traj_folder, f"Estimated_traj_{i}.csv"),
+                    os.path.join(current_traj_folder,
+                                 f"Estimated_traj_{i}.csv"),
                 )
 
                 self.save_csv(
@@ -498,7 +512,8 @@ class LearnerNoise(Learner):
                 plt.plot(
                     tq,
                     # estimation[:, 1].cpu().numpy() - simulation[:, 1].cpu().numpy(),
-                    np.sum(estimation.cpu().numpy() - simulation.cpu().numpy(), axis=1),
+                    np.sum(estimation.cpu().numpy() - simulation.cpu().numpy(),
+                           axis=1),
                     plot_style[i],
                     linewidth=0.8,
                     markersize=1,
@@ -511,7 +526,8 @@ class LearnerNoise(Learner):
             plt.xlabel(rf"$t$")
             # plt.ylabel(rf"$\hat{{x}}_{2}-x_{2}$")
             plt.ylabel(rf"$\hat{{x}}-x$")
-            plt.savefig(os.path.join(current_traj_folder, name), bbox_inches="tight")
+            plt.savefig(os.path.join(current_traj_folder, name),
+                        bbox_inches="tight")
             if verbose:
                 plt.show()
             plt.clf()
@@ -524,9 +540,11 @@ class LearnerNoise(Learner):
     def plot_traj_sens(self, init_state, w_c_array, t_sim, dt, verbose):
 
         # Estimation over the test trajectories with T_star
-        traj_folder = os.path.join(self.results_folder, "Test_trajectories_noise")
+        traj_folder = os.path.join(self.results_folder,
+                                   "Test_trajectories_noise")
         tq, simulation = self.system.simulate(init_state, t_sim, dt)
-        noise = torch.normal(0, 0.01, size=(simulation.shape[0], simulation.shape[1]))
+        noise = torch.normal(0, 0.01,
+                             size=(simulation.shape[0], simulation.shape[1]))
         simulation = simulation.add(noise)
         measurement = self.model.h(simulation)
 
@@ -563,9 +581,11 @@ class LearnerNoise(Learner):
 
             for j in range(estimation.shape[1]):
                 name = "Traj" + str(j) + ".pdf"
-                plt.plot(tq, simulation[:, j].detach().numpy(), label=rf"$x_{j + 1}$")
+                plt.plot(tq, simulation[:, j].detach().numpy(),
+                         label=rf"$x_{j + 1}$")
                 plt.plot(
-                    tq, estimation[:, j].detach().numpy(), label=rf"$\hat{{x}}_{j + 1}$"
+                    tq, estimation[:, j].detach().numpy(),
+                    label=rf"$\hat{{x}}_{j + 1}$"
                 )
                 plt.plot(tq, sensitivity[:, j].detach().numpy())
                 plt.legend(loc=1)
@@ -584,7 +604,9 @@ class LearnerNoise(Learner):
         with torch.no_grad():
             # Estimation over the test trajectories with T_star
             nb_trajs = w_c_arr.shape[0]
-            traj_folder = os.path.join(self.results_folder, "Test_trajectories_RMSE_{}".format(str(std)))
+            traj_folder = os.path.join(self.results_folder,
+                                       "Test_trajectories_RMSE_{}".format(
+                                           str(std)))
             tq, simulation = self.system.simulate(init_state, tsim, dt)
 
             noise = torch.normal(0, std, size=(simulation.shape[0], 2))
@@ -618,7 +640,8 @@ class LearnerNoise(Learner):
                 os.makedirs(current_traj_folder, exist_ok=True)
 
                 filename = f"RMSE_{i}.txt"
-                with open(os.path.join(current_traj_folder, filename), "w") as f:
+                with open(os.path.join(current_traj_folder, filename),
+                          "w") as f:
                     print(error.cpu().numpy(), file=f)
 
                 self.save_csv(
@@ -627,13 +650,15 @@ class LearnerNoise(Learner):
                 )
                 self.save_csv(
                     estimation.cpu().numpy(),
-                    os.path.join(current_traj_folder, f"Estimated_traj_{i}.csv"),
+                    os.path.join(current_traj_folder,
+                                 f"Estimated_traj_{i}.csv"),
                 )
 
                 os.makedirs(current_traj_folder, exist_ok=True)
 
                 filename = f"RMSE_{i}.txt"
-                with open(os.path.join(current_traj_folder, filename), "w") as f:
+                with open(os.path.join(current_traj_folder, filename),
+                          "w") as f:
                     print(error.cpu().numpy(), file=f)
 
                 # for i in range(simulation.shape[1]):
@@ -652,7 +677,8 @@ class LearnerNoise(Learner):
             plt.title(rf"Test trajectory RMSE")
             plt.xlabel(rf"$t$")
             plt.ylabel(rf"$\hat{{x}}-x$")
-            plt.savefig(os.path.join(current_traj_folder, name), bbox_inches="tight")
+            plt.savefig(os.path.join(current_traj_folder, name),
+                        bbox_inches="tight")
             if verbose:
                 plt.show()
             plt.clf()
@@ -661,10 +687,9 @@ class LearnerNoise(Learner):
             filename = "RMSE_traj.txt"
             with open(os.path.join(traj_folder, filename), "w") as f:
                 print(traj_error, file=f)
-    
 
     def save_results(
-        self, checkpoint_path=None,
+            self, checkpoint_path=None,
     ):
         """
         Save the model, the training and validation data. Also saving several
@@ -703,4 +728,3 @@ class LearnerNoise(Learner):
             with open(specs_file, "a") as f:
                 print(f"k {self.model.k}", file=f)
                 print(f"t_c {self.model.t_c}", file=f)
-

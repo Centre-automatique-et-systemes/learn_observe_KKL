@@ -161,4 +161,4 @@ if __name__ == "__main__":
             z_0 = learner.model.encoder(init_state)
             print(z_0, learner.model.decoder(z_0))
             learner.save_trj(init_state=init_state, verbose=False,
-                             tsim=(0, 20), dt=1e-2, var=std)#, z_0=z_0.view(-1,1))
+                             tsim=(0, 20), dt=1e-2, var=std)#, z_0=z_0.(1,-1))
