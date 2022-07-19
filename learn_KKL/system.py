@@ -170,7 +170,7 @@ class System:
             self.u = self.sin_controller
         elif controller == "lin_chirp_controller":
             self.u = self.lin_chirp_controller
-
+        
     def simulate(self, x_0: torch.tensor, tsim: tuple, dt) -> torch.tensor:
         """
         Simulates the system for given params.
@@ -356,6 +356,14 @@ class RevDuffing(System):
 
     def __repr__(self):
         return "Reversed_Duffing_Oscillator"
+    
+    def generate_mesh(self,limits: tuple, num_samples: int, method)-> torch.tensor:
+        if method == 'uniform':
+            mesh = np.linspace(limits[0],limits[1],num_samples)
+            X,Y = np.meshgrid(mesh,mesh)
+            mesh = np.stack((X,Y),-1)
+            mesh = mesh.reshape(num_samples**2,2)
+            return torch.from_numpy(mesh)
 
 
 class VanDerPol(System):

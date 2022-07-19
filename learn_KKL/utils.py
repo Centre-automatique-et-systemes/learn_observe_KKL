@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from smt.sampling_methods import LHS
+from learn_KKL.raffinement import *
 from scipy import linalg
 
 # Set double precision by default
@@ -27,6 +28,7 @@ def generate_mesh(
 
     method: str
         Use 'LHS' or 'uniform'.
+        New : adaptative.
 
     Returns
     ----------
@@ -35,27 +37,38 @@ def generate_mesh(
     """
 
     # Sample either a uniform grid or use latin hypercube sampling
-    if method == 'uniform':
-        # Linspace upper bound and cut additional samples at random (
-        # otherwise all cut in the same region!)
-        axes = np.linspace(limits[:, 0], limits[:, 1], int(np.ceil(np.power(
-            num_samples, 1/len(limits)))))
-        axes_list = [axes[:, i] for i in range(axes.shape[1])]
-        mesh = np.array(np.meshgrid(*axes_list)).T.reshape(-1, axes.shape[1])
-        del_samples = len(mesh) - num_samples
-        if del_samples > 0:
-            idx = np.random.choice(np.arange(len(mesh)),
-                                   size=(del_samples,), replace=False)
-            print(f'Computed the smallest possible uniform grid for the '
-                  f'given dimensions, then deleted {del_samples} samples '
-                  f'randomly to match the desired number of samples '
-                  f'{num_samples}.')
-            mesh = np.delete(mesh, idx, axis=0)
-    elif method == "LHS":
-        sampling = LHS(xlimits=limits)
-        mesh = sampling(num_samples)
-    else:
-        raise NotImplementedError(f"The method {method} is not implemented")
+    match method:
+        case "uniform":
+            # Linspace upper bound and cut additional samples at random (
+            # otherwise all cut in the same region!)
+            num_samples = num_samples[0]*num_samples[1]
+            axes = np.linspace(limits[:, 0], limits[:, 1], int(np.ceil(np.power(
+                num_samples, 1/len(limits)))))
+            axes_list = [axes[:, i] for i in range(axes.shape[1])]
+            mesh = np.array(np.meshgrid(*axes_list)).T.reshape(-1, axes.shape[1])
+            del_samples = len(mesh) - num_samples
+            if del_samples > 0:
+                idx = np.random.choice(np.arange(len(mesh)),
+                                       size=(del_samples,), replace=False)
+                print(f'Computed the smallest possible uniform grid for the '
+                      f'given dimensions, then deleted {del_samples} samples '
+                      f'randomly to match the desired number of samples '
+                      f'{num_samples}.')
+                mesh = np.delete(mesh, idx, axis=0)
+        case "LHS":
+            num_samples = num_samples[0] * num_samples[1]
+            sampling = LHS(xlimits=limits)
+            mesh = sampling(num_samples)
+        case "adaptative":
+            lx,ly = limits[0,1] - limits[0,0], limits[1,1] - limits[1,0]
+            Ox,Oy = limits[0,0],limits[1,0]
+            Nx,Ny = num_samples
+            geometry = [lx,ly,Nx,Ny,Ox,Oy]
+            grid = init_grid(geometry)
+            X,Y = coordinate(grid)
+            mesh = np.stack((X,Y),-1)
+        case _:
+            raise NotImplementedError(f"The method {method} is not implemented")
 
     return torch.as_tensor(mesh)
 

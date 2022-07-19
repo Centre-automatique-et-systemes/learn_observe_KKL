@@ -696,10 +696,6 @@ class Learner(pl.LightningModule):
                 self.val_loss.detach(),
             )
 
-            # No control theoretic evaluation of the observer with only T
-            if self.method == "T":
-                return 0
-
             # Heatmap of RMSE(x, x_hat) with T_star
             mesh = self.model.generate_data_svl(limits, num_samples,
                                                 method=method)
@@ -715,7 +711,7 @@ class Learner(pl.LightningModule):
             self.save_pdf_heatmap(x_mesh, x_hat_star, verbose)
             self.save_random_traj(x_mesh, num_samples, nb_trajs, verbose, tsim,
                                   dt)
-
+            print('salut')
             # Invertibility heatmap
             self.save_invert_heatmap(x_mesh, x_hat_AE, verbose)
 
@@ -723,3 +719,7 @@ class Learner(pl.LightningModule):
             if not fast:  # Computing loss over grid is slow, most of all for AE
                 self.save_loss_grid(x_mesh, x_hat_AE, z_hat_T, x_hat_star,
                                     verbose)
+
+            # No control theoretic evaluation of the observer with only T
+            if self.method == "T":
+                return 0
