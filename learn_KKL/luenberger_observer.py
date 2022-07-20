@@ -801,7 +801,7 @@ class LuenbergerObserver(nn.Module):
         data: torch.tensor
             Pairs of (x, z) data points.
         """
-        mesh = generate_mesh(limits=limits, num_samples=num_samples,
+        mesh,grid = generate_mesh(limits=limits, num_samples=num_samples,
                              method=method)
         num_samples = mesh.shape[0]  # in case regular grid: changed
         self.k = k
@@ -844,7 +844,119 @@ class LuenbergerObserver(nn.Module):
         # Data contains (x_i, z_i) pairs in shape [number_simulations,
         # dim_x + dim_z]
         data = data_fw[-1]
+        return data,grid
+
+    def generate_Z_grid(
+            self,
+            mesh,
+            k: int = 10,
+            dt: float = 1e-2,
+            z_0=None,
+            **kwargs,
+    ):
+        """
+        Generate Z on the given mesh by simulating the system backward and
+        forward in time.
+
+        Parameters
+        ----------
+        mesh: torch.tensor
+            the non uniform grid
+
+        k: int
+            Parameter for t_c = k/min(lambda)
+
+        dt: float
+            Simulation step.
+
+        method: string
+            Method for sampling the initial conditions (uniform or LHS).
+
+        z_0: string
+            Initial value for observer state: default is 0 (None), options are
+            infty (initializes z at its value at t= - infinity) or encoder (initializes z(0) = self.encoder(x(0)).
+
+        Returns
+        ----------
+        data: torch.tensor
+            Pairs of (x, z) data points.
+        """
+        num_samples = mesh.shape[0]  # in case regular grid: changed
+        self.k = k
+        self.t_c = self.k / min(
+            abs(linalg.eig(self.D.detach().numpy())[0].real))
+
+        y_0 = torch.zeros((num_samples, self.dim_x + self.dim_z))  # TODO
+        y_1 = y_0.clone()
+
+        # Simulate only x system backward in time
+        tsim = (0, -self.t_c)
+        y_0[:, : self.dim_x] = mesh
+        _, data_bw = self.simulate_system(y_0, tsim, -dt, only_x=True)
+
+        # Simulate both x and z forward in time starting from the last point
+        # from previous simulation
+        tsim = (-self.t_c, 0)
+        y_1[:, : self.dim_x] = data_bw[-1, :, : self.dim_x]
+        if z_0 == "infty":
+            # initialize z with it value at t = - infinity
+            y_1[:, self.dim_x:] = - torch.matmul(
+                torch.linalg.inv(self.D),
+                torch.matmul(self.F,
+                             self.h(data_bw[-1, :, : self.dim_x].t()))).t()
+        elif z_0 == "encoder":
+            if "noise" in self.method:
+                y_1[:, self.dim_x:] = self.encoder(
+                    torch.cat((
+                        y_1[:, : self.dim_x],
+                        torch.as_tensor(kwargs['w_c']).expand(len(y_1), 1)),
+                        dim=1))
+            else:
+                y_1[:, self.dim_x:] = self.encoder(y_1[:, : self.dim_x])
+        elif z_0 is not None:
+            raise NotImplementedError(
+                f"Method {z_0} for initializing z_0 for backward-forward "
+                f"sampling is not implemented.")
+        _, data_fw = self.simulate_system(y_1, tsim, dt)
+
+        # Data contains (x_i, z_i) pairs in shape [number_simulations,
+        # dim_x + dim_z]
+        data = data_fw[-1]
         return data
+
+    def iterate(self,data1,grid1,data2,grid2,data3,grid3):
+        """
+        Itère les 3 grilles pour raffiner respectivement sur data1[:,2],data2[:,3],data3[:,4]
+
+        Retourne les trois ensembles (data1,grid1), (data2,grid2), (data3,grid3)
+        """
+        from learn_KKL.raffinement import iterate_grid,coordinate
+        # une itération de raffinement/raffinement indépendant pour chaque dimension de Z
+        grid1 = iterate_grid(grid1, data1[:, 2], True)
+        x1, y1 = coordinate(grid1)
+
+        grid2 = iterate_grid(grid2, data2[:, 3], True)
+        x2, y2 = coordinate(grid2)
+
+        grid3 = iterate_grid(grid3, data3[:, 4], True)
+        x3, y3 = coordinate(grid3)
+
+        # calcul de Z sur chaque nouvelle grille
+        mesh1 = np.stack((x1, y1), -1)
+        mesh1 = torch.as_tensor(mesh1)
+        data1 = self.generate_Z_grid(mesh1)
+
+        mesh2 = np.stack((x2, y2), -1)
+        mesh2 = torch.as_tensor(mesh2)
+        data2 = self.generate_Z_grid(mesh2)
+
+        mesh3 = np.stack((x3, y3), -1)
+        mesh3 = torch.as_tensor(mesh3)
+        data3 = self.generate_Z_grid(mesh3)
+
+        return data1, grid1, data2, grid2, data3, grid3
+
+
 
     def generate_data_forward(self, init: torch.tensor, tsim: tuple,
                               num_datapoints: int, k: int = 10,

@@ -55,10 +55,12 @@ def generate_mesh(
                       f'randomly to match the desired number of samples '
                       f'{num_samples}.')
                 mesh = np.delete(mesh, idx, axis=0)
+            return torch.as_tensor(mesh),0
         case "LHS":
             num_samples = num_samples[0] * num_samples[1]
             sampling = LHS(xlimits=limits)
             mesh = sampling(num_samples)
+            return torch.as_tensor(mesh),0
         case "adaptative":
             lx,ly = limits[0,1] - limits[0,0], limits[1,1] - limits[1,0]
             Ox,Oy = limits[0,0],limits[1,0]
@@ -67,10 +69,11 @@ def generate_mesh(
             grid = init_grid(geometry)
             X,Y = coordinate(grid)
             mesh = np.stack((X,Y),-1)
+            return torch.as_tensor(mesh),grid
         case _:
             raise NotImplementedError(f"The method {method} is not implemented")
 
-    return torch.as_tensor(mesh)
+
 
 
 def compute_h_infinity(

@@ -253,9 +253,10 @@ def gradient(cell,nx,ny,Coeffs):
     "compute the gradient of the cell from the surrogate model where the cell is located"
     x,y = cell.center
     Lx,Ly = cell.geometry[0:2]
-    ix,iy = int(x/(Lx/nx)), int(y/(Ly/ny))
+    Ox, Oy = cell.geometry[4:6]
+    ix, iy = int((x - Ox) / (Lx / nx)), int((y - Oy) / (Ly / ny))
     # degré 4
-    [a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,a11,a12,a13,a14,a15] = Coeffs[iy*nx+ix]
-    gx = 4*a1*x**3 + 3*a2*x**2*y + 2*a3*x*y**2 + a4*y**3 + 3*a6*x**2 + 2*a7*x*y + a8*y**2 + 2*a10*x + a11*y + a13
-    gy = a2*x**3 + 2*a3*x**2*y + 3*a4*x*y**2 + 4*a5*y**3 + a7*x**2 + 2*a8*x*y + 3*a9*y**2 + a11*x + 2*a12*y + a14
+    [a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15] = Coeffs[iy * nx + ix]
+    gx = 4 * a1 * x ** 3 + 3 * a2 * x ** 2 * y + 2 * a3 * x * y ** 2 + a4 * y ** 3 + 3 * a6 * x ** 2 + 2 * a7 * x * y + a8 * y ** 2 + 2 * a10 * x + a11 * y + a13
+    gy = a2 * x ** 3 + 2 * a3 * x ** 2 * y + 3 * a4 * x * y ** 2 + 4 * a5 * y ** 3 + a7 * x ** 2 + 2 * a8 * x * y + 3 * a9 * y ** 2 + a11 * x + 2 * a12 * y + a14
     return abs(gx),abs(gy)
