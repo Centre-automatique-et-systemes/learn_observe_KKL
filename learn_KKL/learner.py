@@ -697,7 +697,7 @@ class Learner(pl.LightningModule):
             )
 
             # Heatmap of RMSE(x, x_hat) with T_star
-            mesh = self.model.generate_data_svl(limits, num_samples,
+            mesh,_ = self.model.generate_data_svl(limits, num_samples,
                                                 method=method)
             x_mesh = mesh[:, self.x_idx_out]
             z_mesh = mesh[:, self.z_idx_out]

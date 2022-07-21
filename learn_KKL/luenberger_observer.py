@@ -749,7 +749,7 @@ class LuenbergerObserver(nn.Module):
             if stack is False, shape (tsim * num_samples, dx+dz) if True.
         """
         # Get initial conditions for x,z from backward forward sampling
-        y_0 = self.generate_data_svl(
+        y_0, _ = self.generate_data_svl(
             limits=limits, num_samples=num_samples, method=method, k=k, dt=dt
         )
         # Simulate x(t), z(t) to obtain trajectories for tsim
