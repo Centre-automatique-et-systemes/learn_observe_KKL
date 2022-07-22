@@ -71,6 +71,7 @@ Copyright 2021 Lukas Bahr.
 
 from math import pi
 
+import copy
 import numpy as np
 import torch
 from scipy import signal
@@ -434,13 +435,13 @@ class QuanserQubeServo2(System):
     https://github.com/BlueRiverTech/quanser-openai-driver/blob/main/gym_brt/quanser/qube_simulator.py.
 
     State: (theta, alpha, theta_dot, alpha_dot)
-    Measurement: alpha
+    Measurement: (theta, alpha)
     """
 
     def __init__(self):
         super().__init__()
         self.dim_x = 4
-        self.dim_y = 1
+        self.dim_y = 2
 
         # Motor
         self.Rm = 8.4  # Resistance
@@ -539,15 +540,35 @@ class QuanserQubeServo2(System):
         return xdot
 
     def h(self, x):
-        return torch.unsqueeze(x[..., 1], dim=-1)
+        return x[..., :2]
 
     def g(self, x):
         xdot = torch.zeros_like(x)
         xdot[..., 1] = torch.ones_like(x[..., 1])
         return xdot
 
+    # For flexibility and coherence: use remap function after every simulation
+    # But be prepared to change its behavior!
+    def remap_angles(self, traj):
+        # Map theta to [-pi,pi] and alpha to [0, 2pi]
+        traj[..., 0] = ((traj[..., 0] + np.pi) % (2 * np.pi)) - np.pi
+        traj[..., 1] = traj[..., 1] % (2 * np.pi)
+        return traj
+
+    # For adapting hardware data to the conventions of the simulation model
+    def remap_hardware_angles(self, traj, add_pi_alpha=False):
+        # Reorder as (theta, alpha, thetadot, alphadot)
+        # Convention for alpha: 0 is upwards (depends on dataset!)
+        # Remap as simulation data
+        traj_copy = copy.deepcopy(traj)
+        traj[..., 0], traj[..., 1] = traj_copy[..., 1], traj_copy[..., 0]
+        traj[..., 2], traj[..., 3] = traj_copy[..., 3], traj_copy[..., 2]
+        if add_pi_alpha:
+            traj[..., 1] += np.pi
+        return self.remap_angles(traj)
+
     def __repr__(self):
-        return "QuanserQubeServo2"
+        return "QuanserQubeServo2_meas12"
 
     # Useful functions for EKF
     def __call__(self, t, x, u, t0, init_control, process_noise_var, kwargs,
@@ -570,14 +591,14 @@ class QuanserQubeServo2(System):
 
 class QuanserQubeServo2_meas2(QuanserQubeServo2):
     """
-    Same as QuanserQubeServo2 except we measure both theta and alpha.
+    Same as QuanserQubeServo2 except we measure only alpha.
     """
     def __init__(self):
         super().__init__()
-        self.dim_y = 2
+        self.dim_y = 1
 
     def h(self, x):
-        return x[..., :2]
+        return torch.unsqueeze(x[..., 1], dim=-1)
 
     def __repr__(self):
         return "QuanserQubeServo2_meas2"
@@ -589,6 +610,7 @@ class QuanserQubeServo2_meas1(QuanserQubeServo2):
     """
     def __init__(self):
         super().__init__()
+        self.dim_y = 1
 
     def h(self, x):
         return torch.unsqueeze(x[..., 0], dim=-1)

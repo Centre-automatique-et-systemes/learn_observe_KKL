@@ -15,9 +15,9 @@ sys.path.append(working_path)
 
 # Import KKL observer
 from learn_KKL.learner import Learner
-from learn_KKL.system import QuanserQubeServo2
+from learn_KKL.system import QuanserQubeServo2_meas1
 from learn_KKL.luenberger_observer import LuenbergerObserver
-from learn_KKL.utils import generate_mesh, RMSE
+from learn_KKL.utils import RMSE
 from learn_KKL.filter_utils import EKF_ODE, interpolate_func, \
     dynamics_traj_observer
 
@@ -26,16 +26,14 @@ import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 from sklearn.model_selection import train_test_split
-from torchdiffeq import odeint
 import torch.optim as optim
-import sys
 import os
 import matplotlib.pyplot as plt
 
 # Script to learn a KKL observer from simulations of the Quanser Qube 2,
 # test it on experimental data, and compare with EKF.
 # Quanser Qube: state (theta, alpha, thetadot, alphadot),
-# measurement (alpha)
+# measurement (theta)
 
 # For continuous data need theta in [-pi, pi] and alpha in [0, 2pi]: only
 # managed to train KKL for angles that stay in this range! Rigorously should
@@ -57,30 +55,24 @@ if __name__ == "__main__":
     recon_lambda = 0.1
 
     # Define system
-    system = QuanserQubeServo2()
+    system = QuanserQubeServo2_meas1()
 
     # Define data params (same characteristics as experimental data)
     dt = 0.004
     tsim = (0, 2000 * dt)
-    # tsim = (0, 1.)
-    init_wc = 4.
+    init_wc = 3.
     traj_data = True  # whether to generate data on grid or from trajectories
-    add_forward = True
+    add_forward = False
     if traj_data:  # TODO
-        num_initial_conditions = 10000  # 20
+        num_initial_conditions = 100
         x_limits = np.array([[-0.5, 0.5], [0., 1.], [-0.1, 0.1], [-0.1, 0.1]])
-        # x_limits = np.array(
-        #     [[0.0, 0.001], [0.05, 0.1], [0.0, 0.001], [0.0, 0.001]])
     else:
         num_samples = int(1e5)
-        # x_limits = np.array([[-np.pi, np.pi], [0, 2 * np.pi],
-        #                      [-10., 10.], [-10., 10.]])
-        x_limits = np.array([[-0.5, 0.5], [0., 1.],
-                             [-1., 1.], [-1., 1.]])
+        x_limits = np.array([[-0.5, 0.5], [0., 1.], [-1., 1.], [-1., 1.]])
 
     # Solver options
-    solver_options = {'method': 'rk4', 'options': {'step_size': 1e-3}}
-    # solver_options = {'method': 'dopri5'}
+    # solver_options = {'method': 'rk4', 'options': {'step_size': 1e-3}}
+    solver_options = {'method': 'dopri5'}
 
     # Create the observer
     observer = LuenbergerObserver(
@@ -95,33 +87,15 @@ if __name__ == "__main__":
             x_limits, num_initial_conditions, method="LHS", tsim=tsim,
             stack=False, dt=dt
         )
-        theta = data[..., 0]
-        alpha = data[..., 1]
-        # Map to [-pi,pi]
-        theta = ((theta + np.pi) % (2 * np.pi)) - np.pi
-        # alpha = ((alpha + np.pi) % (2 * np.pi)) - np.pi
-        # Map to [0, 2pi]
-        # theta = theta % (2 * np.pi)
-        alpha = alpha % (2 * np.pi)
-        data[..., 0] = theta
-        data[..., 1] = alpha
+        data = system.remap_angles(data)  # remap angles to stay in compact
         data_ordered = copy.deepcopy(data)
         data = torch.cat(torch.unbind(data, dim=1), dim=0)
-        if add_forward:  # TODO add forward trajectory to have stable data
+        if add_forward:  # TODO add one forward trajectory to dataset
             init = torch.tensor([0., 0.1, 0., 0.] + [0.] * observer.dim_z)
             data_forward = observer.generate_data_forward(
                 init=init, tsim=(0, 10),
                 num_datapoints=2000, k=10, dt=dt, stack=True)
-            theta_forward = data_forward[..., 0]
-            alpha_forward = data_forward[..., 1]
-            # Map to [-pi,pi]
-            theta_forward = ((theta_forward + np.pi) % (2 * np.pi)) - np.pi
-            # alpha_forward = ((alpha_forward + np.pi) % (2 * np.pi)) - np.pi
-            # Map to [0, 2pi]
-            # theta_forward = theta_forward % (2 * np.pi)
-            alpha_forward = alpha_forward % (2 * np.pi)
-            data_forward[..., 0] = theta_forward
-            data_forward[..., 1] = alpha_forward
+            data_forward = system.remap_angles(data_forward)
             data = torch.cat((data, data_forward), dim=0)
     else:
         data = observer.generate_data_svl(
@@ -132,16 +106,7 @@ if __name__ == "__main__":
                 init=init, tsim=(0, 10),
                 num_datapoints=2000, k=10, dt=dt, stack=True)
             data = torch.cat((data, data_forward), dim=0)
-        theta = data[..., 0]
-        alpha = data[..., 1]
-        # Map to [-pi,pi]
-        theta = ((theta + np.pi) % (2 * np.pi)) - np.pi
-        # alpha = ((alpha + np.pi) % (2 * np.pi)) - np.pi
-        # Map to [0, 2pi]
-        # theta = theta % (2 * np.pi)
-        alpha = alpha % (2 * np.pi)
-        data[..., 0] = theta
-        data[..., 1] = alpha
+        data = system.remap_angles(data)  # remap angles to stay in compact
     data, val_data = train_test_split(data, test_size=0.3, shuffle=False)
 
     print(data.shape)
@@ -154,7 +119,7 @@ if __name__ == "__main__":
     num_epochs = 100
     trainer_options = {"max_epochs": num_epochs}
     if traj_data:
-        batch_size = 20
+        batch_size = 100
         init_learning_rate = 1e-2
     else:
         batch_size = 20
@@ -198,6 +163,10 @@ if __name__ == "__main__":
     learner.traj_data = traj_data  # TODO to keep track
     learner.x0_limits = x_limits
     learner.add_forward = add_forward
+    if traj_data:
+        learner.num_initial_conditions = num_initial_conditions
+    else:
+        learner.num_samples = num_samples
 
     # Define logger and checkpointing
     logger = TensorBoardLogger(save_dir=learner.results_folder + "/tb_logs")
@@ -207,7 +176,7 @@ if __name__ == "__main__":
         **trainer_options,
         logger=logger,
         log_every_n_steps=1,
-        check_val_every_n_epoch=3
+        check_val_every_n_epoch=2
     )
 
     # To see logger in tensorboard, copy the following output name_of_folder
@@ -228,7 +197,7 @@ if __name__ == "__main__":
 
     # Plot training data (as trajectories)
     if traj_data:
-        n = 10000
+        n = 1000
         N = data_ordered.shape[0]
         data_ordered = data_ordered[::int(np.ceil(N / n)), :, :]
         plt.plot(data_ordered[..., 0], 'x')
@@ -275,7 +244,7 @@ if __name__ == "__main__":
     ##########################################################################
 
     # # Load learner  # TODO
-    # path = "runs/QuanserQubeServo2/Supervised/T_star/x0_00.1"
+    # path = "runs/QuanserQubeServo2_meas1/Supervised/T_star/exp_3"
     # learner_path = path + "/learner.pkl"
     # import dill as pkl
     # with open(learner_path, "rb") as rb_file:
@@ -288,40 +257,14 @@ if __name__ == "__main__":
     filepath = '../Data/QQS2_data_diffx0/' + fileName + '.csv'
     exp = np.genfromtxt(filepath, delimiter=',')
     exp = exp[1:2001, 1:-1]
-    exp_copy = copy.deepcopy(exp)
-    exp[:, 0], exp[:, 1] = exp_copy[:, 1], exp_copy[:, 0]
-    exp[:, 2], exp[:, 3] = exp_copy[:, 3], exp_copy[:, 2]
-    if traj_data:
-        # Map to [0, 2pi]
-        exp[:, 1] = exp[:, 1] % (2 * np.pi)
-    else:
-        # Map to [0, 2pi]
-        exp[:, 1] = exp[:, 1] % (2 * np.pi)
-    exp = torch.from_numpy(exp)
+    exp = torch.from_numpy(system.remap_hardware_angles(exp))
 
     # Observer
-    measurement = torch.unsqueeze(exp[..., 1], 1)
+    measurement = system.h(exp)
     tq = torch.arange(tsim[0], tsim[1], dt)
     y = torch.cat((tq.unsqueeze(1), measurement), dim=1)
     estimation = observer.predict(y, tsim, dt).detach()
-    theta = estimation[..., 0]
-    alpha = estimation[..., 1]
-    if traj_data:
-        # Map to [-pi,pi]
-        theta = ((theta + np.pi) % (2 * np.pi)) - np.pi
-        # alpha = ((alpha + np.pi) % (2 * np.pi)) - np.pi
-        # Map to [0, 2pi]
-        # theta = theta % (2 * np.pi)
-        alpha = alpha % (2 * np.pi)
-    else:
-        # Map to [-pi,pi]
-        theta = ((theta + np.pi) % (2 * np.pi)) - np.pi
-        # alpha = ((alpha + np.pi) % (2 * np.pi)) - np.pi
-        # Map to [0, 2pi]
-        # theta = theta % (2 * np.pi)
-        alpha = alpha % (2 * np.pi)
-    estimation[..., 0] = theta
-    estimation[..., 1] = alpha
+    estimation = system.remap_angles(estimation)
 
     # Compare both
     os.makedirs(os.path.join(learner.results_folder, fileName), exist_ok=True)
@@ -345,16 +288,15 @@ if __name__ == "__main__":
     x0 = exp[0].unsqueeze(0)
     dyn_config = {'prior_kwargs': {
         'n': x0.shape[1],
-        'observation_matrix': torch.tensor([[0., 1., 0., 0.]]),
-        'EKF_process_covar': 1e-1 * torch.eye(x0.shape[1]),
-        'EKF_init_covar': torch.tensor([1e-4, 1e-3, 1e-2, 1e-1]) * torch.eye(
-            x0.shape[1]),
+        'observation_matrix': torch.tensor([[1., 0., 0., 0.]]),
+        'EKF_process_covar': torch.diag(torch.tensor([1e2, 1e2, 1e5, 1e5])),
+        'EKF_init_covar': torch.diag(torch.tensor([1e1, 1e1, 1e1, 1e1])),
         'EKF_meas_covar': 1e-3 * torch.eye(measurement.shape[1])}}
     EKF_observer = EKF_ODE('cpu', dyn_config)
     y_func = interpolate_func(x=y, t0=tq[0], init_value=measurement[0])
     controller = lambda t, kwargs, t0, init_control, impose_init: 0.
     x0_estim = torch.cat((
-        torch.zeros(1, 1), measurement[0].unsqueeze(1), torch.zeros(1, 2),
+        measurement[0].unsqueeze(1), torch.zeros(1, 3),
         torch.unsqueeze(torch.flatten(dyn_config['prior_kwargs'][
                                           'EKF_init_covar']), 0)), dim=1)
     xtraj = dynamics_traj_observer(
@@ -366,7 +308,8 @@ if __name__ == "__main__":
     for i in range(estimation.shape[1]):
         plt.plot(tq, exp[:, i], label=rf'$x_{i + 1}$')
         plt.plot(tq, estimation[:, i], '--', label=rf'$\hat{{x}}_{i + 1}$')
-        plt.plot(tq, estimation_EKF[:, i], '-.', label=rf'$\hat{{x}}_{i + 1}^{{EKF}}$')
+        plt.plot(tq, estimation_EKF[:, i], '-.',
+                 label=rf'$\hat{{x}}_{i + 1}^{{EKF}}$')
         plt.xlabel(rf"$t$")
         plt.ylabel(rf"$x_{i + 1}$")
         plt.title(rf'RMSE = {rmse[i]:0.2g} for KKL, RMSE = '

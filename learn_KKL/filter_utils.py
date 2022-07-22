@@ -8,8 +8,8 @@ from torchdiffeq import odeint
 # Useful functions for filtering: EKF...
 # Mostly code from other repos added here for transfers
 
-# Reshape any vector of (length,) object to (length, 1) (possibly several
-# points but of dimension 1)
+# Reshape any vector of (length,) to (length, 1) (possibly several points but
+# of dimension 1)
 def reshape_dim1(x):
     if torch.is_tensor(x):
         if len(x.shape) == 0:
@@ -47,8 +47,8 @@ def reshape_dim1_difftraj(x):
     return x
 
 
-# Reshape any vector of (length,) object to (1, length) (single point of
-# certain dimension)
+# Reshape any vector of (length,) to (1, length) (single point of certain
+# dimension)
 def reshape_pt1(x):
     if torch.is_tensor(x):
         if len(x.shape) == 0:
