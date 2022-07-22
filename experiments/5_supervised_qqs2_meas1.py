@@ -120,10 +120,10 @@ if __name__ == "__main__":
     trainer_options = {"max_epochs": num_epochs}
     if traj_data:
         batch_size = 100
-        init_learning_rate = 1e-2
+        init_learning_rate = 1e-3
     else:
         batch_size = 20
-        init_learning_rate = 1e-2
+        init_learning_rate = 1e-3
 
     # Optim options
     optim_method = optim.Adam
