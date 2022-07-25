@@ -619,7 +619,7 @@ class Learner(pl.LightningModule):
             nb_trajs=10,
             tsim=(0, 60),
             dt=1e-2,
-            num_samples=10000,
+            num_samples=[50,50],
             method='uniform',
             checkpoint_path=None,
             verbose=False,
@@ -711,7 +711,6 @@ class Learner(pl.LightningModule):
             self.save_pdf_heatmap(x_mesh, x_hat_star, verbose)
             self.save_random_traj(x_mesh, num_samples, nb_trajs, verbose, tsim,
                                   dt)
-            print('salut')
             # Invertibility heatmap
             self.save_invert_heatmap(x_mesh, x_hat_AE, verbose)
 

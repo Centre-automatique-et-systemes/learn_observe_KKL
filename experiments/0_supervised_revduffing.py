@@ -6,7 +6,6 @@ import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 # Import base utils
 import torch
 from torch import nn
@@ -21,8 +20,13 @@ sys.path.append(working_path)
 
 # Import KKL observer
 from learn_KKL.system import RevDuffing
+from learn_KKL.luenberger_observer import LuenbergerObserver
+from learn_KKL.raffinement import *
+
 
 # Import learner utils
+from learn_KKL.learner import Learner
+from sklearn.model_selection import train_test_split
 
 if __name__ == "__main__":
 
@@ -42,32 +46,32 @@ if __name__ == "__main__":
     # Define data params
     wc = 0.15
     x_limits = np.array([[-1., 1.], [-1., 1.]])
-    num_samples = 10000
+    num_samples = [100,100]
 
     # Solver options
     solver_options = {'method': 'rk4', 'options': {'step_size': 1e-3}}
 
-    # # Instantiate observer object
-    # observer = LuenbergerObserver(
-    #     dim_x=system.dim_x,
-    #     dim_y=system.dim_y,
-    #     method=learning_method,
-    #     wc=wc,
-    #     activation=activation,
-    #     num_hl=num_hl,
-    #     size_hl=size_hl,
-    #     solver_options=solver_options,
-    # )
-    # observer.set_dynamics(system)
-    #
-    # # Generate training data and validation data
-    # data = observer.generate_data_svl(x_limits, num_samples, method="LHS", k=10)
-    # data, val_data = train_test_split(data, test_size=0.3, shuffle=True)
-    #
-    # ##########################################################################
-    # # Setup learner ##########################################################
-    # ##########################################################################
-    #
+    # Instantiate observer object
+    observer = LuenbergerObserver(
+        dim_x=system.dim_x,
+        dim_y=system.dim_y,
+        method=learning_method,
+        wc=wc,
+        activation=activation,
+        num_hl=num_hl,
+        size_hl=size_hl,
+        solver_options=solver_options,
+    )
+    observer.set_dynamics(system)
+
+    # Generate training data and validation data
+    data,grid = observer.generate_data_svl(x_limits, num_samples, method="LHS", k=10)
+    data, val_data = train_test_split(data, test_size=0.3, shuffle=True)
+
+    ##########################################################################
+    # Setup learner ##########################################################
+    ##########################################################################
+
     # # Trainer options
     # num_epochs = 100
     # trainer_options = {"max_epochs": num_epochs}
