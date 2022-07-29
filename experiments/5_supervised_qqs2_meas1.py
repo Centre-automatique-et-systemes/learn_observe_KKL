@@ -58,8 +58,8 @@ if __name__ == "__main__":
     system = QuanserQubeServo2_meas1()
 
     # Define data params (same characteristics as experimental data)
-    dt = 0.004
-    tsim = (0, 2000 * dt)
+    dt = 0.04
+    tsim = (0, 8.)
     init_wc = 3.
     traj_data = True  # whether to generate data on grid or from trajectories
     add_forward = False
@@ -93,8 +93,8 @@ if __name__ == "__main__":
         if add_forward:  # TODO add one forward trajectory to dataset
             init = torch.tensor([0., 0.1, 0., 0.] + [0.] * observer.dim_z)
             data_forward = observer.generate_data_forward(
-                init=init, tsim=(0, 10),
-                num_datapoints=2000, k=10, dt=dt, stack=True)
+                init=init, tsim=(0, 8),
+                num_datapoints=200, k=10, dt=dt, stack=True)
             data_forward = system.remap_angles(data_forward)
             data = torch.cat((data, data_forward), dim=0)
     else:
@@ -103,8 +103,8 @@ if __name__ == "__main__":
         if add_forward:  # TODO add forward trajectory to have stable data
             init = torch.tensor([0., 0.1, 0., 0.] + [0.] * observer.dim_z)
             data_forward = observer.generate_data_forward(
-                init=init, tsim=(0, 10),
-                num_datapoints=2000, k=10, dt=dt, stack=True)
+                init=init, tsim=(0, 8),
+                num_datapoints=200, k=10, dt=dt, stack=True)
             data = torch.cat((data, data_forward), dim=0)
         data = system.remap_angles(data)  # remap angles to stay in compact
     data, val_data = train_test_split(data, test_size=0.3, shuffle=False)
@@ -137,12 +137,12 @@ if __name__ == "__main__":
     scheduler_options = {
         "mode": "min",
         "factor": 0.5,
-        "patience": 3,
+        "patience": 10,
         "threshold": 1e-4,
         "verbose": True,
     }
     stopper = pl.callbacks.early_stopping.EarlyStopping(
-        monitor="val_loss", min_delta=5e-4, patience=10, verbose=False,
+        monitor="val_loss", min_delta=5e-4, patience=15, verbose=False,
         mode="min"
     )
 
@@ -221,7 +221,7 @@ if __name__ == "__main__":
         plt.clf()
         plt.close('all')
 
-    tsim = (0, 2000 * dt)  # for test trajectories
+    tsim = (0, 8)  # for test trajectories
     with torch.no_grad():
         learner.save_results(
             limits=x_limits, nb_trajs=10, tsim=tsim, dt=dt, fast=True,
@@ -255,13 +255,17 @@ if __name__ == "__main__":
     # Experiment
     fileName = 'example_csv_fin4'
     filepath = '../Data/QQS2_data_diffx0/' + fileName + '.csv'
-    exp = np.genfromtxt(filepath, delimiter=',')
-    exp = exp[1:2001, 1:-1]
-    exp = torch.from_numpy(system.remap_hardware_angles(exp))
+    exp_data = np.genfromtxt(filepath, delimiter=',')
+    tq_exp = torch.from_numpy(exp_data[1:2001, -1] - exp_data[1, -1])
+    exp_data = exp_data[1:2001, 1:-1]
+    exp_data = torch.from_numpy(system.remap_hardware_angles(exp_data))
 
     # Observer
-    measurement = system.h(exp)
+    t_exp = torch.cat((tq_exp.unsqueeze(1), exp_data), dim=1)
+    exp_func = interpolate_func(x=t_exp, t0=tq_exp[0], init_value=exp_data[0])
     tq = torch.arange(tsim[0], tsim[1], dt)
+    exp = exp_func(tq)
+    measurement = system.h(exp)
     y = torch.cat((tq.unsqueeze(1), measurement), dim=1)
     estimation = observer.predict(y, tsim, dt).detach()
     estimation = system.remap_angles(estimation)
@@ -289,9 +293,9 @@ if __name__ == "__main__":
     dyn_config = {'prior_kwargs': {
         'n': x0.shape[1],
         'observation_matrix': torch.tensor([[1., 0., 0., 0.]]),
-        'EKF_process_covar': torch.diag(torch.tensor([1e2, 1e2, 1e5, 1e5])),
+        'EKF_process_covar': torch.diag(torch.tensor([1e1, 1e2, 1e4, 1e4])),
         'EKF_init_covar': torch.diag(torch.tensor([1e1, 1e1, 1e1, 1e1])),
-        'EKF_meas_covar': 1e-3 * torch.eye(measurement.shape[1])}}
+        'EKF_meas_covar': 1e-2 * torch.eye(measurement.shape[1])}}
     EKF_observer = EKF_ODE('cpu', dyn_config)
     y_func = interpolate_func(x=y, t0=tq[0], init_value=measurement[0])
     controller = lambda t, kwargs, t0, init_control, impose_init: 0.

@@ -446,21 +446,27 @@ class QuanserQubeServo2(System):
         self.dim_y = 2
 
         # Motor
-        self.Rm = 8.4  # Resistance
+        # self.Rm = 8.4  # Resistance
         self.kt = 0.042  # Current-torque (N-m/A)
-        self.km = 0.042  # Back-emf constant (V-s/rad)
+        # self.km = 0.042  # Back-emf constant (V-s/rad)
 
         # Rotary Arm
         self.mr = 0.095  # Mass (kg)
         self.Lr = 0.085  # Total length (m)
         self.Jr = self.mr * self.Lr ** 2 / 12  # Moment of inertia about pivot (kg-m^2)
-        self.Dr = 0.00027  # Equivalent viscous damping coefficient (N-m-s/rad)
+        # self.Dr = 0.00027  # Equivalent viscous damping coefficient (N-m-s/rad)
 
         # Pendulum Link
         self.mp = 0.024  # Mass (kg)
         self.Lp = 0.129  # Total length (m)
         self.Jp = self.mp * self.Lp ** 2 / 12  # Moment of inertia about pivot (kg-m^2)
-        self.Dp = 0.00005  # Equivalent viscous damping coefficient (N-m-s/rad)
+        # self.Dp = 0.00005  # Equivalent viscous damping coefficient (N-m-s/rad)
+
+        # After identification on hardware data:
+        self.Rm = 14
+        self.km = 0.01
+        self.Dr = 0.0005
+        self.Dp = -3e-5
 
         self.gravity = 9.81  # Gravity constant
 
