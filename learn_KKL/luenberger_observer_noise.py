@@ -196,10 +196,11 @@ class LuenbergerObserverNoise(LuenbergerObserver):
               'script criterion.m should be used instead to compute the final '
               'criterion as it was in the paper.')
         if save:
+            # TODO more efficient computation for dNN/dx(x)! Symbolic?JAX?
             # Compute dTdx over grid
             dTdh = torch.autograd.functional.jacobian(
                 self.encoder, x, create_graph=False, strict=False,
-                vectorize=False
+                vectorize=False  
             )
             dTdx = torch.transpose(
                 torch.transpose(

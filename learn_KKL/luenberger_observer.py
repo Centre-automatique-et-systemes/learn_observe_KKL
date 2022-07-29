@@ -584,6 +584,7 @@ class LuenbergerObserver(nn.Module):
             Computed matrix from the observer state vector.
         """
         # Compute jacobian for T^*(z)
+        # TODO more efficient computation for dNN/dx(x)! Symbolic?JAX?
         dTdy = torch.autograd.functional.jacobian(
             self.encoder,
             self.decoder(z.T),
@@ -967,6 +968,7 @@ class LuenbergerObserver(nn.Module):
         loss_1 = self.recon_lambda * MSE(x, x_hat, dim=dim)
 
         # Compute gradients of T_u with respect to inputs
+        # TODO more efficient computation for dNN/dx(x)! Symbolic?JAX?
         dTdh = torch.autograd.functional.jacobian(
             self.encoder, x, create_graph=False, strict=False, vectorize=False
         )

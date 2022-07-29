@@ -211,8 +211,8 @@ def dynamics_traj_observer(x0, u, y, t0, dt, init_control, discrete=False,
         solver_options.pop('atol')
     else:
         solver_options = {}
-        rtol = 1e-3
-        atol = 1e-6
+        rtol = 1e-7
+        atol = 1e-9
     x0 = reshape_pt1(x0)
     if not torch.is_tensor(t_eval):
         t_eval = torch.tensor(t_eval, device=device)

@@ -430,9 +430,11 @@ class HO_unknown_freq(System):
 
 
 class QuanserQubeServo2(System):
-    """ See https://www.quanser.com/products/qube-servo-2/ QUBE SERVO 2 and for a detailed 
-    reference for this system 
-    https://github.com/BlueRiverTech/quanser-openai-driver/blob/main/gym_brt/quanser/qube_simulator.py.
+    """ See https://www.quanser.com/products/qube-servo-2/ QUBE SERVO 2 and
+    for a detailed reference for this system.
+    Documentation on the simulator:
+    https://github.com/BlueRiverTech/quanser-openai-driver/blob/main/gym_brt/quanser/qube_simulator.py
+    https://github.com/BlueRiverTech/quanser-openai-driver/blob/main/tests/notebooks/Compare%20Qube%20Hardware%20to%20ODEint.ipynb
 
     State: (theta, alpha, theta_dot, alpha_dot)
     Measurement: (theta, alpha)
@@ -465,7 +467,7 @@ class QuanserQubeServo2(System):
         self.u = self.null_controller
         self.u_1 = self.null_controller
 
-    def f(self, x, action=0):
+    def f(self, x, action=0.):
         theta = x[..., 0]
         alpha = x[..., 1]
         theta_dot = x[..., 2]
@@ -583,6 +585,7 @@ class QuanserQubeServo2(System):
     # function u. Useful for EKF!
     def predict_deriv(self, x, f):
         # Compute Jacobian of f with respect to input x
+        # TODO more efficient computation for dNN/dx(x)! Symbolic?JAX?
         dfdh = torch.autograd.functional.jacobian(
             f, x, create_graph=False, strict=False, vectorize=False)
         dfdx = torch.squeeze(dfdh)

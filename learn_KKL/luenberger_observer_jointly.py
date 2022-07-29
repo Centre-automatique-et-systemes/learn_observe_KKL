@@ -127,6 +127,7 @@ class LuenbergerObserverJointly(LuenbergerObserver):
 
          if self.sensitivity_lambda > 0:
              # Compute gradients of T_star with respect to inputs
+             # TODO more efficient computation for dNN/dx(x)! Symbolic?JAX?
              dTdh = torch.autograd.functional.jacobian(
                  self.decoder, z_hat, create_graph=False, strict=False, vectorize=False
              )

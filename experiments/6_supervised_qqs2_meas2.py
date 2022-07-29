@@ -64,7 +64,7 @@ if __name__ == "__main__":
     traj_data = True  # whether to generate data on grid or from trajectories
     add_forward = False
     if traj_data:  # TODO
-        num_initial_conditions = 100
+        num_initial_conditions = 500
         x_limits = np.array([[-0.5, 0.5], [0., 1.], [-0.1, 0.1], [-0.1, 0.1]])
     else:
         num_samples = int(1e5)

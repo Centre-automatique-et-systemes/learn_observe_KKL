@@ -24,11 +24,11 @@ if __name__ == "__main__":
     tsim = (0, 2000 * dt)
 
     # Experiment
-    fileName = 'example_csv_fin1'
-    path = '../Data/QQS2_data_diffx0/' + fileName + '.csv'
-    exp = np.genfromtxt(path, delimiter=',')
+    fileName = 'example_csv_fin4'
+    path = '../Data/QQS2_data_diffx0/' + fileName
+    exp = np.genfromtxt(path + '.csv', delimiter=',')
     exp = exp[1:2001, 1:-1]
-    exp = system.remap_hardware_angles(exp)
+    exp = system.remap_hardware_angles(exp, add_pi_alpha=False)
 
     # Simulation
     x0 = torch.from_numpy(exp[0])

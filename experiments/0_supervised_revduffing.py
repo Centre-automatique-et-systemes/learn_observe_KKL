@@ -214,6 +214,7 @@ if __name__ == "__main__":
             def dydt(t, z: torch.tensor):
                 xhat = self.decoder(z)
                 zhat = self.encoder(xhat)
+                # TODO more efficient computation for dNN/dx(x)! Symbolic?JAX?
                 dTdh = torch.autograd.functional.jacobian(
                     self.encoder, xhat, create_graph=False, strict=False,
                     vectorize=False
@@ -276,6 +277,7 @@ if __name__ == "__main__":
         # wait = input('')
 
         # Gradient heatmap of NN model
+        # TODO more efficient computation for dNN/dx(x)! Symbolic?JAX?
         dTdh = torch.autograd.functional.jacobian(
             learner.model.encoder, x, create_graph=False, strict=False,
             vectorize=False
@@ -288,6 +290,7 @@ if __name__ == "__main__":
         idx_max = torch.argmax(torch.linalg.matrix_norm(dTdx, ord=2))
         Tmax = dTdx[idx_max]
         # Compute dTstar_dz over grid
+        # TODO more efficient computation for dNN/dx(x)! Symbolic?JAX?
         dTstar_dh = torch.autograd.functional.jacobian(
             learner.model.decoder, z, create_graph=False, strict=False,
             vectorize=False
