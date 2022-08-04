@@ -58,14 +58,14 @@ if __name__ == "__main__":
     system = QuanserQubeServo2()
 
     # Define data params (same characteristics as experimental data)
-    dt = 0.04
+    dt = 0.1
     tsim = (0, 8.)
-    init_wc = 10.
+    init_wc = 2.
     traj_data = True  # whether to generate data on grid or from trajectories
     add_forward = False
     if traj_data:  # TODO
-        num_initial_conditions = 500
-        x_limits = np.array([[-0.5, 0.5], [0., 1.], [-0.1, 0.1], [-0.1, 0.1]])
+        num_initial_conditions = 5000
+        x_limits = np.array([[-0.5, 0.5], [-0.5, 0.5], [-0.1, 0.1], [-0.1, 0.1]])
     else:
         num_samples = int(1e5)
         x_limits = np.array([[-0.5, 0.5], [0., 1.], [-1., 1.], [-1., 1.]])
@@ -225,19 +225,8 @@ if __name__ == "__main__":
     with torch.no_grad():
         learner.save_results(
             limits=x_limits, nb_trajs=10, tsim=tsim, dt=dt, fast=True,
-            method='LHS', checkpoint_path=checkpoint_callback.best_model_path)
-        learner.save_plot(
-            "Train_loss.pdf",
-            "Training loss over time",
-            "log",
-            learner.train_loss.detach(),
-        )
-        learner.save_plot(
-            "Val_loss.pdf",
-            "Validation loss over time",
-            "log",
-            learner.val_loss.detach(),
-        )
+            method='uniform',
+            checkpoint_path=checkpoint_callback.best_model_path)
 
     ##########################################################################
     # Test trajectory ########################################################
