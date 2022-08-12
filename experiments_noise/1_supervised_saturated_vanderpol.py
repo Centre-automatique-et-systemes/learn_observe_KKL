@@ -61,7 +61,8 @@ if __name__ == "__main__":
     observer.set_dynamics(system)
 
     # Generate training data and validation data
-    data = observer.generate_data_svl(x_limits, wc_arr, num_samples, method="LHS")
+    data = observer.generate_data_svl(x_limits, wc_arr, num_samples,
+                                      method="LHS")
     data, val_data = train_test_split(data, test_size=0.3, shuffle=True)
 
     ##########################################################################

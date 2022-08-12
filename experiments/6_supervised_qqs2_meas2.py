@@ -76,8 +76,14 @@ if __name__ == "__main__":
 
     # # Create the observer
     # observer = LuenbergerObserver(
-    #     dim_x=system.dim_x, dim_y=system.dim_y, method=learning_method,
-    #     wc=init_wc, recon_lambda=recon_lambda
+    #     dim_x=system.dim_x,
+    #     dim_y=system.dim_y,
+    #     method=learning_method,
+    #     wc=init_wc,
+    #     activation=activation,
+    #     num_hl=num_hl,
+    #     size_hl=size_hl,
+    #     solver_options=solver_options
     # )
     # observer.set_dynamics(system)
     #
@@ -163,6 +169,7 @@ if __name__ == "__main__":
     # learner.traj_data = traj_data  # TODO to keep track
     # learner.x0_limits = x_limits
     # learner.add_forward = add_forward
+    # learner.data_dt = dt
     # if traj_data:
     #     learner.num_initial_conditions = num_initial_conditions
     # else:
@@ -221,6 +228,7 @@ if __name__ == "__main__":
     #     plt.clf()
     #     plt.close('all')
     #
+    # dt = 0.04
     # tsim = (0, 8)  # for test trajectories
     # with torch.no_grad():
     #     learner.save_results(
@@ -242,6 +250,7 @@ if __name__ == "__main__":
     observer = learner.model
 
     # Experiment
+    dt_exp = 0.004
     fileName = 'example_csv_fin3'
     filepath = '../Data/QQS2_data_diffx0/' + fileName + '.csv'
     exp_data = np.genfromtxt(filepath, delimiter=',')

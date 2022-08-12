@@ -535,7 +535,7 @@ class LuenbergerObserver(nn.Module):
                 else:
                     D[complex_idx - 1, complex_idx - 1] = 0.0
                     D[complex_idx - 1, complex_idx] = -(
-                                v.real ** 2 + v.imag ** 2)
+                            v.real ** 2 + v.imag ** 2)
                     D[complex_idx, complex_idx - 1] = 1.0
                     D[complex_idx, complex_idx] = 2 * v.real
                     F[complex_idx] = torch.ones(self.dim_y)
@@ -714,53 +714,6 @@ class LuenbergerObserver(nn.Module):
 
         return tq, sol
 
-    def generate_trajectory_data(
-            self,
-            limits: tuple,
-            num_samples: int,
-            tsim: tuple,
-            k: int = 10,
-            dt: float = 1e-2,
-            method: str = "LHS",
-            stack: bool = True
-    ):
-        """
-        Generate data points by simulating the system forward in time from
-        some initial conditions, which are sampled with LHS or uniform,
-        then z(0) is obtained with backward/forward sampling.
-        Parameters
-        ----------
-        limits: tuple
-            Limits in which to draw the initial conditions x(0).
-        num_samples: int
-            Number of initial conditions.
-        k: int
-           Parameter for time t_c = k/min(lambda) before which to cut.
-        dt: float
-            Simulation step.
-        method: string
-            Method for sampling the initial conditions.
-        stack: bool
-            Whether to stack the data, see output.
-
-        Returns
-        ----------
-        data: torch.tensor
-            Pairs of (x, z) data points, in shape (tsim, num_samples, dx+dz)
-            if stack is False, shape (tsim * num_samples, dx+dz) if True.
-        """
-        # Get initial conditions for x,z from backward forward sampling
-        y_0 = self.generate_data_svl(
-            limits=limits, num_samples=num_samples, method=method, k=k, dt=dt
-        )
-        # Simulate x(t), z(t) to obtain trajectories for tsim
-        _, data = self.simulate_system(y_0, tsim, dt)
-        # Fix issue with grad tensor in pipeline
-        if stack:
-            return torch.cat(torch.unbind(data, dim=1), dim=0)
-        else:
-            return data
-
     def generate_data_svl(
             self,
             limits: tuple,
@@ -847,6 +800,55 @@ class LuenbergerObserver(nn.Module):
         data = data_fw[-1]
         return data
 
+    def generate_trajectory_data(
+            self,
+            limits: tuple,
+            num_samples: int,
+            tsim: tuple,
+            k: int = 10,
+            dt: float = 1e-2,
+            method: str = "LHS",
+            stack: bool = True,
+            z_0: bool = None
+    ):
+        """
+        Generate data points by simulating the system forward in time from
+        some initial conditions, which are sampled with LHS or uniform,
+        then z(0) is obtained with backward/forward sampling.
+        Parameters
+        ----------
+        limits: tuple
+            Limits in which to draw the initial conditions x(0).
+        num_samples: int
+            Number of initial conditions.
+        k: int
+           Parameter for time t_c = k/min(lambda) before which to cut.
+        dt: float
+            Simulation step.
+        method: string
+            Method for sampling the initial conditions.
+        stack: bool
+            Whether to stack the data, see output.
+
+        Returns
+        ----------
+        data: torch.tensor
+            Pairs of (x, z) data points, in shape (tsim, num_samples, dx+dz)
+            if stack is False, shape (tsim * num_samples, dx+dz) if True.
+        """
+        # Get initial conditions for x,z from backward forward sampling
+        y_0 = self.generate_data_svl(
+            limits=limits, num_samples=num_samples, method=method, k=k,
+            dt=dt, z_0=z_0
+        )
+        # Simulate x(t), z(t) to obtain trajectories for tsim
+        _, data = self.simulate_system(y_0, tsim, dt)
+        # Fix issue with grad tensor in pipeline
+        if stack:
+            return torch.cat(torch.unbind(data, dim=1), dim=0)
+        else:
+            return data
+
     def generate_data_forward(self, init: torch.tensor, tsim: tuple,
                               num_datapoints: int, k: int = 10,
                               dt: float = 1e-2, stack: bool = True):
@@ -860,7 +862,7 @@ class LuenbergerObserver(nn.Module):
         tsim: tuple
             Simulation time.
         num_datapoints: int
-            Number of samples to take along trajectory * len(w_c) (convention).
+            Number of samples to take along trajectory.
         k: int
            Parameter for time t_c = k/min(lambda) before which to cut.
         dt: float

@@ -20,18 +20,18 @@ torch.set_default_dtype(torch.float64)
 
 class LuenbergerObserverNoise(LuenbergerObserver):
     def __init__(
-        self,
-        dim_x: int,
-        dim_y: int,
-        method: str = "Supervised_noise",
-        dim_z: int = None,
-        wc_array=np.array([1.0]),
-        num_hl: int = 5,
-        size_hl: int = 50,
-        activation=nn.ReLU(),
-        recon_lambda: float = 1.0,
-        D="block_diag",
-        solver_options=None,
+            self,
+            dim_x: int,
+            dim_y: int,
+            method: str = "Supervised_noise",
+            dim_z: int = None,
+            wc_array=np.array([1.0]),
+            num_hl: int = 5,
+            size_hl: int = 50,
+            activation=nn.ReLU(),
+            recon_lambda: float = 1.0,
+            D="block_diag",
+            solver_options=None,
     ):
 
         LuenbergerObserver.__init__(
@@ -101,14 +101,14 @@ class LuenbergerObserverNoise(LuenbergerObserver):
         )
 
     def generate_data_mesh(
-        self,
-        limits: tuple,
-        num_samples: int,
-        k: int = 10,
-        dt: float = 1e-2,
-        method: str = "LHS",
-        z_0=None,
-        **kwargs
+            self,
+            limits: tuple,
+            num_samples: int,
+            k: int = 10,
+            dt: float = 1e-2,
+            method: str = "LHS",
+            z_0=None,
+            **kwargs
     ):
         return LuenbergerObserver.generate_data_svl(
             self, limits, num_samples, k, dt, method, z_0, **kwargs)
@@ -120,7 +120,8 @@ class LuenbergerObserverNoise(LuenbergerObserver):
 
         num_samples = int(np.ceil(num_datapoints / len(w_c)))
 
-        df = torch.zeros(size=(num_samples, self.dim_x + self.dim_z + 1, len(w_c)))
+        df = torch.zeros(
+            size=(num_samples, self.dim_x + self.dim_z + 1, len(w_c)))
 
         for idx, w_c_i in np.ndenumerate(w_c):
             self.D, self.F = self.set_DF(w_c_i)
@@ -135,6 +136,79 @@ class LuenbergerObserverNoise(LuenbergerObserver):
 
         if stack:
             return torch.cat(torch.unbind(df, dim=-1), dim=0)
+        else:
+            return df
+
+    def generate_trajectory_data(
+            self,
+            limits: tuple,
+            w_c: np.array,
+            num_samples: int,
+            tsim: tuple,
+            k: int = 10,
+            dt: float = 1e-2,
+            method: str = "LHS",
+            stack: bool = True,
+            z_0: bool = None
+    ):
+        """
+        Generate data points by simulating the system forward in time from
+        some initial conditions, which are sampled with LHS or uniform,
+        then z(0) is obtained with backward/forward sampling.
+        Parameters
+        ----------
+        limits: tuple
+            Limits in which to draw the initial conditions x(0).
+        w_c: np.array
+            Array of w_c values for which to simulate.
+        num_samples: int
+            Number of initial conditions.
+        k: int
+           Parameter for time t_c = k/min(lambda) before which to cut.
+        dt: float
+            Simulation step.
+        method: string
+            Method for sampling the initial conditions.
+        stack: bool
+            Whether to stack the data, see output.
+
+        Returns
+        ----------
+        data: torch.tensor
+            Pairs of (x, z) data points, in shape (tsim, num_samples, dx+dz)
+            if stack is False, shape (tsim * num_samples, dx+dz) if True.
+        """
+        # Get initial conditions for x,z from backward forward sampling
+        # num_datapoints = num_samples * len(w_c)
+        # y_0 = self.generate_data_svl(
+        #     limits=limits, w_c=w_c, num_datapoints=num_datapoints, method=method,
+        #     k=k, dt=dt
+        # )
+        # df = torch.zeros(
+        #     size=(num_samples, self.dim_x + self.dim_z + 1, len(w_c)))
+
+        tq = torch.arange(tsim[0], tsim[1], dt)
+        df = torch.zeros(
+            size=(len(tq), num_samples, self.dim_x + self.dim_z + 1, len(w_c)))
+
+        for idx, w_c_i in np.ndenumerate(w_c):
+            self.D, self.F = self.set_DF(w_c_i)
+
+            # Get initial conditions for this wv with B/F sampling
+            y_0 = self.generate_data_mesh(limits, num_samples, k, dt, method,
+                                          z_0=z_0, w_c=w_c_i)
+            # Simulate x(t), z(t) to obtain trajectories for tsim
+            _, data = self.simulate_system(y_0, tsim, dt)
+
+            wc_i_tensor = torch.tensor(w_c_i).repeat(
+                (data.shape[0], data.shape[1])).unsqueeze(-1)
+            data = torch.cat((data, wc_i_tensor), -1)
+
+            df[..., idx] = data.unsqueeze(-1)
+
+        # Fix issue with grad tensor in pipeline
+        if stack:
+            return torch.cat(torch.unbind(df, dim=1), dim=0)
         else:
             return df
 
@@ -165,7 +239,9 @@ class LuenbergerObserverNoise(LuenbergerObserver):
         """
         num_samples = int(np.ceil(num_datapoints / len(w_c)))
 
-        df = torch.zeros(size=(num_samples, self.dim_x + self.dim_z + 1, len(w_c)))
+        df = torch.zeros(
+            size=(num_samples, len(init), self.dim_x + self.dim_z + 1,
+                  len(w_c)))
 
         for idx, w_c_i in np.ndenumerate(w_c):
             self.D, self.F = self.set_DF(w_c_i)
@@ -179,7 +255,8 @@ class LuenbergerObserverNoise(LuenbergerObserver):
                                           size=(num_samples,), replace=False)
             data = torch.squeeze(data[random_idx])
 
-            wc_i_tensor = torch.tensor(w_c_i).repeat(num_samples).unsqueeze(1)
+            wc_i_tensor = torch.tensor(w_c_i).repeat(
+                (data.shape[0], data.shape[1])).unsqueeze(-1)
             data = torch.cat((data, wc_i_tensor), 1)
 
             df[..., idx] = data.unsqueeze(-1)
@@ -200,7 +277,7 @@ class LuenbergerObserverNoise(LuenbergerObserver):
             # Compute dTdx over grid
             dTdh = torch.autograd.functional.jacobian(
                 self.encoder, x, create_graph=False, strict=False,
-                vectorize=False  
+                vectorize=False
             )
             dTdx = torch.transpose(
                 torch.transpose(
@@ -220,7 +297,8 @@ class LuenbergerObserverNoise(LuenbergerObserver):
                     torch.diagonal(dTstar_dh, dim1=0, dim2=2), 1, 2), 0, 1
             )
             dTstar_dz = dTstar_dz[:, :, : self.dim_z]
-            idxstar_max = torch.argmax(torch.linalg.matrix_norm(dTstar_dz, ord=2))
+            idxstar_max = torch.argmax(
+                torch.linalg.matrix_norm(dTstar_dz, ord=2))
             Tstar_max = dTstar_dz[idxstar_max]
 
             # Save this data
@@ -269,8 +347,9 @@ class LuenbergerObserverNoise(LuenbergerObserver):
         elif version == 2:
             C = np.eye(self.dim_z)
             sv = torch.tensor(compute_h_infinity(
-                self.D.numpy(), self.F.numpy(), np.dot(Tstar_max.detach().numpy(),
-                                                       C), 1e-3))
+                self.D.numpy(), self.F.numpy(),
+                np.dot(Tstar_max.detach().numpy(),
+                       C), 1e-3))
             product = sv
             return torch.cat(
                 (torch.linalg.matrix_norm(Tstar_max, ord=2).unsqueeze(0),
@@ -295,7 +374,8 @@ class LuenbergerObserverNoise(LuenbergerObserver):
             sv1 = torch.tensor(
                 compute_h_infinity(self.D.numpy(), self.F.numpy(), C, 1e-10))
             sv2 = torch.tensor(  # TODO implement H2 norm instead!
-                compute_h_infinity(self.D.numpy(), np.eye(self.dim_z), C, 1e-10))
+                compute_h_infinity(self.D.numpy(), np.eye(self.dim_z), C,
+                                   1e-10))
             product = l2_norm * (sv1 + sv2)
             return torch.cat(
                 (l2_norm.unsqueeze(0), sv1.unsqueeze(0),
@@ -306,13 +386,13 @@ class LuenbergerObserverNoise(LuenbergerObserver):
                                       f'{version} is not implemented.')
 
     def predict(
-        self,
-        measurement: torch.tensor,
-        t_sim: tuple,
-        dt: int,
-        w_c: float,
-        out_z: bool = False,
-        z_0=None
+            self,
+            measurement: torch.tensor,
+            t_sim: tuple,
+            dt: int,
+            w_c: float,
+            out_z: bool = False,
+            z_0=None
     ) -> torch.tensor:
         """
         Forward function for autoencoder. Used for training the model.
