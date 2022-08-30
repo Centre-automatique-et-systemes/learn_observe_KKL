@@ -63,7 +63,7 @@ if __name__ == "__main__":
     traj_data = True  # whether to generate data on grid or from trajectories
     add_forward = False
     if traj_data:  # TODO
-        num_initial_conditions = 100
+        num_initial_conditions = 500
         x_limits = np.array(
             [[-0.5, 0.5], [-0.5, 0.5], [-0.1, 0.1], [-0.1, 0.1]])
     else:
@@ -95,7 +95,7 @@ if __name__ == "__main__":
             x_limits, wc_arr, num_initial_conditions, method="LHS", tsim=tsim,
             stack=False, dt=dt
         )
-        data = system.remap_angles(data)  # remap angles to stay in compact
+        data = system.remap_angles(data, wc=True)  # remap angles to stay in compact
         data_ordered = copy.deepcopy(data)
         data = torch.cat(torch.unbind(data, dim=1), dim=0)
         if add_forward:  # TODO add one forward trajectory to dataset
@@ -103,7 +103,7 @@ if __name__ == "__main__":
             data_forward = observer.generate_data_forward(
                 init=init, w_c=wc_arr, tsim=(0, 8),
                 num_datapoints=200, k=10, dt=dt, stack=True)
-            data_forward = system.remap_angles(data_forward)
+            data_forward = system.remap_angles(data_forward, wc=True)
             data = torch.cat((data, data_forward), dim=0)
     else:
         data = observer.generate_data_svl(
@@ -114,7 +114,7 @@ if __name__ == "__main__":
                 init=init, w_c=wc_arr, tsim=(0, 8),
                 num_datapoints=200, k=10, dt=dt, stack=True)
             data = torch.cat((data, data_forward), dim=0)
-        data = system.remap_angles(data)  # remap angles to stay in compact
+        data = system.remap_angles(data, wc=True)  # remap angles to stay in compact
     data = torch.cat(torch.unbind(data, dim=-1), dim=0)
     data, val_data = train_test_split(data, test_size=0.3, shuffle=False)
 
@@ -140,6 +140,80 @@ if __name__ == "__main__":
         optimizer_options = {"weight_decay": 1e-6}
     else:
         optimizer_options = {"weight_decay": 1e-6}
+
+    # Scheduler options
+    scheduler_method = optim.lr_scheduler.ReduceLROnPlateau
+    scheduler_options = {
+        "mode": "min",
+        "factor": 0.5,
+        "patience": 10,
+        "threshold": 1e-4,
+        "verbose": True,
+    }
+    stopper = pl.callbacks.early_stopping.EarlyStopping(
+        monitor="val_loss", min_delta=5e-4, patience=15, verbose=False,
+        mode="min"
+    )
+
+    # Instantiate learner for T
+    learner_T = LearnerNoise(
+        observer=observer,
+        system=system,
+        training_data=data,
+        validation_data=val_data,
+        method='T',
+        batch_size=batch_size,
+        lr=init_learning_rate,
+        optimizer=optim_method,
+        optimizer_options=optimizer_options,
+        scheduler=scheduler_method,
+        scheduler_options=scheduler_options,
+    )
+    learner_T.traj_data = traj_data  # TODO to keep track
+    learner_T.x0_limits = x_limits
+    learner_T.add_forward = add_forward
+    if traj_data:
+        learner_T.num_initial_conditions = num_initial_conditions
+    else:
+        learner_T.num_samples = num_samples
+
+    # Define logger and checkpointing
+    logger = TensorBoardLogger(
+        save_dir=learner_T.results_folder + "/tb_logs")
+    checkpoint_callback = ModelCheckpoint(monitor="val_loss")
+    trainer = pl.Trainer(
+        callbacks=[stopper, checkpoint_callback],
+        **trainer_options,
+        logger=logger,
+        log_every_n_steps=1,
+        check_val_every_n_epoch=2
+    )
+
+    # To see logger in tensorboard, copy the following output name_of_folder
+    print(f"Logs stored in {learner_T.results_folder}/tb_logs")
+    # which should be similar to jupyter_notebooks/runs/method/exp_0/tb_logs/
+    # Then type this in terminal:
+    # tensorboard --logdir=name_of_folder
+
+    # Train and save results
+    trainer.fit(learner_T)
+
+    with torch.no_grad():
+        learner_T.save_results(
+            checkpoint_path=checkpoint_callback.best_model_path)
+
+        learner_T.save_plot(
+            "Train_loss.pdf",
+            "Training loss over time",
+            "log",
+            learner_T.train_loss.detach(),
+        )
+        learner_T.save_plot(
+            "Val_loss.pdf",
+            "Validation loss over time",
+            "log",
+            learner_T.val_loss.detach(),
+        )
 
     # Scheduler options
     scheduler_method = optim.lr_scheduler.ReduceLROnPlateau
@@ -209,28 +283,27 @@ if __name__ == "__main__":
         n = 1000
         N = data_ordered.shape[0]
         data_ordered = data_ordered[::int(np.ceil(N / n)), :, :]
-        plt.plot(data_ordered[..., 0], 'x')
+        plt.plot(data_ordered[..., 0, 0], 'x')
         plt.title(r'Training data: $\theta$')
         plt.savefig(os.path.join(learner_T_star.results_folder, 'Train_theta.pdf'))
         plt.clf()
         plt.close('all')
-        plt.plot(data_ordered[..., 1], 'x')
+        plt.plot(data_ordered[..., 1, 0], 'x')
         plt.title(r'Training data: $\alpha$')
         plt.savefig(os.path.join(learner_T_star.results_folder, 'Train_alpha.pdf'))
         plt.clf()
         plt.close('all')
-        plt.plot(data_ordered[..., 2], 'x')
+        plt.plot(data_ordered[..., 2, 0], 'x')
         plt.title(r'Training data: $\dot{\theta}$')
         plt.savefig(os.path.join(learner_T_star.results_folder, 'Train_thetadot.pdf'))
         plt.clf()
         plt.close('all')
-        plt.plot(data_ordered[..., 3], 'x')
+        plt.plot(data_ordered[..., 3, 0], 'x')
         plt.title(r'Training data: $\dot{\alpha}$')
         plt.savefig(os.path.join(learner_T_star.results_folder, 'Train_alphadot.pdf'))
         plt.clf()
         plt.close('all')
 
-    tsim = (0, 8)  # for test trajectories
     with torch.no_grad():
         learner_T_star.save_results(
             checkpoint_path=checkpoint_callback.best_model_path)
@@ -289,6 +362,8 @@ if __name__ == "__main__":
                                       path=path)
 
     # Test trajectories
+    dt = 0.04
+    tsim = (0, 8)  # for test trajectories
     std_array = [0.0, 0.25, 0.5]
     wc_arr = np.array([0.03, 0.2, 1.])
     x_0 = torch.tensor([0.1, 0.1])
@@ -382,7 +457,7 @@ if __name__ == "__main__":
         for i in range(estimation.shape[1]):
             plt.plot(tq, exp[:, i], label=rf'$x_{i + 1}$')
             plt.plot(tq, estimation[:, i], '--', label=rf'$\hat{{x}}_{i + 1}$')
-            plt.title(rf'Test trajectory for $\omega_c$ = {init_wc:0.2g}, RMSE = '
+            plt.title(rf'Test trajectory for $\omega_c$ = {wc:0.2g}, RMSE = '
                       rf'{rmse[i]:0.2g}')
             plt.xlabel(rf"$t$")
             plt.ylabel(rf"$x_{i + 1}$")

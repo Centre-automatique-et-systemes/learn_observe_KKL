@@ -557,23 +557,35 @@ class QuanserQubeServo2(System):
 
     # For flexibility and coherence: use remap function after every simulation
     # But be prepared to change its behavior!
-    def remap_angles(self, traj):
+    def remap_angles(self, traj, wc=False):
         # Map theta to [-pi,pi] and alpha to [0, 2pi]
-        traj[..., 0] = ((traj[..., 0] + np.pi) % (2 * np.pi)) - np.pi
-        traj[..., 1] = traj[..., 1] % (2 * np.pi)
+        if not wc:
+            traj[..., 0] = ((traj[..., 0] + np.pi) % (2 * np.pi)) - np.pi
+            traj[..., 1] = traj[..., 1] % (2 * np.pi)
+        else:
+            traj[..., 0, :] = ((traj[..., 0, :] + np.pi) % (2 * np.pi)) - np.pi
+            traj[..., 1, :] = traj[..., 1, :] % (2 * np.pi)
         return traj
 
     # For adapting hardware data to the conventions of the simulation model
-    def remap_hardware_angles(self, traj, add_pi_alpha=False):
+    def remap_hardware_angles(self, traj, add_pi_alpha=False, wc=False):
         # Reorder as (theta, alpha, thetadot, alphadot)
         # Convention for alpha: 0 is upwards (depends on dataset!)
         # Remap as simulation data
         traj_copy = copy.deepcopy(traj)
-        traj[..., 0], traj[..., 1] = traj_copy[..., 1], traj_copy[..., 0]
-        traj[..., 2], traj[..., 3] = traj_copy[..., 3], traj_copy[..., 2]
-        if add_pi_alpha:
-            traj[..., 1] += np.pi
-        return self.remap_angles(traj)
+        if not wc:
+            traj[..., 0], traj[..., 1] = traj_copy[..., 1], traj_copy[..., 0]
+            traj[..., 2], traj[..., 3] = traj_copy[..., 3], traj_copy[..., 2]
+            if add_pi_alpha:
+                traj[..., 1] += np.pi
+        else:
+            traj[..., 0, :], traj[..., 1, :] = \
+                traj_copy[..., 1, :], traj_copy[..., 0, :]
+            traj[..., 2, :], traj[..., 3, :] = \
+                traj_copy[..., 3, :], traj_copy[..., 2, :]
+            if add_pi_alpha:
+                traj[..., 1, :] += np.pi
+        return self.remap_angles(traj, wc=wc)
 
     def __repr__(self):
         return "QuanserQubeServo2_meas12"

@@ -344,7 +344,7 @@ class LearnerNoise(Learner):
             path = os.path.join(self.results_folder, 'xzi_mesh')
             os.makedirs(path, exist_ok=True)
 
-        D_arr = torch.zeros(0, 3, 3)
+        D_arr = torch.zeros(0, self.model.dim_z, self.model.dim_z)
         for j in range(len(w_c_array)):
             wc = w_c_array[j]
             self.model.D, _ = self.model.set_DF(wc)

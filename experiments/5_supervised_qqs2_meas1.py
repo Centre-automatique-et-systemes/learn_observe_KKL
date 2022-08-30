@@ -252,6 +252,7 @@ if __name__ == "__main__":
     # observer = learner.model
 
     # Experiment
+    dt_exp = 0.004
     fileName = 'example_csv_fin4'
     filepath = '../Data/QQS2_data_diffx0/' + fileName + '.csv'
     exp_data = np.genfromtxt(filepath, delimiter=',')
