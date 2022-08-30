@@ -92,11 +92,7 @@ class LearnerNoise(Learner):
             traj_folder = os.path.join(self.results_folder, "Test_trajectories")
             tq, simulation = self.system.simulate(trajs_init, tsim, dt)
             measurement = self.model.h(simulation)
-            noise = (
-                torch.normal(0, std, size=(measurement.shape[0], 1))
-                    .repeat(1, nb_trajs)
-                    .unsqueeze(2)
-            )
+            noise = torch.normal(0, std, size=measurement.shape)
             measurement = measurement.add(noise)
 
             # Save these test trajectories
@@ -160,19 +156,17 @@ class LearnerNoise(Learner):
                 print(traj_error / nb_trajs, file=f)
 
     def save_trj(self, init_state, w_c_arr, nb_trajs, verbose, tsim, dt,
-                 var=0.2, z_0=None):
+                 std=0.2, z_0=None):
         with torch.no_grad():
             # Estimation over the test trajectories with T_star
             nb_trajs += w_c_arr.shape[0]
             traj_folder = os.path.join(self.results_folder,
-                                       "Test_trajectories_{}".format(str(var)))
+                                       "Test_trajectories_{}".format(str(std)))
             tq, simulation = self.system.simulate(init_state, tsim, dt)
 
-            noise = torch.normal(0, var, size=(simulation.shape))
-
-            simulation_noise = simulation.add(noise)
-
-            measurement = self.model.h(simulation_noise)
+            measurement = self.model.h(simulation)
+            noise = torch.normal(0, std, size=measurement.shape)
+            measurement = measurement.add(noise)
 
             # Save these test trajectories
             os.makedirs(traj_folder, exist_ok=True)
@@ -261,7 +255,7 @@ class LearnerNoise(Learner):
                 x_mesh = mesh[:, self.x_idx_out, j]
                 z_mesh = mesh[:, self.z_idx_in, j]
 
-                # noise = torch.normal(0, 0.01, size=(z_mesh.shape[0], z_mesh.shape[1]))
+                # noise = torch.normal(0, 0.01, size=(z_mesh.shape)
                 # z_mesh.add(noise)
 
                 # compute x_hat for every w_c
@@ -440,7 +434,7 @@ class LearnerNoise(Learner):
         plt.close("all")
 
     def plot_traj_error(
-            self, init_state, w_c_arr, nb_trajs, verbose, tsim, dt, var=0.0,
+            self, init_state, w_c_arr, nb_trajs, verbose, tsim, dt, std=0.0,
             z_0=None
     ):
         with torch.no_grad():
@@ -449,15 +443,12 @@ class LearnerNoise(Learner):
             nb_trajs += w_c_arr.shape[0]
             traj_folder = os.path.join(self.results_folder,
                                        "Test_trajectories_error_{}".format(
-                                           str(var)))
+                                           str(std)))
             tq, simulation = self.system.simulate(init_state, tsim, dt)
 
-            noise = torch.normal(0, var, size=(simulation.shape[0], 2))
-
-            measurement_noise = simulation.add(noise)
-
-            measurement = self.model.h(measurement_noise)
-            # measurement = measurement.add(noise)
+            measurement = self.model.h(simulation)
+            noise = torch.normal(0, std, size=measurement.shape)
+            measurement = measurement.add(noise)
 
             # Save these test trajectories
             os.makedirs(traj_folder, exist_ok=True)
@@ -543,10 +534,10 @@ class LearnerNoise(Learner):
         traj_folder = os.path.join(self.results_folder,
                                    "Test_trajectories_noise")
         tq, simulation = self.system.simulate(init_state, t_sim, dt)
-        noise = torch.normal(0, 0.01,
-                             size=(simulation.shape[0], simulation.shape[1]))
-        simulation = simulation.add(noise)
+
         measurement = self.model.h(simulation)
+        noise = torch.normal(0, 0.01, size=measurement.shape)
+        measurement = measurement.add(noise)
 
         # Save these test trajectories
         os.makedirs(traj_folder, exist_ok=True)
@@ -600,7 +591,7 @@ class LearnerNoise(Learner):
                 plt.clf()
                 plt.close("all")
 
-    def plot_rmse_error(self, init_state, w_c_arr, verbose, tsim, dt, std=0.0):
+    def plot_traj_rmse(self, init_state, w_c_arr, verbose, tsim, dt, std=0.0):
         with torch.no_grad():
             # Estimation over the test trajectories with T_star
             nb_trajs = w_c_arr.shape[0]
@@ -609,11 +600,9 @@ class LearnerNoise(Learner):
                                            str(std)))
             tq, simulation = self.system.simulate(init_state, tsim, dt)
 
-            noise = torch.normal(0, std, size=(simulation.shape[0], 2))
-
-            measurement_noise = simulation.add(noise)
-
-            measurement = self.model.h(measurement_noise)
+            measurement = self.model.h(simulation)
+            noise = torch.normal(0, std, size=measurement.shape)
+            measurement = measurement.add(noise)
 
             # Save these test trajectories
             os.makedirs(traj_folder, exist_ok=True)
@@ -676,7 +665,7 @@ class LearnerNoise(Learner):
             plt.grid(visible=True)
             plt.title(rf"Test trajectory RMSE")
             plt.xlabel(rf"$t$")
-            plt.ylabel(rf"$\hat{{x}}-x$")
+            plt.ylabel(rf"RMSE($\hat{{x}},x$)")
             plt.savefig(os.path.join(current_traj_folder, name),
                         bbox_inches="tight")
             if verbose:

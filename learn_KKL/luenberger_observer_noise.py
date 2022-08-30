@@ -422,7 +422,7 @@ class LuenbergerObserverNoise(LuenbergerObserver):
 
         w_c_tensor = torch.tensor(w_c).repeat(sol.shape[0]).unsqueeze(1)
 
-        z_hat = torch.cat((sol[:, :, 0], w_c_tensor), 1)
+        z_hat = torch.cat((torch.squeeze(sol), w_c_tensor), 1)
         x_hat = self.decoder(z_hat)
 
         if out_z:

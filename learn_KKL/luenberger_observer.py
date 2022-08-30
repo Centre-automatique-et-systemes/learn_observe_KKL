@@ -1146,6 +1146,7 @@ class LuenbergerObserver(nn.Module):
         _, sol = self.simulate(measurement, tsim, dt, z_0)
 
         # x_hat = self.decoder(sol[:, :, 0])
-        x_hat = self.decoder(sol[:, 0, :])
+        # x_hat = self.decoder(sol[:, 0, :])
+        x_hat = self.decoder(torch.squeeze(sol))
 
         return x_hat

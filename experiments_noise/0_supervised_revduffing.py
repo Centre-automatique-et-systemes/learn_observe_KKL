@@ -240,14 +240,14 @@ if __name__ == "__main__":
         torch.cat((x_0.expand(len(wc_arr), -1),
                    torch.as_tensor(wc_arr).reshape(-1, 1)), dim=1))
 
-    learner_T_star.plot_rmse_error(x_0, wc_arr, verbose, tsim, dt, std=0.25)
+    learner_T_star.plot_traj_rmse(x_0, wc_arr, verbose, tsim, dt, std=0.25)
 
     for std in std_array:
         learner_T_star.save_trj(
-            x_0, wc_arr, 0, verbose, tsim, dt, var=std#, z_0=z_0
+            x_0, wc_arr, 0, verbose, tsim, dt, std=std#, z_0=z_0
         )
         learner_T_star.plot_traj_error(
-            x_0, wc_arr, 0, verbose, tsim, dt, var=std#, z_0=z_0
+            x_0, wc_arr, 0, verbose, tsim, dt, std=std#, z_0=z_0
         )
 
     # Heatmap

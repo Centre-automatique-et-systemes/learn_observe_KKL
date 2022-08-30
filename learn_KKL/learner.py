@@ -383,19 +383,17 @@ class Learner(pl.LightningModule):
                 plt.clf()
                 plt.close('all')
 
-    def save_trj(self, init_state, verbose, tsim, dt, var=0.2,
+    def save_trj(self, init_state, verbose, tsim, dt, std=0.2,
                  traj_folder=None, z_0=None):
         # Estimation over the test trajectories with T_star
         if traj_folder is None:
             traj_folder = os.path.join(self.results_folder,
-                                       "Test_trajectories/Traj_{var}")
+                                       f"Test_trajectories/Traj_{std}")
         tq, simulation = self.system.simulate(init_state, tsim, dt)
 
-        noise = torch.normal(0, var, size=(simulation.shape))
-
-        simulation_noise = simulation.add(noise)
-
-        measurement = self.model.h(simulation_noise)
+        measurement = self.model.h(simulation)
+        noise = torch.normal(0, std, size=measurement.shape)
+        measurement = measurement.add(noise)
 
         # Save these test trajectories
         os.makedirs(traj_folder, exist_ok=True)
@@ -473,11 +471,9 @@ class Learner(pl.LightningModule):
                         df.drop(df.columns[0], axis=1).values)[0]
             tq, simulation = self.system.simulate(trajs_init, tsim, dt)
 
-            noise = torch.normal(0, std, size=(simulation.shape))
-
-            simulation_noise = simulation.add(noise)
-
-            measurement = self.model.h(simulation_noise)
+            measurement = self.model.h(simulation)
+            noise = torch.normal(0, std, size=measurement.shape)
+            measurement = measurement.add(noise)
 
             # Save these test trajectories
             os.makedirs(traj_folder, exist_ok=True)
