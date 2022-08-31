@@ -1,17 +1,16 @@
 # -*- coding: utf-8 -*-
 
 import os
+
 import numpy as np
 import pandas as pd
-from seaborn import utils
 import torch
+from functorch import jacfwd, vmap
 from scipy import linalg
 from torch import nn
-from torchdiffeq import odeint
 
 from learn_KKL.luenberger_observer import LuenbergerObserver
-
-from .utils import RMSE, generate_mesh, compute_h_infinity, MLPn
+from .utils import compute_h_infinity, MLPn
 
 # Set double precision by default
 torch.set_default_tensor_type(torch.DoubleTensor)
@@ -273,33 +272,19 @@ class LuenbergerObserverNoise(LuenbergerObserver):
               'script criterion.m should be used instead to compute the final '
               'criterion as it was in the paper.')
         if save:
-            # TODO more efficient computation for dNN/dx(x)! Symbolic?JAX?
-            # Compute dTdx over grid
-            dTdh = torch.autograd.functional.jacobian(
-                self.encoder, x, create_graph=False, strict=False,
-                vectorize=False
-            )
-            dTdx = torch.transpose(
-                torch.transpose(
-                    torch.diagonal(dTdh, dim1=0, dim2=2), 1, 2), 0, 1
-            )
-            dTdx = dTdx[:, :, : self.dim_x]
-            idx_max = torch.argmax(torch.linalg.matrix_norm(dTdx, ord=2))
-            Tmax = dTdx[idx_max]
+            with torch.no_grad():
+                # Compute dTdx over grid
+                dTdx = vmap(jacfwd(self.encoder))(x)
+                dTdx = dTdx[:, :, : self.dim_x]
+                idx_max = torch.argmax(torch.linalg.matrix_norm(dTdx, ord=2))
+                Tmax = dTdx[idx_max]
 
-            # Compute dTstar_dz over grid
-            dTstar_dh = torch.autograd.functional.jacobian(
-                self.decoder, z, create_graph=False, strict=False,
-                vectorize=False
-            )
-            dTstar_dz = torch.transpose(
-                torch.transpose(
-                    torch.diagonal(dTstar_dh, dim1=0, dim2=2), 1, 2), 0, 1
-            )
-            dTstar_dz = dTstar_dz[:, :, : self.dim_z]
-            idxstar_max = torch.argmax(
-                torch.linalg.matrix_norm(dTstar_dz, ord=2))
-            Tstar_max = dTstar_dz[idxstar_max]
+                # Compute dTstar_dz over grid
+                dTstar_dz = vmap(jacfwd(self.decoder))(z)
+                dTstar_dz = dTstar_dz[:, :, : self.dim_z]
+                idxstar_max = torch.argmax(
+                    torch.linalg.matrix_norm(dTstar_dz, ord=2))
+                Tstar_max = dTstar_dz[idxstar_max]
 
             # Save this data
             wc = z[0, -1].item()

@@ -2,6 +2,7 @@
 
 import torch
 from torch import nn
+from functorch import vmap, jacfwd
 
 from learn_KKL.luenberger_observer import LuenbergerObserver
 
@@ -127,13 +128,7 @@ class LuenbergerObserverJointly(LuenbergerObserver):
 
          if self.sensitivity_lambda > 0:
              # Compute gradients of T_star with respect to inputs
-             # TODO more efficient computation for dNN/dx(x)! Symbolic?JAX?
-             dTdh = torch.autograd.functional.jacobian(
-                 self.decoder, z_hat, create_graph=False, strict=False, vectorize=False
-             )
-             dTdz = torch.transpose(
-                 torch.transpose(torch.diagonal(dTdh, dim1=0, dim2=2), 1, 2), 0, 1
-             )
+             dTdz = vmap(jacfwd(self.decoder))(z_hat)
              dTdz = dTdz[:, :, : self.dim_z]  # TODO correct this loss!!!
              loss_3 = self.sensitivity_lambda * torch.linalg.norm(
                  torch.matmul(dTdz, torch.matmul(torch.inverse(self.D), self.F)))

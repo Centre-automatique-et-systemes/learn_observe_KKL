@@ -99,6 +99,7 @@ from scipy import linalg
 from scipy import signal
 from torch import nn
 from torchdiffeq import odeint
+from functorch import vmap, jacfwd
 
 from torchinterp1d import Interp1d
 from .utils import MSE, generate_mesh, MLPn
@@ -584,19 +585,7 @@ class LuenbergerObserver(nn.Module):
             Computed matrix from the observer state vector.
         """
         # Compute jacobian for T^*(z)
-        # TODO more efficient computation for dNN/dx(x)! Symbolic?JAX?
-        dTdy = torch.autograd.functional.jacobian(
-            self.encoder,
-            self.decoder(z.T),
-            create_graph=False,
-            strict=False,
-            vectorize=True,
-        )  # TODO vectorize is experimental but faster!
-
-        # Shape jacobian
-        dTdx = torch.zeros((self.dim_z, self.dim_x))
-        for j in range(dTdy.shape[1]):
-            dTdx[j, :] = dTdy[0, j, 0, :]
+        dTdx = vmap(jacfwd(self.encoder))(self.decoder(z.T))
 
         # System measurement g(T^*(z))
         msm = self.g(self.decoder(z.T).T)
@@ -970,13 +959,7 @@ class LuenbergerObserver(nn.Module):
         loss_1 = self.recon_lambda * MSE(x, x_hat, dim=dim)
 
         # Compute gradients of T_u with respect to inputs
-        # TODO more efficient computation for dNN/dx(x)! Symbolic?JAX?
-        dTdh = torch.autograd.functional.jacobian(
-            self.encoder, x, create_graph=False, strict=False, vectorize=False
-        )
-        dTdx = torch.transpose(
-            torch.transpose(torch.diagonal(dTdh, dim1=0, dim2=2), 1, 2), 0, 1
-        )
+        dTdx = vmap(jacfwd(self.encoder))(x)
         lhs = torch.einsum("ijk,ik->ij", dTdx, self.f(x))
 
         # D = self.D.to(self.device)

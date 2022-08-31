@@ -10,9 +10,11 @@ import pandas as pd
 # Import base utils
 import torch
 from torch import nn
+from functorch import vmap, jacfwd
 
 # To avoid Type 3 fonts for submission https://tex.stackexchange.com/questions/18687/how-to-generate-pdf-without-any-type3-fonts
 plt.rc('text', usetex=True)
+plt.rc('text.latex', preamble=r'\usepackage{amsfonts}\usepackage{cmbright}')
 plt.rc('font', family='serif')
 
 # In order to import learn_KKL we need to add the working dir to the system path
@@ -214,15 +216,7 @@ if __name__ == "__main__":
             def dydt(t, z: torch.tensor):
                 xhat = self.decoder(z)
                 zhat = self.encoder(xhat)
-                # TODO more efficient computation for dNN/dx(x)! Symbolic?JAX?
-                dTdh = torch.autograd.functional.jacobian(
-                    self.encoder, xhat, create_graph=False, strict=False,
-                    vectorize=False
-                )
-                dTdx = torch.transpose(
-                    torch.transpose(torch.diagonal(dTdh, dim1=0, dim2=2), 1, 2), 0,
-                    1
-                )
+                dTdx = vmap(jacfwd(self.encoder))(xhat)
                 lhs = torch.einsum("ijk,ik->ij", dTdx, self.f(xhat))
                 rhs = torch.matmul(
                     zhat, self.D.t()) + torch.matmul(self.h(xhat), self.F.t())
@@ -277,28 +271,12 @@ if __name__ == "__main__":
         # wait = input('')
 
         # Gradient heatmap of NN model
-        # TODO more efficient computation for dNN/dx(x)! Symbolic?JAX?
-        dTdh = torch.autograd.functional.jacobian(
-            learner.model.encoder, x, create_graph=False, strict=False,
-            vectorize=False
-        )
-        dTdx = torch.transpose(
-            torch.transpose(
-                torch.diagonal(dTdh, dim1=0, dim2=2), 1, 2), 0, 1
-        )
+        dTdx = vmap(jacfwd(learner.model.encoder))(x)
         dTdx = dTdx[:, :, : learner.model.dim_x]
         idx_max = torch.argmax(torch.linalg.matrix_norm(dTdx, ord=2))
         Tmax = dTdx[idx_max]
         # Compute dTstar_dz over grid
-        # TODO more efficient computation for dNN/dx(x)! Symbolic?JAX?
-        dTstar_dh = torch.autograd.functional.jacobian(
-            learner.model.decoder, z, create_graph=False, strict=False,
-            vectorize=False
-        )
-        dTstar_dz = torch.transpose(
-            torch.transpose(
-                torch.diagonal(dTstar_dh, dim1=0, dim2=2), 1, 2), 0, 1
-        )
+        dTstar_dz = vmap(jacfwd(learner.model.decoder))(z)
         dTstar_dz = dTstar_dz[:, :, : learner.model.dim_z]
         idxstar_max = torch.argmax(torch.linalg.matrix_norm(dTstar_dz, ord=2))
         Tstar_max = dTstar_dz[idxstar_max]

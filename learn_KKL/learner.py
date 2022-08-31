@@ -15,6 +15,7 @@ from .utils import RMSE, StandardScaler
 
 # To avoid Type 3 fonts for submission https://tex.stackexchange.com/questions/18687/how-to-generate-pdf-without-any-type3-fonts
 plt.rc('text', usetex=True)
+plt.rc('text.latex', preamble=r'\usepackage{amsfonts}\usepackage{cmbright}')
 plt.rc('font', family='serif')
 
 sb.set_style("whitegrid")
@@ -424,7 +425,7 @@ class Learner(pl.LightningModule):
         for j in range(estimation.shape[1]):
             name = "Traj" + str(j) + ".pdf"
             if j == 0:
-                plt.plot(tq, simulation_noise[:, j].detach().numpy(), '-',
+                plt.plot(tq, measurement[:, j].detach().numpy(), '-',
                          label=r"$y$")
             plt.plot(tq, simulation[:, j].detach().numpy(), '--',
                      label=rf"$x_{j + 1}$")
@@ -504,7 +505,7 @@ class Learner(pl.LightningModule):
                 for j in range(estimation.shape[1]):
                     name = "Traj" + str(j) + ".pdf"
                     if j == 0:
-                        plt.plot(tq, simulation_noise[:, i, j].detach().numpy(),
+                        plt.plot(tq, measurement[:, i, j].detach().numpy(),
                                  '-', label=r"$y$")
                     plt.plot(tq, simulation[:, i, j].detach().numpy(), '--',
                              label=rf"$x_{j + 1}$")

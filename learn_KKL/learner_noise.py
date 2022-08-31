@@ -13,6 +13,7 @@ from .utils import RMSE, StandardScaler
 
 # To avoid Type 3 fonts for submission https://tex.stackexchange.com/questions/18687/how-to-generate-pdf-without-any-type3-fonts
 plt.rc('text', usetex=True)
+plt.rc('text.latex', preamble=r'\usepackage{amsfonts}\usepackage{cmbright}')
 plt.rc('font', family='serif')
 
 sb.set_style("whitegrid")

@@ -44,7 +44,7 @@ import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
 
-    TRAIN = True
+    TRAIN = False
 
     ##########################################################################
     # Setup observer #########################################################
@@ -326,7 +326,7 @@ if __name__ == "__main__":
 
     else:
         # Load learner  # TODO
-        path = "runs/QuanserQubeServo2_meas12/Supervised_noise/T_star/exp_1"
+        path = "runs/QuanserQubeServo2_meas12/Supervised_noise/T_star/exp_2"
         learner_path = path + "/learner.pkl"
         import dill as pkl
         with open(learner_path, "rb") as rb_file:

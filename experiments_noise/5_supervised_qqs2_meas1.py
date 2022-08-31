@@ -348,17 +348,17 @@ if __name__ == "__main__":
           'this script, set save to False and path to this subfolder.')
     save = True
     path = ''
-    if save:
-        mesh = learner_T_star.model.generate_data_svl(
-            x_limits, wc_arr, 10000 * len(wc_arr), method="uniform",
-            stack=False
-        )
-    else:
-        mesh = torch.randn((10, learner_T_star.model.dim_x +
-                            learner_T_star.model.dim_z, 1))
-    learner_T_star.save_rmse_wc(mesh, wc_arr, verbose)
-    learner_T_star.plot_sensitiviy_wc(mesh, wc_arr, verbose, save=save,
-                                      path=path)
+    # if save:
+    #     mesh = learner_T_star.model.generate_data_svl(
+    #         x_limits, wc_arr, 10000 * len(wc_arr), method="uniform",
+    #         stack=False
+    #     )
+    # else:
+    #     mesh = torch.randn((10, learner_T_star.model.dim_x +
+    #                         learner_T_star.model.dim_z, 1))
+    # learner_T_star.save_rmse_wc(mesh, wc_arr, verbose)
+    # learner_T_star.plot_sensitiviy_wc(mesh, wc_arr, verbose, save=save,
+    #                                   path=path)
 
     # Test trajectories
     dt = 0.04
