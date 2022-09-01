@@ -413,7 +413,7 @@ class LuenbergerObserver(nn.Module):
         self.decoder.set_scalers(scaler_X=self.scaler_z, scaler_Y=self.scaler_x)
 
     def set_F(self, F):
-        """ set custom F 
+        """ set custom F
         (in order to avoid information loss you should strive for rankF = dim_y"""
         self.F = F
 
@@ -962,13 +962,13 @@ class LuenbergerObserver(nn.Module):
 
         Retourne les deux ensembles (data1,grid1), (data2,grid2)
         """
-        from learn_KKL.raffinementZ import iterate_grid, coordinate
+        from learn_KKL.raffinementV3 import iterate_grid, coordinate
         import numpy
         # une itération de raffinement/raffinement indépendant pour chaque dimension de X
-        grid1 = iterate_grid(grid1, data1[:, 2:5].numpy(), 0)
+        grid1 = iterate_grid(grid1,data1[:,0].numpy(),data1[:, 2:5].numpy())
         x1, y1 = coordinate(grid1)
 
-        grid2 = iterate_grid(grid2, data2[:, 2:5].numpy(), 1)
+        grid2 = iterate_grid(grid2,data2[:,1].numpy(),data2[:, 2:5].numpy())
         x2, y2 = coordinate(grid2)
 
         # calcul de Z sur chaque nouvelle grille
@@ -1150,7 +1150,7 @@ class LuenbergerObserver(nn.Module):
         return loss
 
     def loss_T_star(
-            self, x: torch.tensor, x_hat: torch.tensor, dim=None
+            self, x: torch.tensor, x_hat: torch.tensor, axe: int
     ) -> torch.tensor:
         """
         Loss function for training only the forward transformation T*.
@@ -1172,8 +1172,8 @@ class LuenbergerObserver(nn.Module):
         loss: torch.tensor
             Reconstruction loss MSE(x, x_hat).
         """
-        loss = MSE(x, x_hat, dim=dim)
-        return loss
+        loss = MSE(x, x_hat, dim=0)
+        return loss[axe]
 
     def loss(self, method="Autoencoder", *input):
         if method == "T":
@@ -1269,7 +1269,7 @@ class LuenbergerObserver(nn.Module):
         tsim: tuple
             Tuple of (Start, End) time of simulation.
 
-        dt: float 
+        dt: float
             Step width of tsim.
 
         Returns

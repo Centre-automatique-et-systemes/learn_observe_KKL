@@ -88,6 +88,7 @@ class Learner(pl.LightningModule):
             system,
             training_data,
             validation_data,
+            axe,
             method="Autoencoder",
             batch_size=10,
             lr=1e-3,
@@ -102,6 +103,7 @@ class Learner(pl.LightningModule):
         self.method = method
         self.model = observer
         self.model.to(self.device)
+        self.axe = axe
 
         # Data handling
         self.training_data = training_data
@@ -253,7 +255,7 @@ class Learner(pl.LightningModule):
         elif self.method == "T_star":
             x = batch[:, self.x_idx_out]
             x_hat = self.forward(batch)
-            loss = self.model.loss(self.method, x, x_hat)
+            loss = self.model.loss(self.method, x, x_hat, self.axe)
         self.log("train_loss", loss, on_step=True, prog_bar=True, logger=True)
         self.train_loss = torch.cat((self.train_loss, torch.tensor([[loss]])))
         logs = {"train_loss": loss.detach()}
@@ -297,7 +299,7 @@ class Learner(pl.LightningModule):
             elif self.method == "T_star":
                 x = batch[:, self.x_idx_out]
                 x_hat = self.forward(batch)
-                loss = self.model.loss(self.method, x, x_hat)
+                loss = self.model.loss(self.method, x, x_hat, self.axe)
             self.log("val_loss", loss, on_step=True, prog_bar=True, logger=True)
             self.val_loss = torch.cat((self.val_loss, torch.tensor([[loss]])))
             logs = {"val_loss": loss.detach()}

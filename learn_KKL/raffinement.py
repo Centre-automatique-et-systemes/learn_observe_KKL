@@ -116,7 +116,7 @@ def crit_sequence(grid,Z,nx,ny,Coeffs):
 
 def alpha_sequence(grid,Z,nx,ny,Coeffs):
     res1,res2,res3 = crit_sequence(grid,Z,nx,ny,Coeffs)
-    return np.linspace(0,res1.mean(),len(grid)),np.linspace(0,res2.mean(),len(grid)),np.linspace(0,res3.mean(),len(grid))
+    return np.linspace(0,res1.max(),len(grid)),np.linspace(0,res2.max(),len(grid)),np.linspace(0,res3.max(),len(grid))
 
 
 def distrib_sequence(grid,Z,nx,ny,Coeffs):
@@ -181,34 +181,35 @@ def iterate_grid(grid,Z,smooth):
                 new_grid.insert(k,C01)
                 new_grid.insert(k,C00)
                 raffinement += 1
-            
-        # raffinement uniquement sur x 
-        if gx > 15*gy and gx > alphax and raffinement == 0:
+
+        # raffinement uniquement sur x
+        if gx > alphax and raffinement == 0:
             C00,C01 = cell.split_x()
             if cell in new_grid:
                 new_grid.remove(cell)
             new_grid.insert(k,C01)
             new_grid.insert(k,C00)
             raffinement += 1
-            
-        # reffinement uniquement sur y 
-        if gy > 15*gx and gy > alphay and raffinement == 0:
+        #
+        # reffinement uniquement sur y
+        if gy > alphay and raffinement == 0:
             C00,C01 = cell.split_y()
             if cell in new_grid:
                 new_grid.remove(cell)
             new_grid.insert(k,C01)
             new_grid.insert(k,C00)
             raffinement += 1
-        
-        # sinon raffinement iso
-        if np.sqrt(gx**2+gy**2) > alpha and raffinement == 0:
-            C00,C01,C10,C11 = cell.split_iso()
+
+        # raffinement iso
+        if np.sqrt(gx ** 2 + gy ** 2) > alpha and raffinement == 0:
+            C00, C01, C10, C11 = cell.split_iso()
             new_grid.remove(cell)
-            new_grid.insert(k,C11)
-            new_grid.insert(k,C10)
-            new_grid.insert(k,C01)
-            new_grid.insert(k,C00)
-         
+            new_grid.insert(k, C11)
+            new_grid.insert(k, C10)
+            new_grid.insert(k, C01)
+            new_grid.insert(k, C00)
+            raffinement += 1
+
     return new_grid
 
 
