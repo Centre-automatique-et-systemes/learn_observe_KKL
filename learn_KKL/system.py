@@ -76,7 +76,7 @@ import numpy as np
 import torch
 from scipy import signal
 from torchdiffeq import odeint
-from functorch import vmap, jacfwd
+from functorch import vmap, jacrev
 
 # Set double precision by default
 torch.set_default_tensor_type(torch.DoubleTensor)
@@ -604,7 +604,7 @@ class QuanserQubeServo2(System):
     # function u. Useful for EKF!
     def predict_deriv(self, x, f):
         # Compute Jacobian of f with respect to input x
-        dfdh = vmap(jacfwd(f))(x)
+        dfdh = vmap(jacrev(f))(x)
         dfdx = torch.squeeze(dfdh)
         return dfdx
 

@@ -5,7 +5,7 @@ import os
 import numpy as np
 import pandas as pd
 import torch
-from functorch import jacfwd, vmap
+from functorch import jacfwd, vmap, jacrev
 from scipy import linalg
 from torch import nn
 
@@ -123,7 +123,7 @@ class LuenbergerObserverNoise(LuenbergerObserver):
             size=(num_samples, self.dim_x + self.dim_z + 1, len(w_c)))
 
         for idx, w_c_i in np.ndenumerate(w_c):
-            self.D, self.F = self.set_DF(w_c_i)
+            self.D, self.F = self.set_DF(w_c_i, method=self.method_setD)
 
             data = self.generate_data_mesh(limits, num_samples, k, dt,
                                            method, z_0=z_0, w_c=w_c_i)
@@ -191,7 +191,7 @@ class LuenbergerObserverNoise(LuenbergerObserver):
             size=(len(tq), num_samples, self.dim_x + self.dim_z + 1, len(w_c)))
 
         for idx, w_c_i in np.ndenumerate(w_c):
-            self.D, self.F = self.set_DF(w_c_i)
+            self.D, self.F = self.set_DF(w_c_i, method=self.method_setD)
 
             # Get initial conditions for this wv with B/F sampling
             y_0 = self.generate_data_mesh(limits, num_samples, k, dt, method,
@@ -243,7 +243,7 @@ class LuenbergerObserverNoise(LuenbergerObserver):
                   len(w_c)))
 
         for idx, w_c_i in np.ndenumerate(w_c):
-            self.D, self.F = self.set_DF(w_c_i)
+            self.D, self.F = self.set_DF(w_c_i, method=self.method_setD)
 
             tq, data = self.simulate_system(init, tsim, dt)
             self.k = k
@@ -280,7 +280,7 @@ class LuenbergerObserverNoise(LuenbergerObserver):
                 Tmax = dTdx[idx_max]
 
                 # Compute dTstar_dz over grid
-                dTstar_dz = vmap(jacfwd(self.decoder))(z)
+                dTstar_dz = vmap(jacrev(self.decoder))(z)
                 dTstar_dz = dTstar_dz[:, :, : self.dim_z]
                 idxstar_max = torch.argmax(
                     torch.linalg.matrix_norm(dTstar_dz, ord=2))
@@ -401,7 +401,7 @@ class LuenbergerObserverNoise(LuenbergerObserver):
         x_hat: torch.tensor
             Estimation of the observer model.
         """
-        self.D, _ = self.set_DF(w_c)
+        self.D, _ = self.set_DF(w_c, method=self.method_setD)
 
         _, sol = self.simulate(measurement, t_sim, dt, z_0)
 

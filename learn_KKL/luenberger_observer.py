@@ -298,6 +298,7 @@ class LuenbergerObserver(nn.Module):
             self.D, self.F = self.set_DF(wc=self.wc, method=self.method_setD)
         else:
             self.wc = 0.0
+            self.method_setD = 'given'
             self.D = torch.as_tensor(D)
             self.F = torch.ones((self.dim_z, self.dim_y))
 
@@ -356,6 +357,7 @@ class LuenbergerObserver(nn.Module):
                 "dim_x " + str(self.dim_x),
                 "dim_y " + str(self.dim_y),
                 "dim_z " + str(self.dim_z),
+                "method_setD " + str(self.method_setD),
                 "wc " + str(self.wc),
                 "D " + str(self.D),
                 "F " + str(self.F),

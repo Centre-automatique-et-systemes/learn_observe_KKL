@@ -342,7 +342,8 @@ class LearnerNoise(Learner):
         D_arr = torch.zeros(0, self.model.dim_z, self.model.dim_z)
         for j in range(len(w_c_array)):
             wc = w_c_array[j]
-            self.model.D, _ = self.model.set_DF(wc)
+            self.model.D, _ = self.model.set_DF(wc,
+                                                method=self.model.method_setD)
 
             if save:
                 x_mesh = mesh[:, self.x_idx_in, j]

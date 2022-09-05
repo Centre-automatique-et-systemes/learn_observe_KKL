@@ -10,7 +10,7 @@ import pandas as pd
 # Import base utils
 import torch
 from torch import nn
-from functorch import vmap, jacfwd
+from functorch import vmap, jacfwd, jacrev
 
 # To avoid Type 3 fonts for submission https://tex.stackexchange.com/questions/18687/how-to-generate-pdf-without-any-type3-fonts
 plt.rc('text', usetex=True)
@@ -276,7 +276,7 @@ if __name__ == "__main__":
         idx_max = torch.argmax(torch.linalg.matrix_norm(dTdx, ord=2))
         Tmax = dTdx[idx_max]
         # Compute dTstar_dz over grid
-        dTstar_dz = vmap(jacfwd(learner.model.decoder))(z)
+        dTstar_dz = vmap(jacrev(learner.model.decoder))(z)
         dTstar_dz = dTstar_dz[:, :, : learner.model.dim_z]
         idxstar_max = torch.argmax(torch.linalg.matrix_norm(dTstar_dz, ord=2))
         Tstar_max = dTstar_dz[idxstar_max]

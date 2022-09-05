@@ -44,7 +44,7 @@ import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
 
-    TRAIN = False
+    TRAIN = True
 
     ##########################################################################
     # Setup observer #########################################################
@@ -54,7 +54,6 @@ if __name__ == "__main__":
     num_hl = 5
     size_hl = 50
     activation = nn.ReLU()
-    recon_lambda = 0.1
 
     # Define system
     system = QuanserQubeServo2()
@@ -65,14 +64,15 @@ if __name__ == "__main__":
     traj_data = True  # whether to generate data on grid or from trajectories
     add_forward = False
     if traj_data:  # TODO
-        num_initial_conditions = 1000
+        num_initial_conditions = 500
         x_limits = np.array(
             [[-0.5, 0.5], [-0.5, 0.5], [-0.1, 0.1], [-0.1, 0.1]])
     else:
         num_samples = int(1e5)
         x_limits = np.array(
             [[-0.5, 0.5], [-0.5, 0.5], [-0.1, 0.1], [-0.1, 0.1]])
-    wc_arr = np.linspace(1., 5., 10)
+    wc_arr = np.linspace(2., 5., 10)
+    D = 'diag'  # 'block_diag'
 
     # Solver options
     # solver_options = {'method': 'rk4', 'options': {'step_size': 1e-3}}
@@ -85,6 +85,7 @@ if __name__ == "__main__":
             dim_y=system.dim_y,
             method=learning_method,
             wc_array=wc_arr,
+            D=D,
             activation=activation,
             num_hl=num_hl,
             size_hl=size_hl,
@@ -134,7 +135,7 @@ if __name__ == "__main__":
             batch_size = 100
             init_learning_rate = 1e-2
         else:
-            batch_size = 20
+            batch_size = 100
             init_learning_rate = 1e-2
 
         # Optim options
@@ -149,12 +150,12 @@ if __name__ == "__main__":
         scheduler_options = {
             "mode": "min",
             "factor": 0.5,
-            "patience": 10,
+            "patience": 5,
             "threshold": 1e-4,
             "verbose": True,
         }
         stopper = pl.callbacks.early_stopping.EarlyStopping(
-            monitor="val_loss", min_delta=5e-4, patience=15, verbose=False,
+            monitor="val_loss", min_delta=5e-4, patience=5, verbose=False,
             mode="min"
         )
 
@@ -223,12 +224,12 @@ if __name__ == "__main__":
         scheduler_options = {
             "mode": "min",
             "factor": 0.5,
-            "patience": 10,
+            "patience": 5,
             "threshold": 1e-4,
             "verbose": True,
         }
         stopper = pl.callbacks.early_stopping.EarlyStopping(
-            monitor="val_loss", min_delta=5e-4, patience=15, verbose=False,
+            monitor="val_loss", min_delta=5e-4, patience=5, verbose=False,
             mode="min"
         )
 
@@ -444,8 +445,9 @@ if __name__ == "__main__":
     for i in range(len(wc_arr)):
         # KKL observer
         wc = wc_arr[i]
-        estimation = observer.predict(y, tsim, dt, wc).detach()
-        estimation = system.remap_angles(estimation)
+        with torch.no_grad():
+            estimation = observer.predict(y, tsim, dt, wc)
+            estimation = system.remap_angles(estimation)
 
         # Compare both
         os.makedirs(os.path.join(learner_T_star.results_folder, fileName,

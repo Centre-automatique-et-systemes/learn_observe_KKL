@@ -2,7 +2,7 @@
 
 import torch
 from torch import nn
-from functorch import vmap, jacfwd
+from functorch import vmap, jacrev
 
 from learn_KKL.luenberger_observer import LuenbergerObserver
 
@@ -128,7 +128,7 @@ class LuenbergerObserverJointly(LuenbergerObserver):
 
          if self.sensitivity_lambda > 0:
              # Compute gradients of T_star with respect to inputs
-             dTdz = vmap(jacfwd(self.decoder))(z_hat)
+             dTdz = vmap(jacrev(self.decoder))(z_hat)
              dTdz = dTdz[:, :, : self.dim_z]  # TODO correct this loss!!!
              loss_3 = self.sensitivity_lambda * torch.linalg.norm(
                  torch.matmul(dTdz, torch.matmul(torch.inverse(self.D), self.F)))

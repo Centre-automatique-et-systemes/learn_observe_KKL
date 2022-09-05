@@ -54,7 +54,6 @@ if __name__ == "__main__":
     num_hl = 5
     size_hl = 50
     activation = nn.ReLU()
-    recon_lambda = 0.1
 
     # Define system
     system = QuanserQubeServo2_meas1()
@@ -65,14 +64,15 @@ if __name__ == "__main__":
     traj_data = True  # whether to generate data on grid or from trajectories
     add_forward = False
     if traj_data:  # TODO
-        num_initial_conditions = 1000
+        num_initial_conditions = 500
         x_limits = np.array(
             [[-0.5, 0.5], [-0.5, 0.5], [-0.1, 0.1], [-0.1, 0.1]])
     else:
         num_samples = int(1e5)
         x_limits = np.array(
             [[-0.5, 0.5], [-0.5, 0.5], [-0.1, 0.1], [-0.1, 0.1]])
-    wc_arr = np.linspace(1., 5., 10)
+    wc_arr = np.linspace(2., 5., 10)
+    D = 'diag'  # 'block_diag'
 
     # Solver options
     # solver_options = {'method': 'rk4', 'options': {'step_size': 1e-3}}
@@ -85,6 +85,7 @@ if __name__ == "__main__":
             dim_y=system.dim_y,
             method=learning_method,
             wc_array=wc_arr,
+            D=D,
             activation=activation,
             num_hl=num_hl,
             size_hl=size_hl,
@@ -149,12 +150,12 @@ if __name__ == "__main__":
         scheduler_options = {
             "mode": "min",
             "factor": 0.5,
-            "patience": 10,
+            "patience": 5,
             "threshold": 1e-4,
             "verbose": True,
         }
         stopper = pl.callbacks.early_stopping.EarlyStopping(
-            monitor="val_loss", min_delta=5e-4, patience=15, verbose=False,
+            monitor="val_loss", min_delta=5e-4, patience=5, verbose=False,
             mode="min"
         )
 
@@ -223,12 +224,12 @@ if __name__ == "__main__":
         scheduler_options = {
             "mode": "min",
             "factor": 0.5,
-            "patience": 10,
+            "patience": 5,
             "threshold": 1e-4,
             "verbose": True,
         }
         stopper = pl.callbacks.early_stopping.EarlyStopping(
-            monitor="val_loss", min_delta=5e-4, patience=15, verbose=False,
+            monitor="val_loss", min_delta=5e-4, patience=5, verbose=False,
             mode="min"
         )
 
@@ -326,7 +327,8 @@ if __name__ == "__main__":
 
     else:
         # Load learner  # TODO
-        path = "runs/QuanserQubeServo2_meas1/Supervised_noise/T_star/exp_1"
+        path = "runs/QuanserQubeServo2_meas1/Supervised_noise/T_star" \
+               "/N1000_wc1510"
         learner_path = path + "/learner.pkl"
         import dill as pkl
         with open(learner_path, "rb") as rb_file:
@@ -348,17 +350,17 @@ if __name__ == "__main__":
           'this script, set save to False and path to this subfolder.')
     save = True
     path = ''
-    # if save:
-    #     mesh = learner_T_star.model.generate_data_svl(
-    #         x_limits, wc_arr, 10000 * len(wc_arr), method="uniform",
-    #         stack=False
-    #     )
-    # else:
-    #     mesh = torch.randn((10, learner_T_star.model.dim_x +
-    #                         learner_T_star.model.dim_z, 1))
-    # learner_T_star.save_rmse_wc(mesh, wc_arr, verbose)
-    # learner_T_star.plot_sensitiviy_wc(mesh, wc_arr, verbose, save=save,
-    #                                   path=path)
+    if save:
+        mesh = learner_T_star.model.generate_data_svl(
+            x_limits, wc_arr, 10000 * len(wc_arr), method="uniform",
+            stack=False
+        )
+    else:
+        mesh = torch.randn((10, learner_T_star.model.dim_x +
+                            learner_T_star.model.dim_z, 1))
+    learner_T_star.save_rmse_wc(mesh, wc_arr, verbose)
+    learner_T_star.plot_sensitiviy_wc(mesh, wc_arr, verbose, save=save,
+                                      path=path)
 
     # Test trajectories
     dt = 0.04
@@ -443,8 +445,9 @@ if __name__ == "__main__":
     for i in range(len(wc_arr)):
         # KKL observer
         wc = wc_arr[i]
-        estimation = observer.predict(y, tsim, dt, wc).detach()
-        estimation = system.remap_angles(estimation)
+        with torch.no_grad():
+            estimation = observer.predict(y, tsim, dt, wc)
+            estimation = system.remap_angles(estimation)
 
         # Compare both
         os.makedirs(os.path.join(learner_T_star.results_folder, fileName,
