@@ -251,19 +251,12 @@ if __name__ == "__main__":
         )
 
     # Heatmap
-    mesh = learner_T_star.model.generate_data_svl(
-        x_limits, wc_arr, 10000, method="uniform", stack=False#, z_0="encoder"
-    )
+    if not save:
+        mesh = learner_T_star.model.generate_data_svl(
+            x_limits, wc_arr, 10000, method="uniform", stack=False
+            #, z_0="encoder"
+        )
     learner_T_star.save_pdf_heatmap(mesh, verbose)
-
-    # Invertibility heatmap
-    for i in range(len(wc_arr)):
-        wc = wc_arr[i]
-        xmesh = mesh[:, learner_T_star.x_idx_in, i]
-        zmesh = torch.cat((learner_T_star.model.encoder(xmesh),
-                           torch.unsqueeze(mesh[:, -1, i], 1)),
-                          dim=1)
-        learner_T_star.save_invert_heatmap(xmesh[:, :-1],
-                                           learner_T_star.model.decoder(zmesh),
-                                           verbose=False, wc=wc)
+    learner_T_star.save_invert_heatmap(mesh, verbose)
+    # TODO bug heatmaps when z_0="encoder"?
 

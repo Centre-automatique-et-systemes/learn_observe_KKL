@@ -260,9 +260,9 @@ class LearnerNoise(Learner):
                 # z_mesh.add(noise)
 
                 # compute x_hat for every w_c
-                x_hat_star = self.model("T_star", z_mesh)
+                x_hat = self.model("T_star", z_mesh)
 
-                errors[j] = RMSE(x_mesh, x_hat_star).detach().numpy()
+                errors[j] = RMSE(x_mesh, x_hat).detach().numpy()
 
             # https://stackoverflow.com/questions/37822925/how-to-smooth-by-interpolation-when-using-pcolormesh
             name = "RMSE_w_c.pdf"
@@ -295,42 +295,23 @@ class LearnerNoise(Learner):
                 w_c = z_mesh[0, -1]
 
                 # compute x_hat for every w_c
-                x_hat_star = self.model("T_star", z_mesh)
+                x_hat = self.model("T_star", z_mesh)
 
-                error = RMSE(x_mesh, x_hat_star, dim=1)
+                Learner.save_pdf_heatmap(
+                    self, x_mesh=x_mesh, x_hat=x_hat, verbose=verbose, wc=w_c)
 
-                for i in range(1, x_mesh.shape[1]):
-                    # https://stackoverflow.com/questions/37822925/how-to-smooth-by-interpolation-when-using-pcolormesh
-                    name = "RMSE_heatmap" + str(j) + ".pdf"
-                    plt.scatter(
-                        x_mesh[:, i - 1],
-                        x_mesh[:, i],
-                        cmap="jet",
-                        c=np.log(error.detach().numpy()),
-                        # vmin=-11,
-                        # vmax=-3,
-                    )
-                    cbar = plt.colorbar()
-                    cbar.set_label("Log estimation error")
-                    # cbar.set_label("Log estimation error")
+    def save_invert_heatmap(self, mesh, verbose):
+        with torch.no_grad():
+            for j in range(mesh.shape[-1]):
+                x_mesh = mesh[:, self.x_idx_out, j]
+                z_mesh = mesh[:, self.z_idx_in, j]
+                w_c = z_mesh[0, -1]
 
-                    plt.title(
-                        r"RMSE between $x$ and $\hat{x}$"
-                        + rf" with $\omega_c =$ {w_c.item():0.2g}"
-                    )
-                    plt.grid(False)
-                    plt.xlabel(rf"$x_{i}$")
-                    plt.ylabel(rf"$x_{i + 1}$")
-                    plt.savefig(
-                        os.path.join(self.results_folder, name),
-                        bbox_inches="tight"
-                    )
-                    if verbose:
-                        plt.show()
-                        plt.close("all")
+                # compute x_hat for every w_c
+                x_hat = self.model("T_star", z_mesh)
 
-                    plt.clf()
-                    plt.close("all")
+                Learner.save_invert_heatmap(
+                    self, x_mesh=x_mesh, x_hat=x_hat, verbose=verbose, wc=w_c)
 
     def plot_sensitiviy_wc(self, mesh, w_c_array, verbose,
                            y_lim=[None, None], save=True, path=''):
@@ -344,6 +325,7 @@ class LearnerNoise(Learner):
             wc = w_c_array[j]
             self.model.D, _ = self.model.set_DF(wc,
                                                 method=self.model.method_setD)
+            print(self.model.D)
 
             if save:
                 x_mesh = mesh[:, self.x_idx_in, j]

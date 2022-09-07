@@ -64,15 +64,15 @@ if __name__ == "__main__":
     traj_data = True  # whether to generate data on grid or from trajectories
     add_forward = False
     if traj_data:  # TODO
-        num_initial_conditions = 500
+        num_initial_conditions = 1000
         x_limits = np.array(
             [[-0.5, 0.5], [-0.5, 0.5], [-0.1, 0.1], [-0.1, 0.1]])
     else:
         num_samples = int(1e5)
         x_limits = np.array(
             [[-0.5, 0.5], [-0.5, 0.5], [-0.1, 0.1], [-0.1, 0.1]])
-    wc_arr = np.linspace(2., 5., 10)
-    D = 'diag'  # 'block_diag'
+    wc_arr = np.linspace(1, 3., 100)
+    D = 'block_diag'  # 'block_diag'
 
     # Solver options
     # solver_options = {'method': 'rk4', 'options': {'step_size': 1e-3}}
@@ -99,7 +99,7 @@ if __name__ == "__main__":
                 x_limits, wc_arr, num_initial_conditions, method="LHS", tsim=tsim,
                 stack=False, dt=dt
             )
-            data = system.remap_angles(data, wc=True)  # remap angles to stay in compact
+            data = system.remap(data, wc=True)  # remap angles to stay in compact
             data_ordered = copy.deepcopy(data)
             data = torch.cat(torch.unbind(data, dim=1), dim=0)
             if add_forward:  # TODO add one forward trajectory to dataset
@@ -107,7 +107,7 @@ if __name__ == "__main__":
                 data_forward = observer.generate_data_forward(
                     init=init, w_c=wc_arr, tsim=(0, 8),
                     num_datapoints=200, k=10, dt=dt, stack=True)
-                data_forward = system.remap_angles(data_forward, wc=True)
+                data_forward = system.remap(data_forward, wc=True)
                 data = torch.cat((data, data_forward), dim=0)
         else:
             data = observer.generate_data_svl(
@@ -118,7 +118,7 @@ if __name__ == "__main__":
                     init=init, w_c=wc_arr, tsim=(0, 8),
                     num_datapoints=200, k=10, dt=dt, stack=True)
                 data = torch.cat((data, data_forward), dim=0)
-            data = system.remap_angles(data, wc=True)  # remap angles to stay in compact
+            data = system.remap(data, wc=True)  # remap angles to stay in compact
         data = torch.cat(torch.unbind(data, dim=-1), dim=0)
         data, val_data = train_test_split(data, test_size=0.3, shuffle=False)
 
@@ -150,12 +150,12 @@ if __name__ == "__main__":
         scheduler_options = {
             "mode": "min",
             "factor": 0.5,
-            "patience": 5,
-            "threshold": 1e-4,
+            "patience": 3,
+            "threshold": 5e-4,
             "verbose": True,
         }
         stopper = pl.callbacks.early_stopping.EarlyStopping(
-            monitor="val_loss", min_delta=5e-4, patience=5, verbose=False,
+            monitor="val_loss", min_delta=1e-4, patience=7, verbose=False,
             mode="min"
         )
 
@@ -224,12 +224,12 @@ if __name__ == "__main__":
         scheduler_options = {
             "mode": "min",
             "factor": 0.5,
-            "patience": 5,
-            "threshold": 1e-4,
+            "patience": 3,
+            "threshold": 5e-4,
             "verbose": True,
         }
         stopper = pl.callbacks.early_stopping.EarlyStopping(
-            monitor="val_loss", min_delta=5e-4, patience=5, verbose=False,
+            monitor="val_loss", min_delta=1e-4, patience=7, verbose=False,
             mode="min"
         )
 
@@ -348,13 +348,12 @@ if __name__ == "__main__":
     print('Computing our gain-tuning criterion can take some time but saves '
           'intermediary data in a subfolder zi_mesh: if you have already run '
           'this script, set save to False and path to this subfolder.')
-    save = True
+    save = TRAIN
     path = ''
     if save:
         mesh = learner_T_star.model.generate_data_svl(
-            x_limits, wc_arr, 10000 * len(wc_arr), method="uniform",
-            stack=False
-        )
+            x_limits, wc_arr, 10000 * len(wc_arr), method="LHS",
+            stack=False)
     else:
         mesh = torch.randn((10, learner_T_star.model.dim_x +
                             learner_T_star.model.dim_z, 1))
@@ -365,9 +364,9 @@ if __name__ == "__main__":
     # Test trajectories
     dt = 0.04
     tsim = (0, 8)  # for test trajectories
-    std_array = [0.0, 0.25, 0.5]
-    wc_arr = np.array([1., 3., 5.])
-    x_0 = torch.tensor([0.1, -0.1, 0., 0.])
+    std_array = [0.0, 0.1, 0.2]
+    wc_arr = np.array([0.5, 1, 2, 3])
+    x_0 = torch.tensor([0.1, 0.1, 0., 0.])
     z_0 = learner_T_star.model.encoder(
         torch.cat((x_0.expand(len(wc_arr), -1),
                    torch.as_tensor(wc_arr).reshape(-1, 1)), dim=1))
@@ -380,24 +379,15 @@ if __name__ == "__main__":
             x_0, wc_arr, verbose, tsim, dt, std=std  # , z_0=z_0
         )
 
-    # Heatmap
-    mesh = learner_T_star.model.generate_data_svl(
-        x_limits, wc_arr, 10000, method="uniform", stack=False
-        # , z_0="encoder"
-    )
+    # Heatmaps
+    if not save:
+        mesh = learner_T_star.model.generate_data_svl(
+            x_limits, wc_arr, 10000 * len(wc_arr), method="LHS", stack=False
+            # , z_0="encoder"
+        )
     learner_T_star.save_pdf_heatmap(mesh, verbose)
+    learner_T_star.save_invert_heatmap(mesh, verbose)
     # TODO bug heatmaps when z_0="encoder"?
-
-    # Invertibility heatmap
-    for i in range(len(wc_arr)):
-        wc = wc_arr[i]
-        xmesh = mesh[:, learner_T_star.x_idx_in, i]
-        zmesh = torch.cat((learner_T_star.model.encoder(xmesh),
-                           torch.unsqueeze(mesh[:, -1, i], 1)),
-                          dim=1)
-        learner_T_star.save_invert_heatmap(xmesh[:, :-1],
-                                           learner_T_star.model.decoder(zmesh),
-                                           verbose=False, wc=wc)
 
 
     ##########################################################################
@@ -411,7 +401,7 @@ if __name__ == "__main__":
     exp_data = np.genfromtxt(filepath, delimiter=',')
     tq_exp = torch.from_numpy(exp_data[1:2001, -1] - exp_data[1, -1])
     exp_data = exp_data[1:2001, 1:-1]
-    exp_data = torch.from_numpy(system.remap_hardware_angles(exp_data))
+    exp_data = torch.from_numpy(system.remap_hardware(exp_data))
 
     # Utils
     t_exp = torch.cat((tq_exp.unsqueeze(1), exp_data), dim=1)
@@ -447,7 +437,7 @@ if __name__ == "__main__":
         wc = wc_arr[i]
         with torch.no_grad():
             estimation = observer.predict(y, tsim, dt, wc)
-            estimation = system.remap_angles(estimation)
+            estimation = system.remap(estimation)
 
         # Compare both
         os.makedirs(os.path.join(learner_T_star.results_folder, fileName,

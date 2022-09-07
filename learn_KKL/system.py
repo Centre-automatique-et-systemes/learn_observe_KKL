@@ -445,6 +445,9 @@ class QuanserQubeServo2(System):
         super().__init__()
         self.dim_x = 4
         self.dim_y = 2
+        self.needs_remap = True
+        # after each simulation, remap trajectory to [-pi,pi] and [0,
+        # 2pi]: belongs to systems that need to remap simulated trajectories
 
         # Motor
         # self.Rm = 8.4  # Resistance
@@ -558,7 +561,7 @@ class QuanserQubeServo2(System):
 
     # For flexibility and coherence: use remap function after every simulation
     # But be prepared to change its behavior!
-    def remap_angles(self, traj, wc=False):
+    def remap(self, traj, wc=False):
         # Map theta to [-pi,pi] and alpha to [0, 2pi]
         if not wc:
             traj[..., 0] = ((traj[..., 0] + np.pi) % (2 * np.pi)) - np.pi
@@ -569,7 +572,7 @@ class QuanserQubeServo2(System):
         return traj
 
     # For adapting hardware data to the conventions of the simulation model
-    def remap_hardware_angles(self, traj, add_pi_alpha=False, wc=False):
+    def remap_hardware(self, traj, add_pi_alpha=False, wc=False):
         # Reorder as (theta, alpha, thetadot, alphadot)
         # Convention for alpha: 0 is upwards (depends on dataset!)
         # Remap as simulation data
@@ -586,7 +589,7 @@ class QuanserQubeServo2(System):
                 traj_copy[..., 3, :], traj_copy[..., 2, :]
             if add_pi_alpha:
                 traj[..., 1, :] += np.pi
-        return self.remap_angles(traj, wc=wc)
+        return self.remap(traj, wc=wc)
 
     def __repr__(self):
         return "QuanserQubeServo2_meas12"

@@ -74,6 +74,7 @@ class LuenbergerObserverJointly(LuenbergerObserver):
                 "dim_x " + str(self.dim_x),
                 "dim_y " + str(self.dim_y),
                 "dim_z " + str(self.dim_z),
+                "method_setD " + str(self.method_setD),
                 "wc " + str(self.wc),
                 "D_0 " + str(self.D_0),
                 "D " + str(self.D),

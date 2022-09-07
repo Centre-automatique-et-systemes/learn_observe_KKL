@@ -358,12 +358,15 @@ class Learner(pl.LightningModule):
             plt.clf()
             plt.close("all")
 
-    def save_pdf_heatmap(self, x_mesh, x_hat_star, verbose):
+    def save_pdf_heatmap(self, x_mesh, x_hat, verbose, wc=None):
         with torch.no_grad():
-            error = RMSE(x_mesh, x_hat_star, dim=1)
+            error = RMSE(x_mesh, x_hat, dim=1)
             for i in range(1, x_mesh.shape[1]):
                 # https://stackoverflow.com/questions/37822925/how-to-smooth-by-interpolation-when-using-pcolormesh
-                name = "RMSE_heatmap" + str(i) + ".pdf"
+                if wc is not None:
+                    name = f"RMSE_heatmap_wc{wc:0.2g}_{i}.pdf"
+                else:
+                    name = "RMSE_heatmap" + str(i) + ".pdf"
                 plt.scatter(
                     x_mesh[:, i - 1],
                     x_mesh[:, i],
@@ -372,8 +375,13 @@ class Learner(pl.LightningModule):
                 )
                 cbar = plt.colorbar()
                 cbar.set_label("Log estimation error")
-                plt.title(rf"RMSE between $x$ and $\hat{{x}}$: "
-                          rf"{np.mean(error.detach().numpy()):0.2g}")
+                if wc is not None:
+                    plt.title(
+                        r"RMSE between $x$ and $\hat{x}$"
+                        + rf" with $\omega_c =$ {wc.item():0.2g}")
+                else:
+                    plt.title(rf"RMSE between $x$ and $\hat{{x}}$: "
+                              rf"{np.mean(error.detach().numpy()):0.2g}")
                 plt.xlabel(rf"$x_{i}$")
                 plt.ylabel(rf"$x_{i + 1}$")
                 plt.legend()
@@ -530,10 +538,10 @@ class Learner(pl.LightningModule):
             with open(os.path.join(traj_folder, filename), "w") as f:
                 print(traj_error / nb_trajs, file=f)
 
-    def save_invert_heatmap(self, x_mesh, x_hat_AE, verbose, wc=None):
+    def save_invert_heatmap(self, x_mesh, x_hat, verbose, wc=None):
         with torch.no_grad():
             # Invertibility heatmap
-            error = RMSE(x_mesh, x_hat_AE, dim=1)
+            error = RMSE(x_mesh, x_hat, dim=1)
             for i in range(1, x_mesh.shape[1]):
                 if wc is not None:
                     name = f"Invertibility_heatmap_wc{wc:0.2g}_{i}.pdf"

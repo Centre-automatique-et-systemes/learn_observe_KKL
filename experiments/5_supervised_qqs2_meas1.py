@@ -95,7 +95,7 @@ if __name__ == "__main__":
             x_limits, num_initial_conditions, method="LHS", tsim=tsim,
             stack=False, dt=dt
         )
-        data = system.remap_angles(data)  # remap angles to stay in compact
+        data = system.remap(data)  # remap angles to stay in compact
         data_ordered = copy.deepcopy(data)
         data = torch.cat(torch.unbind(data, dim=1), dim=0)
         if add_forward:  # TODO add one forward trajectory to dataset
@@ -103,7 +103,7 @@ if __name__ == "__main__":
             data_forward = observer.generate_data_forward(
                 init=init, tsim=(0, 8),
                 num_datapoints=200, k=10, dt=dt, stack=True)
-            data_forward = system.remap_angles(data_forward)
+            data_forward = system.remap(data_forward)
             data = torch.cat((data, data_forward), dim=0)
     else:
         data = observer.generate_data_svl(
@@ -114,7 +114,7 @@ if __name__ == "__main__":
                 init=init, tsim=(0, 8),
                 num_datapoints=200, k=10, dt=dt, stack=True)
             data = torch.cat((data, data_forward), dim=0)
-        data = system.remap_angles(data)  # remap angles to stay in compact
+        data = system.remap(data)  # remap angles to stay in compact
     data, val_data = train_test_split(data, test_size=0.3, shuffle=False)
 
     print(data.shape)
@@ -235,7 +235,7 @@ if __name__ == "__main__":
     with torch.no_grad():
         learner.save_results(
             limits=x_limits, nb_trajs=10, tsim=tsim, dt=dt, fast=True,
-            method='uniform',
+            method='LHS',
             checkpoint_path=checkpoint_callback.best_model_path)
 
     ##########################################################################
@@ -258,7 +258,7 @@ if __name__ == "__main__":
     exp_data = np.genfromtxt(filepath, delimiter=',')
     tq_exp = torch.from_numpy(exp_data[1:2001, -1] - exp_data[1, -1])
     exp_data = exp_data[1:2001, 1:-1]
-    exp_data = torch.from_numpy(system.remap_hardware_angles(exp_data))
+    exp_data = torch.from_numpy(system.remap_hardware(exp_data))
 
     # Observer
     t_exp = torch.cat((tq_exp.unsqueeze(1), exp_data), dim=1)
@@ -268,7 +268,7 @@ if __name__ == "__main__":
     measurement = system.h(exp)
     y = torch.cat((tq.unsqueeze(1), measurement), dim=1)
     estimation = observer.predict(y, tsim, dt).detach()
-    estimation = system.remap_angles(estimation)
+    estimation = system.remap(estimation)
 
     # Compare both
     os.makedirs(os.path.join(learner.results_folder, fileName), exist_ok=True)

@@ -87,6 +87,7 @@ class LuenbergerObserverNoise(LuenbergerObserver):
                 "dim_x " + str(self.dim_x),
                 "dim_y " + str(self.dim_y),
                 "dim_z " + str(self.dim_z),
+                "method_setD " + str(self.method_setD),
                 "wc_array " + str(self.wc_array),
                 "nb_wc " + str(len(self.wc_array)),
                 "D " + str(self.D),
@@ -124,6 +125,7 @@ class LuenbergerObserverNoise(LuenbergerObserver):
 
         for idx, w_c_i in np.ndenumerate(w_c):
             self.D, self.F = self.set_DF(w_c_i, method=self.method_setD)
+            print(self.D)
 
             data = self.generate_data_mesh(limits, num_samples, k, dt,
                                            method, z_0=z_0, w_c=w_c_i)
@@ -192,6 +194,7 @@ class LuenbergerObserverNoise(LuenbergerObserver):
 
         for idx, w_c_i in np.ndenumerate(w_c):
             self.D, self.F = self.set_DF(w_c_i, method=self.method_setD)
+            print(self.D)
 
             # Get initial conditions for this wv with B/F sampling
             y_0 = self.generate_data_mesh(limits, num_samples, k, dt, method,

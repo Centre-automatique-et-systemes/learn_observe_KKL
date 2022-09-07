@@ -301,6 +301,7 @@ class LuenbergerObserver(nn.Module):
             self.method_setD = 'given'
             self.D = torch.as_tensor(D)
             self.F = torch.ones((self.dim_z, self.dim_y))
+        print(self.method_setD)
 
         # Model params
         self.device = torch.device(
@@ -752,6 +753,7 @@ class LuenbergerObserver(nn.Module):
         self.k = k
         self.t_c = self.k / min(
             abs(linalg.eig(self.D.detach().numpy())[0].real))
+        print(self.t_c)
 
         y_0 = torch.zeros((num_samples, self.dim_x + self.dim_z))  # TODO
         y_1 = y_0.clone()
