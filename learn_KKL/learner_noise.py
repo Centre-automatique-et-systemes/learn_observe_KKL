@@ -325,7 +325,6 @@ class LearnerNoise(Learner):
             wc = w_c_array[j]
             self.model.D, _ = self.model.set_DF(wc,
                                                 method=self.model.method_setD)
-            print(self.model.D)
 
             if save:
                 x_mesh = mesh[:, self.x_idx_in, j]
@@ -438,7 +437,7 @@ class LearnerNoise(Learner):
             os.makedirs(traj_folder, exist_ok=True)
             traj_error = 0.0
 
-            plot_style = ["-", "--", "-."]
+            # plot_style = ["-", "--", "-."]
 
             for i in range(nb_trajs):
                 # TODO run predictions in parallel for all test trajectories!!!
@@ -489,7 +488,7 @@ class LearnerNoise(Learner):
                     # estimation[:, 1].cpu().numpy() - simulation[:, 1].cpu().numpy(),
                     np.sum(estimation.cpu().numpy() - simulation.cpu().numpy(),
                            axis=1),
-                    plot_style[i],
+                    # plot_style[i],
                     linewidth=0.8,
                     markersize=1,
                     label=rf"$\omega_c = {float(w_c_arr[i]):0.2g}$",
@@ -592,7 +591,7 @@ class LearnerNoise(Learner):
             os.makedirs(traj_folder, exist_ok=True)
             traj_error = 0.0
 
-            plot_style = ["-", "--", "-."]
+            # plot_style = ["-", "--", "-.", ":"]
 
             for i in range(nb_trajs):
                 # TODO run predictions in parallel for all test trajectories!!!
@@ -639,7 +638,7 @@ class LearnerNoise(Learner):
                 plt.plot(
                     tq,
                     RMSE(estimation, simulation, 1).cpu().numpy(),
-                    plot_style[i],
+                    # plot_style[i],
                     linewidth=0.8,
                     markersize=1,
                     label=rf"$\omega_c = {float(w_c_arr[i]):0.2g}$",

@@ -64,14 +64,14 @@ if __name__ == "__main__":
     traj_data = True  # whether to generate data on grid or from trajectories
     add_forward = False
     if traj_data:  # TODO
-        num_initial_conditions = 1000
+        num_initial_conditions = 500
         x_limits = np.array(
             [[-0.5, 0.5], [-0.5, 0.5], [-0.1, 0.1], [-0.1, 0.1]])
     else:
         num_samples = int(1e5)
         x_limits = np.array(
-            [[-0.5, 0.5], [-0.5, 0.5], [-0.1, 0.1], [-0.1, 0.1]])
-    wc_arr = np.linspace(1, 3., 100)
+            [[-0.5, 0.5], [0, 2 * np.pi], [-10, 10.], [-10, 10.]])
+    wc_arr = np.linspace(0.1, 4, 100)
     D = 'block_diag'  # 'block_diag'
 
     # Solver options
@@ -89,17 +89,16 @@ if __name__ == "__main__":
             activation=activation,
             num_hl=num_hl,
             size_hl=size_hl,
-            solver_options=solver_options,
+            solver_options=solver_options
         )
         observer.set_dynamics(system)
 
         # Generate data
         if traj_data:
             data = observer.generate_trajectory_data(
-                x_limits, wc_arr, num_initial_conditions, method="LHS", tsim=tsim,
-                stack=False, dt=dt
+                x_limits, wc_arr, num_initial_conditions, method="LHS",
+                tsim=tsim, stack=False, dt=dt
             )
-            data = system.remap(data, wc=True)  # remap angles to stay in compact
             data_ordered = copy.deepcopy(data)
             data = torch.cat(torch.unbind(data, dim=1), dim=0)
             if add_forward:  # TODO add one forward trajectory to dataset
@@ -107,7 +106,6 @@ if __name__ == "__main__":
                 data_forward = observer.generate_data_forward(
                     init=init, w_c=wc_arr, tsim=(0, 8),
                     num_datapoints=200, k=10, dt=dt, stack=True)
-                data_forward = system.remap(data_forward, wc=True)
                 data = torch.cat((data, data_forward), dim=0)
         else:
             data = observer.generate_data_svl(
@@ -118,7 +116,6 @@ if __name__ == "__main__":
                     init=init, w_c=wc_arr, tsim=(0, 8),
                     num_datapoints=200, k=10, dt=dt, stack=True)
                 data = torch.cat((data, data_forward), dim=0)
-            data = system.remap(data, wc=True)  # remap angles to stay in compact
         data = torch.cat(torch.unbind(data, dim=-1), dim=0)
         data, val_data = train_test_split(data, test_size=0.3, shuffle=False)
 
@@ -150,7 +147,7 @@ if __name__ == "__main__":
         scheduler_options = {
             "mode": "min",
             "factor": 0.5,
-            "patience": 3,
+            "patience": 5,
             "threshold": 5e-4,
             "verbose": True,
         }
@@ -224,7 +221,7 @@ if __name__ == "__main__":
         scheduler_options = {
             "mode": "min",
             "factor": 0.5,
-            "patience": 3,
+            "patience": 5,
             "threshold": 5e-4,
             "verbose": True,
         }
@@ -250,13 +247,15 @@ if __name__ == "__main__":
         learner_T_star.traj_data = traj_data  # TODO to keep track
         learner_T_star.x0_limits = x_limits
         learner_T_star.add_forward = add_forward
+        learner_T_star.data_dt = dt
         if traj_data:
             learner_T_star.num_initial_conditions = num_initial_conditions
         else:
             learner_T_star.num_samples = num_samples
 
         # Define logger and checkpointing
-        logger = TensorBoardLogger(save_dir=learner_T_star.results_folder + "/tb_logs")
+        logger = TensorBoardLogger(
+            save_dir=learner_T_star.results_folder + "/tb_logs")
         checkpoint_callback = ModelCheckpoint(monitor="val_loss")
         trainer = pl.Trainer(
             callbacks=[stopper, checkpoint_callback],
@@ -289,22 +288,26 @@ if __name__ == "__main__":
             data_ordered = data_ordered[::int(np.ceil(N / n)), :, :]
             plt.plot(data_ordered[..., 0, 0], 'x')
             plt.title(r'Training data: $\theta$')
-            plt.savefig(os.path.join(learner_T_star.results_folder, 'Train_theta.pdf'))
+            plt.savefig(
+                os.path.join(learner_T_star.results_folder, 'Train_theta.pdf'))
             plt.clf()
             plt.close('all')
             plt.plot(data_ordered[..., 1, 0], 'x')
             plt.title(r'Training data: $\alpha$')
-            plt.savefig(os.path.join(learner_T_star.results_folder, 'Train_alpha.pdf'))
+            plt.savefig(
+                os.path.join(learner_T_star.results_folder, 'Train_alpha.pdf'))
             plt.clf()
             plt.close('all')
             plt.plot(data_ordered[..., 2, 0], 'x')
             plt.title(r'Training data: $\dot{\theta}$')
-            plt.savefig(os.path.join(learner_T_star.results_folder, 'Train_thetadot.pdf'))
+            plt.savefig(os.path.join(learner_T_star.results_folder,
+                                     'Train_thetadot.pdf'))
             plt.clf()
             plt.close('all')
             plt.plot(data_ordered[..., 3, 0], 'x')
             plt.title(r'Training data: $\dot{\alpha}$')
-            plt.savefig(os.path.join(learner_T_star.results_folder, 'Train_alphadot.pdf'))
+            plt.savefig(os.path.join(learner_T_star.results_folder,
+                                     'Train_alphadot.pdf'))
             plt.clf()
             plt.close('all')
 
@@ -331,6 +334,7 @@ if __name__ == "__main__":
                "/N1000_wc1510"
         learner_path = path + "/learner.pkl"
         import dill as pkl
+
         with open(learner_path, "rb") as rb_file:
             learner_T_star = pkl.load(rb_file)
         learner_T_star.results_folder = path
@@ -340,6 +344,11 @@ if __name__ == "__main__":
     # Gain criterion #########################################################
     ##########################################################################
 
+    # Test parameters
+    dt = 0.04
+    tsim = (0, 8)  # for test trajectories
+    data_tsim = (0, 4)  # for generating test data
+
     # Gain criterion
     nb = int(np.min([len(learner_T_star.training_data), 10000]))
     idx = np.random.choice(np.arange(len(learner_T_star.training_data)),
@@ -348,12 +357,17 @@ if __name__ == "__main__":
     print('Computing our gain-tuning criterion can take some time but saves '
           'intermediary data in a subfolder zi_mesh: if you have already run '
           'this script, set save to False and path to this subfolder.')
-    save = TRAIN
+    save = True
     path = ''
     if save:
-        mesh = learner_T_star.model.generate_data_svl(
-            x_limits, wc_arr, 10000 * len(wc_arr), method="LHS",
-            stack=False)
+        if traj_data:
+            mesh = observer.generate_trajectory_data(
+                x_limits, wc_arr, 500, method="LHS", tsim=data_tsim,
+                stack=True, dt=dt)
+        else:
+            mesh = learner_T_star.model.generate_data_svl(
+                x_limits, wc_arr, 10000 * len(wc_arr), method="LHS",
+                stack=False)
     else:
         mesh = torch.randn((10, learner_T_star.model.dim_x +
                             learner_T_star.model.dim_z, 1))
@@ -362,10 +376,8 @@ if __name__ == "__main__":
                                       path=path)
 
     # Test trajectories
-    dt = 0.04
-    tsim = (0, 8)  # for test trajectories
-    std_array = [0.0, 0.1, 0.2]
-    wc_arr = np.array([0.5, 1, 2, 3])
+    std_array = [0.0, 0.05, 0.1]
+    wc_arr = np.array([1, 2, 3., 4., 5.])
     x_0 = torch.tensor([0.1, 0.1, 0., 0.])
     z_0 = learner_T_star.model.encoder(
         torch.cat((x_0.expand(len(wc_arr), -1),
@@ -381,14 +393,18 @@ if __name__ == "__main__":
 
     # Heatmaps
     if not save:
-        mesh = learner_T_star.model.generate_data_svl(
-            x_limits, wc_arr, 10000 * len(wc_arr), method="LHS", stack=False
-            # , z_0="encoder"
-        )
+        if traj_data:
+            mesh = observer.generate_trajectory_data(
+                x_limits, wc_arr, 500, method="LHS", tsim=data_tsim,
+                stack=True, dt=dt)
+        else:
+            mesh = learner_T_star.model.generate_data_svl(
+                x_limits, wc_arr, 10000 * len(wc_arr), method="LHS", stack=False
+                # , z_0="encoder"
+            )
     learner_T_star.save_pdf_heatmap(mesh, verbose)
     learner_T_star.save_invert_heatmap(mesh, verbose)
     # TODO bug heatmaps when z_0="encoder"?
-
 
     ##########################################################################
     # Test trajectory ########################################################
@@ -437,7 +453,6 @@ if __name__ == "__main__":
         wc = wc_arr[i]
         with torch.no_grad():
             estimation = observer.predict(y, tsim, dt, wc)
-            estimation = system.remap(estimation)
 
         # Compare both
         os.makedirs(os.path.join(learner_T_star.results_folder, fileName,

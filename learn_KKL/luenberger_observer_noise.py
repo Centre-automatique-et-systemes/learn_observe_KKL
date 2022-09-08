@@ -125,7 +125,6 @@ class LuenbergerObserverNoise(LuenbergerObserver):
 
         for idx, w_c_i in np.ndenumerate(w_c):
             self.D, self.F = self.set_DF(w_c_i, method=self.method_setD)
-            print(self.D)
 
             data = self.generate_data_mesh(limits, num_samples, k, dt,
                                            method, z_0=z_0, w_c=w_c_i)
@@ -133,6 +132,9 @@ class LuenbergerObserverNoise(LuenbergerObserver):
             wc_i_tensor = torch.tensor(w_c_i).repeat(num_samples).unsqueeze(1)
             data = torch.cat((data, wc_i_tensor), 1)
 
+            # Remap simulation data if necessary for this system
+            if self.system.needs_remap:
+                data = self.system.remap(data)
             df[..., idx] = data.unsqueeze(-1)
 
         if stack:
@@ -179,22 +181,12 @@ class LuenbergerObserverNoise(LuenbergerObserver):
             Pairs of (x, z) data points, in shape (tsim, num_samples, dx+dz)
             if stack is False, shape (tsim * num_samples, dx+dz) if True.
         """
-        # Get initial conditions for x,z from backward forward sampling
-        # num_datapoints = num_samples * len(w_c)
-        # y_0 = self.generate_data_svl(
-        #     limits=limits, w_c=w_c, num_datapoints=num_datapoints, method=method,
-        #     k=k, dt=dt
-        # )
-        # df = torch.zeros(
-        #     size=(num_samples, self.dim_x + self.dim_z + 1, len(w_c)))
-
         tq = torch.arange(tsim[0], tsim[1], dt)
         df = torch.zeros(
             size=(len(tq), num_samples, self.dim_x + self.dim_z + 1, len(w_c)))
 
         for idx, w_c_i in np.ndenumerate(w_c):
             self.D, self.F = self.set_DF(w_c_i, method=self.method_setD)
-            print(self.D)
 
             # Get initial conditions for this wv with B/F sampling
             y_0 = self.generate_data_mesh(limits, num_samples, k, dt, method,
@@ -206,6 +198,9 @@ class LuenbergerObserverNoise(LuenbergerObserver):
                 (data.shape[0], data.shape[1])).unsqueeze(-1)
             data = torch.cat((data, wc_i_tensor), -1)
 
+            # Remap simulation data if necessary for this system
+            if self.system.needs_remap:
+                data = self.system.remap(data)
             df[..., idx] = data.unsqueeze(-1)
 
         # Fix issue with grad tensor in pipeline
@@ -261,6 +256,9 @@ class LuenbergerObserverNoise(LuenbergerObserver):
                 (data.shape[0], data.shape[1])).unsqueeze(-1)
             data = torch.cat((data, wc_i_tensor), 1)
 
+            # Remap simulation data if necessary for this system
+            if self.system.needs_remap:
+                data = self.system.remap(data)
             df[..., idx] = data.unsqueeze(-1)
 
         if stack:
@@ -412,6 +410,10 @@ class LuenbergerObserverNoise(LuenbergerObserver):
 
         z_hat = torch.cat((torch.squeeze(sol), w_c_tensor), 1)
         x_hat = self.decoder(z_hat)
+
+        # Remap simulation data if necessary for this system
+        if self.system.needs_remap:
+            x_hat = self.system.remap(x_hat)
 
         if out_z:
             return x_hat, z_hat

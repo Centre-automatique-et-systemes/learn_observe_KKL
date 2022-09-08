@@ -150,6 +150,7 @@ class System:
 
     def __init__(self):
         self.u = self.null_controller
+        self.needs_remap = False
 
     def f(self, x: torch.tensor):
         return 0
@@ -165,6 +166,9 @@ class System:
 
     def u_1(self, x: torch.tensor):
         return 0
+
+    def remap(self, x, wc=False):
+        raise NotImplementedError
 
     def set_controller(self, controller) -> None:
         if controller == "null_controller":
@@ -208,7 +212,10 @@ class System:
         # Solve
         sol = odeint(dxdt, x_0, tq)
 
-        return tq, torch.squeeze(sol)
+        if self.needs_remap:
+            return tq, self.remap(torch.squeeze(sol))
+        else:
+            return tq, torch.squeeze(sol)
 
     def lin_chirp_controller(
         self, t: float, t_0: float = 0.0, a: float = 0.001, b: float = 9.99e-05
@@ -441,13 +448,18 @@ class QuanserQubeServo2(System):
     Measurement: (theta, alpha)
     """
 
-    def __init__(self):
+    def __init__(self, r: float = 50., d: float = 100.):
         super().__init__()
         self.dim_x = 4
         self.dim_y = 2
         self.needs_remap = True
         # after each simulation, remap trajectory to [-pi,pi] and [0,
         # 2pi]: belongs to systems that need to remap simulated trajectories
+
+        # Saturation to avoid simulation exploding in backward time
+        self.r = r  # for saturation = 1 if norm(x) <= r
+        self.d = d  # for saturation = 0 if norm(x) >= r+d
+        self.coef = self.set_coef()  # saturation = polynomial(norm(x) - r)
 
         # Motor
         # self.Rm = 8.4  # Resistance
@@ -476,6 +488,21 @@ class QuanserQubeServo2(System):
 
         self.u = self.null_controller
         self.u_1 = self.null_controller
+
+    def p(self, x):
+        # Saturation = polynomial(x) that goes from 1 to 0 over [0, d] with
+        # deriv = 0 at both ends to ensure Lipschitz: 4 conditions, 4 unknowns
+        return self.coef[0] * x ** 3 + self.coef[1] * x ** 2 + self.coef[
+            2] * x + self.coef[3]
+
+    def set_coef(self):
+        A = torch.tensor(
+            [[0, 0, 0, 1.],
+             [0, 0, 1., 0],
+             [self.d ** 3, self.d ** 2, self.d, 1],
+             [3 * self.d ** 2, 2 * self.d, 1, 0]])
+        B = torch.tensor([[1.], [0], [0], [0]])
+        return torch.linalg.solve(A, B)
 
     def f(self, x, action=0.):
         theta = x[..., 0]
@@ -549,7 +576,16 @@ class QuanserQubeServo2(System):
             )
         )
 
-        return xdot
+        # Saturation
+        xnorm = torch.linalg.norm(x, 2, dim=-1)
+        sat = torch.where(xnorm <= self.r, 1.,
+                          torch.where(xnorm < self.r + self.d,
+                                      self.p(xnorm - self.r), 0.))
+        # xbig = torch.argwhere(xnorm > self.r)
+        # if torch.numel(xbig) > 0:
+        #     print(torch.numel(xbig))
+
+        return xdot * torch.unsqueeze(sat, dim=-1)
 
     def h(self, x):
         return x[..., :2]
@@ -693,10 +729,16 @@ class SaturatedVanDerPol(System):
         self.eps = eps
         self.r = r  # for saturation = 1 if norm(x) <= r
         self.d = d  # for saturation = 0 if norm(x) >= r+d
-        self.coef = self.set_coef()  # saturation = polynomial(coef) between
+        self.coef = self.set_coef()  # saturation = polynomial(norm(x) - r)
 
         self.u = self.null_controller
         self.u_1 = self.null_controller
+
+    def p(self, x):
+        # Saturation = polynomial(x) that goes from 1 to 0 over [0, d] with
+        # deriv = 0 at both ends to ensure Lipschitz: 4 conditions, 4 unknowns
+        return self.coef[0] * x ** 3 + self.coef[1] * x ** 2 + self.coef[
+            2] * x + self.coef[3]
 
     def set_coef(self):
         A = torch.tensor(
@@ -706,10 +748,6 @@ class SaturatedVanDerPol(System):
              [3 * self.d ** 2, 2 * self.d, 1, 0]])
         B = torch.tensor([[1.], [0], [0], [0]])
         return torch.linalg.solve(A, B)
-
-    def p(self, x):
-        return self.coef[0] * x ** 3 + self.coef[1] * x ** 2 + self.coef[
-            2] * x + self.coef[3]
 
     def f(self, x):
         xdot = torch.zeros_like(x)

@@ -52,7 +52,6 @@ if __name__ == "__main__":
     num_hl = 5
     size_hl = 50
     activation = nn.ReLU()
-    recon_lambda = 0.1
 
     # Define system
     system = QuanserQubeServo2_meas2()
@@ -60,15 +59,18 @@ if __name__ == "__main__":
     # Define data params (same characteristics as experimental data)
     dt = 0.04
     tsim = (0, 8.)
-    init_wc = 3.
     traj_data = True  # whether to generate data on grid or from trajectories
     add_forward = False
     if traj_data:  # TODO
-        num_initial_conditions = 1000
-        x_limits = np.array([[-0.5, 0.5], [-0.5, 0.5], [-0.1, 0.1], [-0.1, 0.1]])
+        num_initial_conditions = 100
+        x_limits = np.array(
+            [[-0.5, 0.5], [-0.5, 0.5], [-0.1, 0.1], [-0.1, 0.1]])
     else:
         num_samples = int(1e5)
-        x_limits = np.array([[-0.5, 0.5], [-0.5, 0.5], [-1., 1.], [-1., 1.]])
+        x_limits = np.array(
+            [[-0.5, 0.5], [0, 2 * np.pi], [-10, 10.], [-10, 10.]])
+    wc = 3.
+    D = 'block_diag'  # 'block_diag'
 
     # Solver options
     # solver_options = {'method': 'rk4', 'options': {'step_size': 1e-3}}
@@ -79,7 +81,8 @@ if __name__ == "__main__":
         dim_x=system.dim_x,
         dim_y=system.dim_y,
         method=learning_method,
-        wc=init_wc,
+        wc=wc,
+        D=D,
         activation=activation,
         num_hl=num_hl,
         size_hl=size_hl,
@@ -93,7 +96,6 @@ if __name__ == "__main__":
             x_limits, num_initial_conditions, method="LHS", tsim=tsim,
             stack=False, dt=dt
         )
-        data = system.remap(data)  # remap angles to stay in compact
         data_ordered = copy.deepcopy(data)
         data = torch.cat(torch.unbind(data, dim=1), dim=0)
         if add_forward:  # TODO add one forward trajectory to dataset
@@ -101,7 +103,6 @@ if __name__ == "__main__":
             data_forward = observer.generate_data_forward(
                 init=init, tsim=(0, 8),
                 num_datapoints=200, k=10, dt=dt, stack=True)
-            data_forward = system.remap(data_forward)
             data = torch.cat((data, data_forward), dim=0)
     else:
         data = observer.generate_data_svl(
@@ -112,7 +113,6 @@ if __name__ == "__main__":
                 init=init, tsim=(0, 8),
                 num_datapoints=200, k=10, dt=dt, stack=True)
             data = torch.cat((data, data_forward), dim=0)
-        data = system.remap(data)  # remap angles to stay in compact
     data, val_data = train_test_split(data, test_size=0.3, shuffle=False)
 
     print(data.shape)
@@ -143,12 +143,12 @@ if __name__ == "__main__":
     scheduler_options = {
         "mode": "min",
         "factor": 0.5,
-        "patience": 10,
-        "threshold": 1e-4,
+        "patience": 5,
+        "threshold": 5e-4,
         "verbose": True,
     }
     stopper = pl.callbacks.early_stopping.EarlyStopping(
-        monitor="val_loss", min_delta=5e-4, patience=15, verbose=False,
+        monitor="val_loss", min_delta=1e-4, patience=7, verbose=False,
         mode="min"
     )
 
@@ -267,7 +267,6 @@ if __name__ == "__main__":
     y = torch.cat((tq.unsqueeze(1), measurement), dim=1)
     with torch.no_grad():
         estimation = observer.predict(y, tsim, dt).detach()
-        estimation = system.remap(estimation)
 
     # Compare both
     os.makedirs(os.path.join(learner.results_folder, fileName), exist_ok=True)
@@ -275,7 +274,7 @@ if __name__ == "__main__":
     for i in range(estimation.shape[1]):
         plt.plot(tq, exp[:, i], label=rf'$x_{i + 1}$')
         plt.plot(tq, estimation[:, i], '--', label=rf'$\hat{{x}}_{i + 1}$')
-        plt.title(rf'Test trajectory for $\omega_c$ = {init_wc:0.2g}, RMSE = '
+        plt.title(rf'Test trajectory for $\omega_c$ = {wc:0.2g}, RMSE = '
                   rf'{rmse[i]:0.2g}')
         plt.xlabel(rf"$t$")
         plt.ylabel(rf"$x_{i + 1}$")

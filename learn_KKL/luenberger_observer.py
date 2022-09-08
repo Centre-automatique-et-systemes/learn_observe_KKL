@@ -397,6 +397,7 @@ class LuenbergerObserver(nn.Module):
         self.h = system.h
         self.u = system.u
         self.u_1 = system.u_1
+        self.system = system
 
     def set_scalers(self, scaler_x, scaler_z):
         """
@@ -635,16 +636,10 @@ class LuenbergerObserver(nn.Module):
 
         def dydt(t, z: torch.tensor):
             if self.u_1 == self.u:
-                # z_dot = torch.matmul(self.D, z) + torch.matmul(self.F, measurement(t).t())
                 z_dot = torch.matmul(z, self.D.t()) + torch.matmul(
                     measurement(t), self.F.t()
                 )
             else:
-                # z_dot = (
-                #     torch.matmul(self.D, z)
-                #     + torch.matmul(self.F, measurement(t).t())
-                #     + torch.mul(self.phi(z), self.u_1(t) - self.u(t))
-                # )
                 z_dot = torch.matmul(z, self.D.t()) + torch.matmul(
                     measurement(t), self.F.t() + torch.mul(
                         self.phi(z), self.u_1(t) - self.u(t))
@@ -791,7 +786,11 @@ class LuenbergerObserver(nn.Module):
         # Data contains (x_i, z_i) pairs in shape [number_simulations,
         # dim_x + dim_z]
         data = data_fw[-1]
-        return data
+        # Remap simulation data if necessary for this system
+        if self.system.needs_remap:
+            return self.system.remap(data)
+        else:
+            return data
 
     def generate_trajectory_data(
             self,
@@ -836,6 +835,11 @@ class LuenbergerObserver(nn.Module):
         )
         # Simulate x(t), z(t) to obtain trajectories for tsim
         _, data = self.simulate_system(y_0, tsim, dt)
+
+        # Remap simulation data if necessary for this system
+        if self.system.needs_remap:
+            data = self.system.remap(data)
+
         # Fix issue with grad tensor in pipeline
         if stack:
             return torch.cat(torch.unbind(data, dim=1), dim=0)
@@ -876,7 +880,11 @@ class LuenbergerObserver(nn.Module):
                                           size=(num_datapoints,), replace=False)
             data = torch.squeeze(data[random_idx])
 
-        return data
+        # Remap simulation data if necessary for this system
+        if self.system.needs_remap:
+            return self.system.remap(data)
+        else:
+            return data
 
     @staticmethod
     def interpolate_func(x: torch.tensor) -> callable:
@@ -1132,8 +1140,10 @@ class LuenbergerObserver(nn.Module):
         """
         _, sol = self.simulate(measurement, tsim, dt, z_0)
 
-        # x_hat = self.decoder(sol[:, :, 0])
-        # x_hat = self.decoder(sol[:, 0, :])
         x_hat = self.decoder(torch.squeeze(sol))
 
-        return x_hat
+        # Remap simulation data if necessary for this system
+        if self.system.needs_remap:
+            return self.system.remap(x_hat)
+        else:
+            return x_hat
