@@ -15,7 +15,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 
 from learn_KKL.luenberger_observer import LuenbergerObserver
 from learn_KKL.system import RevDuffing,VanDerPol
-from learn_KKL.learner import Learner
+from learn_KKL.learnerV2 import Learner
 from learn_KKL.raffinement import *
 import matplotlib.pyplot as plt
 

@@ -24,12 +24,13 @@ in time as well as the phase potrait.
 
     import matplotlib.pyplot as plt
     from learn_KKL.system import RevDuffing
+    import torch
 
     # Get reversed duffing as example system
     system = RevDuffing()
 
     # Simulation params
-    x_0 = torch.tensor([[1.],[2.]])
+    x_0 = torch.transpose(torch.tensor([[1.],[2.]]),0,1)
     tsim = (0, 50)
     dt = 2e-1
 
@@ -38,7 +39,7 @@ in time as well as the phase potrait.
     tq, sol_null = system.simulate(x_0, tsim, dt)
 
     # Plot phase potrait
-    plt.plot(soll_null[:,0], sol_null[:,1])
+    plt.plot(sol_null[:,0], sol_null[:,1])
     plt.show()
 
     # Simulation with chirp input
@@ -46,7 +47,7 @@ in time as well as the phase potrait.
     tq, sol_chirp = system.simulate(x_0, tsim, dt)
 
     # Plot phase potrait
-    plt.plot(soll_chirp[:,0], sol_chirp[:,1])
+    plt.plot(sol_chirp[:,0], sol_chirp[:,1])
     plt.show()
 
     # Plot truth ground data and estimation
@@ -74,6 +75,7 @@ import numpy as np
 import torch
 from scipy import signal
 from torchdiffeq import odeint
+from functorch import vmap, jacfwd
 
 # Set double precision by default
 torch.set_default_tensor_type(torch.DoubleTensor)
@@ -569,8 +571,9 @@ class QuanserQubeServo2(System):
     # function u. Useful for EKF!
     def predict_deriv(self, x, f):
         # Compute Jacobian of f with respect to input x
-        dfdh = torch.autograd.functional.jacobian(
-            f, x, create_graph=False, strict=False, vectorize=False)
+        # dfdh = torch.autograd.functional.jacobian(
+        #     f, x, create_graph=False, strict=False, vectorize=False)
+        dfdh = vmap(jacfwd(f))(x)
         dfdx = torch.squeeze(dfdh)
         return dfdx
 

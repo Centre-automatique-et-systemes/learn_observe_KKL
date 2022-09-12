@@ -14,7 +14,7 @@ working_path = str(pathlib.Path().resolve())
 sys.path.append(working_path)
 
 # Import KKL observer
-from learn_KKL.learner import Learner
+from learn_KKL.learnerV2 import Learner
 from learn_KKL.system import QuanserQubeServo2_meas1
 from learn_KKL.luenberger_observer import LuenbergerObserver
 from learn_KKL.utils import generate_mesh, RMSE

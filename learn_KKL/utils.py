@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from smt.sampling_methods import LHS
-from learn_KKL.raffinement import *
+from learn_KKL.raffinement_dimN import *
 from scipy import linalg
 
 # Set double precision by default
@@ -11,7 +11,7 @@ torch.set_default_dtype(torch.float64)
 
 
 def generate_mesh(
-    limits: np.array, num_samples: int, method: str = "LHS"
+    limits: np.array, num_samples: np.array(int), method: str = "LHS"
 ) -> torch.tensor:
     """
     Generates 2D mesh either from a uniform distribution or uses latin hypercube
@@ -41,7 +41,7 @@ def generate_mesh(
         case "uniform":
             # Linspace upper bound and cut additional samples at random (
             # otherwise all cut in the same region!)
-            num_samples = num_samples[0]*num_samples[1]
+            num_samples = np.product(num_samples)
             axes = np.linspace(limits[:, 0], limits[:, 1], int(np.ceil(np.power(
                 num_samples, 1/len(limits)))))
             axes_list = [axes[:, i] for i in range(axes.shape[1])]
@@ -57,18 +57,17 @@ def generate_mesh(
                 mesh = np.delete(mesh, idx, axis=0)
             return torch.as_tensor(mesh),0
         case "LHS":
-            num_samples = num_samples[0] * num_samples[1]
+            num_samples = np.product(num_samples)
             sampling = LHS(xlimits=limits)
             mesh = sampling(num_samples)
             return torch.as_tensor(mesh),0
         case "adaptative":
-            lx,ly = limits[0,1] - limits[0,0], limits[1,1] - limits[1,0]
-            Ox,Oy = limits[0,0],limits[1,0]
-            Nx,Ny = num_samples
-            geometry = [lx,ly,Nx,Ny,Ox,Oy]
+            dim = len(limits)
+            L = limits[:,1] - limits[:,0]
+            Origin = limits[:,0]
+            geometry = [L,num_samples,Origin]
             grid = init_grid(geometry)
-            X,Y = coordinate(grid)
-            mesh = np.stack((X,Y),-1)
+            mesh = coordinate(grid)
             return torch.as_tensor(mesh),grid
         case _:
             raise NotImplementedError(f"The method {method} is not implemented")

@@ -15,7 +15,6 @@ from .utils import RMSE, StandardScaler
 
 # To avoid Type 3 fonts for submission https://tex.stackexchange.com/questions/18687/how-to-generate-pdf-without-any-type3-fonts
 plt.rc('text', usetex=True)
-plt.rc('text.latex', preamble=r'\usepackage{amsfonts}\usepackage{cmbright}')
 plt.rc('font', family='serif')
 
 sb.set_style("whitegrid")
@@ -89,6 +88,7 @@ class Learner(pl.LightningModule):
             system,
             training_data,
             validation_data,
+            axe,
             method="Autoencoder",
             batch_size=10,
             lr=1e-3,
@@ -103,6 +103,7 @@ class Learner(pl.LightningModule):
         self.method = method
         self.model = observer
         self.model.to(self.device)
+        self.axe = axe
 
         # Data handling
         self.training_data = training_data
@@ -137,7 +138,7 @@ class Learner(pl.LightningModule):
 
         # Folder to save results
         i = 0
-        params = os.path.join(os.getcwd(), "../jupyter_notebooks/runs", str(self.system),
+        params = os.path.join(os.getcwd(), "runs", str(self.system),
                               self.model.method)
         if "Supervised" in self.model.method:
             params += "/" + self.method
@@ -254,7 +255,7 @@ class Learner(pl.LightningModule):
         elif self.method == "T_star":
             x = batch[:, self.x_idx_out]
             x_hat = self.forward(batch)
-            loss = self.model.loss(self.method, x, x_hat)
+            loss = self.model.loss(self.method, x, x_hat, self.axe)
         self.log("train_loss", loss, on_step=True, prog_bar=True, logger=True)
         self.train_loss = torch.cat((self.train_loss, torch.tensor([[loss]])))
         logs = {"train_loss": loss.detach()}
@@ -298,7 +299,7 @@ class Learner(pl.LightningModule):
             elif self.method == "T_star":
                 x = batch[:, self.x_idx_out]
                 x_hat = self.forward(batch)
-                loss = self.model.loss(self.method, x, x_hat)
+                loss = self.model.loss(self.method, x, x_hat, self.axe)
             self.log("val_loss", loss, on_step=True, prog_bar=True, logger=True)
             self.val_loss = torch.cat((self.val_loss, torch.tensor([[loss]])))
             logs = {"val_loss": loss.detach()}
@@ -384,17 +385,19 @@ class Learner(pl.LightningModule):
                 plt.clf()
                 plt.close('all')
 
-    def save_trj(self, init_state, verbose, tsim, dt, std=0.2,
+    def save_trj(self, init_state, verbose, tsim, dt, var=0.2,
                  traj_folder=None, z_0=None):
         # Estimation over the test trajectories with T_star
         if traj_folder is None:
             traj_folder = os.path.join(self.results_folder,
-                                       f"Test_trajectories/Traj_{std}")
+                                       "Test_trajectories/Traj_{var}")
         tq, simulation = self.system.simulate(init_state, tsim, dt)
 
-        measurement = self.model.h(simulation)
-        noise = torch.normal(0, std, size=measurement.shape)
-        measurement = measurement.add(noise)
+        noise = torch.normal(0, var, size=(simulation.shape))
+
+        simulation_noise = simulation.add(noise)
+
+        measurement = self.model.h(simulation_noise)
 
         # Save these test trajectories
         os.makedirs(traj_folder, exist_ok=True)
@@ -425,7 +428,7 @@ class Learner(pl.LightningModule):
         for j in range(estimation.shape[1]):
             name = "Traj" + str(j) + ".pdf"
             if j == 0:
-                plt.plot(tq, measurement[:, j].detach().numpy(), '-',
+                plt.plot(tq, simulation_noise[:, j].detach().numpy(), '-',
                          label=r"$y$")
             plt.plot(tq, simulation[:, j].detach().numpy(), '--',
                      label=rf"$x_{j + 1}$")
@@ -472,9 +475,11 @@ class Learner(pl.LightningModule):
                         df.drop(df.columns[0], axis=1).values)[0]
             tq, simulation = self.system.simulate(trajs_init, tsim, dt)
 
-            measurement = self.model.h(simulation)
-            noise = torch.normal(0, std, size=measurement.shape)
-            measurement = measurement.add(noise)
+            noise = torch.normal(0, std, size=(simulation.shape))
+
+            simulation_noise = simulation.add(noise)
+
+            measurement = self.model.h(simulation_noise)
 
             # Save these test trajectories
             os.makedirs(traj_folder, exist_ok=True)
@@ -505,7 +510,7 @@ class Learner(pl.LightningModule):
                 for j in range(estimation.shape[1]):
                     name = "Traj" + str(j) + ".pdf"
                     if j == 0:
-                        plt.plot(tq, measurement[:, i, j].detach().numpy(),
+                        plt.plot(tq, simulation_noise[:, i, j].detach().numpy(),
                                  '-', label=r"$y$")
                     plt.plot(tq, simulation[:, i, j].detach().numpy(), '--',
                              label=rf"$x_{j + 1}$")
@@ -616,7 +621,7 @@ class Learner(pl.LightningModule):
             nb_trajs=10,
             tsim=(0, 60),
             dt=1e-2,
-            num_samples=10000,
+            num_samples=[50,50],
             method='uniform',
             checkpoint_path=None,
             verbose=False,
@@ -693,12 +698,8 @@ class Learner(pl.LightningModule):
                 self.val_loss.detach(),
             )
 
-            # No control theoretic evaluation of the observer with only T
-            if self.method == "T":
-                return 0
-
             # Heatmap of RMSE(x, x_hat) with T_star
-            mesh = self.model.generate_data_svl(limits, num_samples,
+            mesh,_ = self.model.generate_data_svl(limits, num_samples,
                                                 method=method)
             x_mesh = mesh[:, self.x_idx_out]
             z_mesh = mesh[:, self.z_idx_out]
@@ -712,7 +713,6 @@ class Learner(pl.LightningModule):
             self.save_pdf_heatmap(x_mesh, x_hat_star, verbose)
             self.save_random_traj(x_mesh, num_samples, nb_trajs, verbose, tsim,
                                   dt)
-
             # Invertibility heatmap
             self.save_invert_heatmap(x_mesh, x_hat_AE, verbose)
 
@@ -720,3 +720,7 @@ class Learner(pl.LightningModule):
             if not fast:  # Computing loss over grid is slow, most of all for AE
                 self.save_loss_grid(x_mesh, x_hat_AE, z_hat_T, x_hat_star,
                                     verbose)
+
+            # No control theoretic evaluation of the observer with only T
+            if self.method == "T":
+                return 0

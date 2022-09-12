@@ -25,7 +25,7 @@ from learn_KKL.raffinement import *
 
 
 # Import learner utils
-from learn_KKL.learner import Learner
+from learn_KKL.learnerV2 import Learner
 from sklearn.model_selection import train_test_split
 
 if __name__ == "__main__":

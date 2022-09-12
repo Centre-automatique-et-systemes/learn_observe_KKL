@@ -89,6 +89,7 @@ class Learner(pl.LightningModule):
             system,
             training_data,
             validation_data,
+            axe,
             method="Autoencoder",
             batch_size=10,
             lr=1e-3,
@@ -110,8 +111,8 @@ class Learner(pl.LightningModule):
         self.num_train = len(self.training_data)
         self.num_val = len(self.validation_data)
         # Indices of x and z in training data: same in and out
-        self.x_idx_in = [i for i in range(self.model.dim_x)]
-        self.x_idx_out = [i for i in range(self.model.dim_x)]
+        self.x_idx_in = [axe]
+        self.x_idx_out = [axe]
         self.z_idx_in = [i for i in range(self.model.dim_x, self.model.dim_x
                                           + self.model.dim_z)]
         self.z_idx_out = [i for i in range(self.model.dim_x, self.model.dim_x

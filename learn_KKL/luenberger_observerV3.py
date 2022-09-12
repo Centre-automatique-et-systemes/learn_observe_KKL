@@ -321,7 +321,8 @@ class LuenbergerObserver(nn.Module):
             num_hl=self.num_hl,
             n_in=self.dim_z,
             n_hl=self.size_hl,
-            n_out=self.dim_x,
+            # n_out=self.dim_x,
+            n_out=1,
             activation=self.activation,
         )
         self.scaler_x = None
@@ -414,7 +415,7 @@ class LuenbergerObserver(nn.Module):
         self.decoder.set_scalers(scaler_X=self.scaler_z, scaler_Y=self.scaler_x)
 
     def set_F(self, F):
-        """ set custom F 
+        """ set custom F
         (in order to avoid information loss you should strive for rankF = dim_y"""
         self.F = F
 
@@ -1232,7 +1233,7 @@ class LuenbergerObserver(nn.Module):
         tsim: tuple
             Tuple of (Start, End) time of simulation.
 
-        dt: float 
+        dt: float
             Step width of tsim.
 
         Returns
