@@ -5,7 +5,7 @@ Created on Thu Sep  1 14:08:46 2022
 @author: pchauris
 """
 
-"Imlpémenter le raffinement pour une grille de dimension quelconque n, toujours sur un critère de Rn dans R"
+"Implémenter le raffinement pour une grille de dimension quelconque n, sur un critère de Rn dans R"
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -17,7 +17,6 @@ class Cell:
         P = [L[i]/N[i] for i in range(dimension)]
         X = [index[i]*P[i] + P[i]/2 + O[i] for i in range(dimension)]
 
-        
         self.index = index
         self.geometry = geometry
         self.center = np.array(X)
@@ -28,7 +27,7 @@ class Cell:
         print('center :',self.center)
         print('size :',self.size)
         
-    def split_iso(self):
+    def split(self):
         P = self.size
         X = self.center
         combi = combinaisons(self.geometry)
@@ -73,10 +72,10 @@ def combinaisons(geometry):
     res = res.reshape(dim,2**dim).T
     return res*P/4
 
-def raffinement(grid):
+def raffinement_complet(grid):
     new_grid = []
     for cell in grid:
-        new_cells = cell.split_iso()
+        new_cells = cell.split()
         for cells in new_cells:
             new_grid.append(cells)
     return new_grid
@@ -108,9 +107,8 @@ def raffinement2(grid,critere):
     alpha = auto_threshold(grid,critere)
     for k in range(len(grid)):
         cell = grid[k]
-
         if critere[k] > alpha:
-            new_cells = cell.split_iso()
+            new_cells = cell.split()
             for cells in new_cells:
                 new_grid.append(cells)
         else:

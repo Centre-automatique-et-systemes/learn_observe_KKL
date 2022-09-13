@@ -264,6 +264,7 @@ class LuenbergerObserver(nn.Module):
             self,
             dim_x: int,
             dim_y: int,
+            separation: bool,
             method: str = "Autoencoder",
             dim_z: int = None,
             wc: float = 1.0,
@@ -317,12 +318,15 @@ class LuenbergerObserver(nn.Module):
             n_out=self.dim_z,
             activation=self.activation,
         )
+        if separation == True:
+            n_out = 1
+        else:
+            n_out = self.dim_x
         self.decoder = MLPn(
             num_hl=self.num_hl,
             n_in=self.dim_z,
             n_hl=self.size_hl,
-            # n_out=self.dim_x,
-            n_out=1,
+            n_out=n_out,
             activation=self.activation,
         )
         self.scaler_x = None
