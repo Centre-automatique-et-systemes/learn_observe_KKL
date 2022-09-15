@@ -54,11 +54,20 @@ def indices(geometry):
     return np.array(res)
 
 def init_grid(geometry):
+    "returns the list of cells uniformly distributed according to the geometry"
+    "geometry is of shape [Length,Npoints,Origin] with:"
+    "Length = [L1,L2,...Ln] the list of lengths for each dimensions, n being the number of dimensions"
+    "Npoints = [N1,N2,...,Nn] the list of point numbers for each dimensions"
+    "Origin = [O1,O2,...,On] the list of origin coordinates for each dimensions"
+
+    "Example : to create a 3D grid over a domain [0,1]x[0,10]x[-1,1], set geometry = [[1,10,2],[30,10,20],[0,0,-1]] "
+    "with 30,10,20 the number of points along each dimension"
     indice = indices(geometry)
     grid = [Cell(ind,geometry) for ind in indice]
     return grid
 
 def coordinate(grid):
+    "returns the coordinates of the grid in shape [Npoints,dimension] with dimension the dimension of the grid"
     pos = [cell.center for cell in grid]
     return np.array(pos)
             
@@ -102,7 +111,10 @@ def auto_threshold(grid,critere):
     return alphamax
 
 def raffinement2(grid,critere):
-    "en chaque point x de la grille, raffine si critere(x) > alpha"
+    "returns new refined grid (new list of cells) over criterium=critere"
+    "grid is list of cells"
+    "critere is 1D array of size equal to the number of cells in the grid"
+    "for every cell of coordinate x, refine the cell if critere(x) > alpha"
     new_grid = []
     alpha = auto_threshold(grid,critere)
     for k in range(len(grid)):

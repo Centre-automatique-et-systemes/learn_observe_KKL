@@ -101,7 +101,7 @@ from torch import nn
 from torchdiffeq import odeint
 
 from torchinterp1d import Interp1d
-from .utils import MSE, generate_mesh, MLPn
+from .utilsV3 import MSE, generate_mesh, MLPn
 
 # Set double precision by default
 torch.set_default_tensor_type(torch.DoubleTensor)

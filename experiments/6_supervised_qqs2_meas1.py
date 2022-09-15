@@ -17,7 +17,7 @@ sys.path.append(working_path)
 from learn_KKL.learnerV2 import Learner
 from learn_KKL.system import QuanserQubeServo2_meas1
 from learn_KKL.luenberger_observer import LuenbergerObserver
-from learn_KKL.utils import generate_mesh, RMSE
+from learn_KKL.utilsV3 import generate_mesh, RMSE
 from learn_KKL.filter_utils import EKF_ODE, interpolate_func, \
     dynamics_traj_observer
 

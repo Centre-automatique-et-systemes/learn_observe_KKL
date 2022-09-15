@@ -1,47 +1,12 @@
-# Learning to observe: neural network-based KKL observers
-
-### To run the code:
-- create a directory (further named dir), `cd dir`
-- clone the repo in dir/repo
-- unzip Data.zip in dir/Data
-- create a virtual environment in dir (with pip: `python3 -m venv 
-  venv`), source it (`source venv/bin/activate`)
-- go to dir/repo, then run `pip install -e .` to install the package
-- install interpolation repo: in dir, `git clone https://github.com/aliutkus/torchinterp1d`, `cd torchinterp1d`, `pip install -e .`
+# Internship Pierre : performance improvement tools for KKL observers
 
 ### Content
-The directory `learn_KKL` contains the main files: `system.py` contains the 
-dynamical systems considered (Van der Pol...), `luenberger_observer.py` 
-contains the KKL observer (architecture of the encoder and decoder, forward 
-functions to train and use them...), and `learner.py` contains a utility 
-class for training the observer based on pytorch lightning. The user is 
-encouraged to add their dynamical systems in `system.py`, and to write their 
-own learner class if they need more advanced functionalities.
+From the original toolbox, refinement tools have been added in `learn_KKL.raffinement_dimN`
+They have then been integrated in the observer class :
+- in method observer.generate_data_svl, you can use the method "adaptative" to generate a refinable grid.
+- with observer.raffine_grid, you can refine the grid and generate at the same time the corresponding Z points over the new refined grid.
+- new versions of class observer and learner are available (luenberger_observerV3 and learnerV3) to train each componant of the state separately.
 
 **Tutorials** are provided in the directory `jupyter_notebooks`. It contains 
-four base cases: two systems (Van der Pol and the reverse Duffing oscillator)
-and two designs for the observer (autoencoder and supervised learning). The 
-user is encouraged to first run the tutorials in order to understand how the 
-toolbox is structured.
-
-### To reproduce the results of the paper:
-Supervised learning with dependency on w_c: run `python 
-experiments/0_supervised_revduffing.py` for the reverse Duffing experiments, `python 
-experiments/1_supervised_saturated_vanderpol.py` for the Saturated Van der 
-Pol experiments.
-The final plots for our gain tuning criterion were obtained in Matlab by 
-running `criterion.m` on the data obtained from the previous scripts, since 
-there are no native python functions for computing the H-infinity and H-2 
-norms in our criterion (the plot given by python is only an approximation).
-
-Autoencoder with D optimized jointly: run `python experiments/2_ae-d_revduffing.
-py` for the reverse Duffing oscillator or `python experiments/3_ae-d_vanderpol.
-py` for the Saturated Van der Pol.
-
-### If you use this toolbox, please cite:
-```
-@article{paper,  
-author={M. {Buisson-Fenet} and L. {Bahr} and and F. {Di Meglio}},  
-title={Towards gain tuning for numerical KKL observers}
-}
-```
+an example of application of the tools for RevDuffing system in file `test_tools_duffing`.
+The file `test_QQube` shows how to use the refinement tools for higher dimension systems such as QuanserCube.

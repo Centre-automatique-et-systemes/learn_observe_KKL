@@ -5,7 +5,7 @@ from torch import nn
 
 from learn_KKL.luenberger_observer import LuenbergerObserver
 
-from .utils import MSE, generate_mesh
+from .utilsV3 import MSE, generate_mesh
 
 # Set double precision by default
 torch.set_default_tensor_type(torch.DoubleTensor)

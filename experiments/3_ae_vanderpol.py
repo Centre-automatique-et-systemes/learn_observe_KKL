@@ -15,7 +15,7 @@ sys.path.append(working_path)
 from learn_KKL.learnerV2 import Learner
 from learn_KKL.system import SaturatedVanDerPol
 from learn_KKL.luenberger_observer import LuenbergerObserver
-from learn_KKL.utils import generate_mesh
+from learn_KKL.utilsV3 import generate_mesh
 
 # Import learner utils
 import pytorch_lightning as pl

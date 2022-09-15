@@ -9,7 +9,7 @@ import torch
 import torch.optim as optim
 
 from learn_KKL.learnerV2 import Learner
-from .utils import RMSE, StandardScaler
+from .utilsV3 import RMSE, StandardScaler
 
 # To avoid Type 3 fonts for submission https://tex.stackexchange.com/questions/18687/how-to-generate-pdf-without-any-type3-fonts
 plt.rc('text', usetex=True)

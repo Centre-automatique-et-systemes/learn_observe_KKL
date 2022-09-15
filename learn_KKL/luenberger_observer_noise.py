@@ -11,7 +11,7 @@ from torchdiffeq import odeint
 
 from learn_KKL.luenberger_observer import LuenbergerObserver
 
-from .utils import RMSE, generate_mesh, compute_h_infinity, MLPn
+from .utilsV3 import RMSE, generate_mesh, compute_h_infinity, MLPn
 
 # Set double precision by default
 torch.set_default_tensor_type(torch.DoubleTensor)
