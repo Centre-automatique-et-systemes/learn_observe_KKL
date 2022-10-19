@@ -69,8 +69,10 @@ if __name__ == "__main__":
         num_samples = int(1e5)
         x_limits = np.array(
             [[-0.5, 0.5], [0, 2 * np.pi], [-10, 10.], [-10, 10.]])
-        wc = 3.
-        D = 'block_diag'  # 'block_diag'
+    # wc = 3.
+    wc = float(sys.argv[1]) * 0.1 + 1
+    print('wc', wc)
+    D = 'block_diag'  # 'block_diag'
 
     # Solver options
     # solver_options = {'method': 'rk4', 'options': {'step_size': 1e-3}}

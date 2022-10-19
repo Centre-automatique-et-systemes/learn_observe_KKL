@@ -71,7 +71,7 @@ if __name__ == "__main__":
         num_samples = int(1e5)
         x_limits = np.array(
             [[-0.5, 0.5], [0, 2 * np.pi], [-10, 10.], [-10, 10.]])
-    wc_arr = np.linspace(1, 10., 100)
+    wc_arr = np.linspace(1, 2., 100)
     D = 'diag'  # 'block_diag'
 
     # Solver options

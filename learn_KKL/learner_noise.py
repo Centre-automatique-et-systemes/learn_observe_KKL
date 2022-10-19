@@ -12,9 +12,21 @@ from learn_KKL.learner import Learner
 from .utils import RMSE, StandardScaler
 
 # To avoid Type 3 fonts for submission https://tex.stackexchange.com/questions/18687/how-to-generate-pdf-without-any-type3-fonts
-plt.rc('text', usetex=True)
-plt.rc('text.latex', preamble=r'\usepackage{amsfonts}\usepackage{cmbright}')
-plt.rc('font', family='serif')
+# https://jwalton.info/Matplotlib-latex-PGF/
+plot_params = {
+    'font.family': 'serif',
+    'text.usetex': True,
+    'pgf.rcfonts': False,
+    'axes.labelsize': 16,
+    'ytick.labelsize': 16,
+    'xtick.labelsize': 16,
+    "pgf.preamble": "\n".join([
+        r'\usepackage{bm}',
+    ]),
+    'text.latex.preamble': [r'\usepackage{amsmath}',
+                            r'\usepackage{amssymb}',
+                            r'\usepackage{cmbright}'],
+}
 
 sb.set_style("whitegrid")
 

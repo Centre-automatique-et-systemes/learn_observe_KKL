@@ -62,14 +62,16 @@ if __name__ == "__main__":
     traj_data = True  # whether to generate data on grid or from trajectories
     add_forward = False
     if traj_data:  # TODO
-        num_initial_conditions = 100
+        num_initial_conditions = 5000
         x_limits = np.array(
             [[-0.5, 0.5], [-0.5, 0.5], [-0.1, 0.1], [-0.1, 0.1]])
     else:
         num_samples = int(1e5)
         x_limits = np.array(
             [[-0.5, 0.5], [0, 2 * np.pi], [-10, 10.], [-10, 10.]])
-    wc = 3.
+    # wc = 3.
+    wc = float(sys.argv[1]) * 0.1 + 1
+    print('wc', wc)
     D = 'block_diag'  # 'block_diag'
 
     # Solver options
@@ -251,7 +253,7 @@ if __name__ == "__main__":
 
     # Experiment
     dt_exp = 0.004
-    fileName = 'example_csv_fin3'
+    fileName = 'example_csv_fin4'
     filepath = '../Data/QQS2_data_diffx0/' + fileName + '.csv'
     exp_data = np.genfromtxt(filepath, delimiter=',')
     tq_exp = torch.from_numpy(exp_data[1:2001, -1] - exp_data[1, -1])
