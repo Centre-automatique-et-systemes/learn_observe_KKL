@@ -265,22 +265,6 @@ if __name__ == "__main__":
         file.to_csv(os.path.join(path, f'mesh.csv'), header=False)
         T = learner.model.encoder(x)
         Tstar = learner.model.decoder(z)
-        # dTdx = np.zeros((len(mesh), len(learner.z_idx_out), len(learner.x_idx_in)))
-        # for i in range(len(learner.x_idx_in)):
-        #     # regular grid in x
-        #     dx = (x_limits[i, 1] - x_limits[i, 0]) / int(np.ceil(np.power(
-        #         num_samples, 1/len(learner.x_idx_in))))
-        #     dT = FinDiff(i, dx)
-        #     dTdx[:, :, i] = dT(T)
-        # dTstardz = np.zeros((len(mesh), len(learner.x_idx_out),
-        #                      len(learner.z_idx_in)))
-        # for i in range(len(learner.z_idx_in)):
-        #     # irregular grid in z
-        #     dTstar = FinDiff(i, z[:, i])
-        #     dTstardz[:, :, i] = dTstar(Tstar)
-        # print(mesh.shape)
-        # print('waiting')
-        # wait = input('')
 
         # Gradient heatmap of NN model
         dTdx = vmap(jacfwd(learner.model.encoder))(x)

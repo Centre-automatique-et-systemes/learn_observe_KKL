@@ -64,14 +64,14 @@ if __name__ == "__main__":
     traj_data = True  # whether to generate data on grid or from trajectories
     add_forward = False
     if traj_data:  # TODO
-        num_initial_conditions = 500
+        num_initial_conditions = 5000
         x_limits = np.array(
             [[-0.5, 0.5], [-0.5, 0.5], [-0.1, 0.1], [-0.1, 0.1]])
     else:
         num_samples = int(1e5)
         x_limits = np.array(
             [[-0.5, 0.5], [0, 2 * np.pi], [-10, 10.], [-10, 10.]])
-    wc_arr = np.linspace(0.1, 4, 100)
+    wc_arr = np.linspace(1, 5, 50)
     D = 'block_diag'  # 'block_diag'
 
     # Solver options
@@ -376,8 +376,9 @@ if __name__ == "__main__":
                                       path=path)
 
     # Test trajectories
-    std_array = [0.0, 0.05, 0.1]
-    wc_arr = np.array([1, 2, 3., 4., 5.])
+    std_array = [0.0, 0.025, 0.05]
+    wc_arr = np.array([1, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2, 3,
+                      4, 5])
     x_0 = torch.tensor([0.1, 0.1, 0., 0.])
     z_0 = learner_T_star.model.encoder(
         torch.cat((x_0.expand(len(wc_arr), -1),

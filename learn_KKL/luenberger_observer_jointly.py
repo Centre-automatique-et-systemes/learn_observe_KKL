@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
 
 import torch
+import scipy.linalg
+import numpy as np
 from torch import nn
 from functorch import vmap, jacrev
 
 from learn_KKL.luenberger_observer import LuenbergerObserver
 
-from .utils import MSE, generate_mesh
+from .utils import MSE, generate_mesh, compute_h_infinity
 
 # Set double precision by default
 torch.set_default_tensor_type(torch.DoubleTensor)
@@ -46,8 +48,7 @@ class LuenbergerObserverJointly(LuenbergerObserver):
         )
         self.sensitivity_lambda = sensitivity_lambda
         if self.sensitivity_lambda > 0:
-            raise Exception('Adding a sensitivity term to the AE loss is '
-                            'experimental and should be corrected first!')
+            print('Adding a sensitivity term to the AE loss is experimental!')
 
     @property
     def D(self):
@@ -128,12 +129,31 @@ class LuenbergerObserverJointly(LuenbergerObserver):
              x, x_hat, z_hat, dim)
 
          if self.sensitivity_lambda > 0:
+             # TODO right norms are implemented but results less good as Matlab!
+             # And uses numpy so has to detach D: not ok for optim D jointly...
              # Compute gradients of T_star with respect to inputs
-             dTdz = vmap(jacrev(self.decoder))(z_hat)
-             dTdz = dTdz[:, :, : self.dim_z]  # TODO correct this loss!!!
-             loss_3 = self.sensitivity_lambda * torch.linalg.norm(
-                 torch.matmul(dTdz, torch.matmul(torch.inverse(self.D), self.F)))
-
+             dTstar_dz = vmap(jacrev(self.decoder))(z_hat)
+             dTstar_dz = dTstar_dz[:, :, : self.dim_z]
+             l2_norm = torch.linalg.norm(
+                 torch.linalg.matrix_norm(dTstar_dz, dim=(1, 2), ord=2))
+             C = np.eye(self.dim_z)
+             sv1 = torch.tensor(
+                 compute_h_infinity(self.D.numpy(), self.F.numpy(), C, 1e-10))
+             # sv2 = torch.tensor(
+             #     compute_h_infinity(self.D.numpy(), np.eye(self.dim_z), C,
+             #                        1e-10))
+             # obs_sys = control.matlab.ss(self.D.numpy(), self.F.numpy(), C, 0)
+             # sv1 = control.h2syn()
+             # A1 = self.D.numpy()
+             # Q1 = - self.F.numpy() @ self.F.numpy().T
+             # P1 = scipy.linalg.solve_continuous_lyapunov(A1, Q1)
+             # sv1 = torch.as_tensor((C @ P1 @ C.T).trace())
+             A2 = self.D.numpy()
+             Q2 = - np.eye(self.dim_z)
+             P2 = scipy.linalg.solve_continuous_lyapunov(A2, Q2)
+             sv2 = torch.as_tensor((C @ P2 @ C.T).trace())
+             product = l2_norm * (sv1 + sv2)
+             loss_3 = self.sensitivity_lambda * product ** 2
          else:
              loss_3 = torch.zeros_like(loss)
 

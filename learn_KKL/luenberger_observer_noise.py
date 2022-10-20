@@ -354,14 +354,25 @@ class LuenbergerObserverNoise(LuenbergerObserver):
                  sv.unsqueeze(0)), dim=0
             )
         elif version == 9:
+            # TODO right norms are implemented but results less good as Matlab!
             C = np.eye(self.dim_z)
             l2_norm = torch.linalg.norm(
                 torch.linalg.matrix_norm(dTstar_dz, dim=(1, 2), ord=2))
             sv1 = torch.tensor(
                 compute_h_infinity(self.D.numpy(), self.F.numpy(), C, 1e-10))
-            sv2 = torch.tensor(  # TODO implement H2 norm instead!
-                compute_h_infinity(self.D.numpy(), np.eye(self.dim_z), C,
-                                   1e-10))
+            # sv2 = torch.tensor(
+            #     compute_h_infinity(self.D.numpy(), np.eye(self.dim_z), C,
+            #                        1e-10))
+            # obs_sys = control.matlab.ss(model.D.numpy(), model.F.numpy(), C, 0)
+            # sv1 = control.h2syn()
+            # A1 = model.D.numpy()
+            # Q1 = - model.F.numpy() @ model.F.numpy().T
+            # P1 = scipy.linalg.solve_continuous_lyapunov(A1, Q1)
+            # sv1 = torch.as_tensor((C @ P1 @ C.T).trace())
+            A2 = self.D.numpy()
+            Q2 = - np.eye(self.dim_z)
+            P2 = linalg.solve_continuous_lyapunov(A2, Q2)
+            sv2 = torch.as_tensor((C @ P2 @ C.T).trace())
             product = l2_norm * (sv1 + sv2)
             return torch.cat(
                 (l2_norm.unsqueeze(0), sv1.unsqueeze(0),

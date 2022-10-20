@@ -376,8 +376,9 @@ if __name__ == "__main__":
                                       path=path)
 
     # Test trajectories
-    std_array = [0.0, 0.05, 0.1]
-    wc_arr = np.array([1, 2, 3., 4., 5])
+    std_array = [0.0, 0.025, 0.05]
+    wc_arr = np.array([1, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2, 3,
+                       4, 5])
     x_0 = torch.tensor([0.1, 0.1, 0., 0.])
     z_0 = learner_T_star.model.encoder(
         torch.cat((x_0.expand(len(wc_arr), -1),

@@ -38,6 +38,7 @@ if __name__ == "__main__":
     size_hl = 50
     activation = nn.ReLU()
     recon_lambda = 0.1
+    sensitivity_lambda = 0.01
 
     # Define system
     system = RevDuffing()
@@ -45,7 +46,7 @@ if __name__ == "__main__":
     # Define data params
     x_limits = np.array([[-1.0, 1.0], [-1.0, 1.0]])
     num_samples = 70000
-    init_wc = 0.3
+    init_wc = 0.2
 
     # Solver options
     solver_options = {'method': 'rk4', 'options': {'step_size': 1e-3}}
@@ -60,7 +61,8 @@ if __name__ == "__main__":
         size_hl=size_hl,
         solver_options=solver_options,
         wc=init_wc,
-        recon_lambda=recon_lambda
+        recon_lambda=recon_lambda,
+        sensitivity_lambda=sensitivity_lambda
     )
     observer.set_dynamics(system)
 

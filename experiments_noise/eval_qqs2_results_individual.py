@@ -1,6 +1,9 @@
 from pathlib import Path
+
 import matplotlib.pyplot as plt
 import os
+
+import scipy.linalg
 import torch
 import pandas as pd
 import numpy as np
@@ -124,14 +127,25 @@ def sensitivity_norm(model, x, z, wc, save=True, path='', version=9):
              sv.unsqueeze(0)), dim=0
         )
     elif version == 9:
+        # TODO right norms are implemented but results less good as Matlab!
         C = np.eye(model.dim_z)
         l2_norm = torch.linalg.norm(
             torch.linalg.matrix_norm(dTstar_dz, dim=(1, 2), ord=2))
         sv1 = torch.tensor(
-            compute_h_infinity(model.D.numpy(), model.F.numpy(), C, 1e-10))
-        sv2 = torch.tensor(  # TODO implement H2 norm instead!
-            compute_h_infinity(model.D.numpy(), np.eye(model.dim_z), C,
-                               1e-10))
+                    compute_h_infinity(model.D.numpy(), model.F.numpy(), C, 1e-10))
+        # sv2 = torch.tensor(
+        #     compute_h_infinity(model.D.numpy(), np.eye(model.dim_z), C,
+        #                        1e-10))
+        # obs_sys = control.matlab.ss(model.D.numpy(), model.F.numpy(), C, 0)
+        # sv1 = control.h2syn()
+        # A1 = model.D.numpy()
+        # Q1 = - model.F.numpy() @ model.F.numpy().T
+        # P1 = scipy.linalg.solve_continuous_lyapunov(A1, Q1)
+        # sv1 = torch.as_tensor((C @ P1 @ C.T).trace())
+        A2 = model.D.numpy()
+        Q2 = - np.eye(model.dim_z)
+        P2 = scipy.linalg.solve_continuous_lyapunov(A2, Q2)
+        sv2 = torch.as_tensor((C @ P2 @ C.T).trace())
         product = l2_norm * (sv1 + sv2)
         return torch.cat(
             (l2_norm.unsqueeze(0), sv1.unsqueeze(0),
@@ -316,7 +330,7 @@ def test_trajs(exp_folder, exp_subfolders, test_array, std_array, x0,
 if __name__ == "__main__":
     # Enter folder from which to extract the experiments
     ROOT = Path(__file__).parent.parent
-    MEASUREMENT = 2  # Either 1, 2, 12
+    MEASUREMENT = 1  # Either 1, 2, 12
     EXP_FOLDER = ROOT / 'runs' / f'QuanserQubeServo2_meas{MEASUREMENT}' / \
                  'Supervised' / 'T_star' / 'N5000_wc1540'
 
