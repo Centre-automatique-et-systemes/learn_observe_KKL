@@ -1,19 +1,19 @@
 % Matlab reshapes opposite of python, by columns and not by rows!! 
 % Solution: reshape for transpose of what you need then transpose result!
 clear all
-% dx = 2;
-% dy = 1;
-% dz = 3;
-% wc_arr = linspace(0.03, 1., 100);
-dx = 4;
-dy = 2;
-dz = 10;
-wc_arr = linspace(1, 5., 40);
+dx = 2;
+dy = 1;
+dz = 3;
+wc_arr = linspace(0.03, 1., 100);
+%dx = 4;
+%dy = 1;
+%dz = 5;
+%wc_arr = linspace(1, 5., 50);
 
 %path = "runs/VanDerPol/Supervised_noise/T_star/exp_100_wc0.03-1_-11+1cycle_rk41e-2/xzi_mesh/";
-%path = "runs/Reversed_Duffing_Oscillator/Supervised_noise/T_star/exp_100_wc0.03-1_rk41e-3_k10_2/xzi_mesh/";
+path = "runs/Reversed_Duffing_Oscillator/Supervised_noise/T_star/exp_100_wc0.03-1_rk41e-3_k10_3/xzi_mesh/";
 %path = "runs/SaturatedVanDerPol/Supervised_noise/T_star/exp_100_wc0.03-1_-2727_rk41e-3/xzi_mesh/";
-path = "runs/QuanserQubeServo2_meas12/Supervised/T_star/N5000_wc1540/xzi_mesh/";
+%path = "runs/QuanserQubeServo2_meas1/Supervised_noise/T_star/Ntraj5000_wc1550/xzi_mesh/";
 Darr = table2array(readtable(append(path, 'D_arr.csv')));
 Darr = Darr(:, 2:end);
 

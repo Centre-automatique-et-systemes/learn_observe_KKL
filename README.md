@@ -26,16 +26,19 @@ toolbox is structured.
 
 ### To reproduce the results of the paper:
 Supervised learning with dependency on w_c: run `python 
-experiments/0_supervised_revduffing.py` for the reverse Duffing experiments, `python 
-experiments/1_supervised_saturated_vanderpol.py` for the Saturated Van der 
-Pol experiments.
+experiments_noise/0_supervised_revduffing.py` for the reverse Duffing 
+experiments,
+`python experiments/5_supervised_qqs2_meas1.py` for the 
+Qube experiments.
 The final plots for our gain tuning criterion were obtained in Matlab by 
 running `criterion.m` on the data obtained from the previous scripts, since 
 there are no native python functions for computing the H-infinity and H-2 
 norms in our criterion (the plot given by python is only an approximation).
 
-Autoencoder with D optimized jointly: run `python experiments/2_ae-d_revduffing.
-py` for the reverse Duffing oscillator or `python experiments/3_ae-d_vanderpol.
+Autoencoder with D optimized jointly: run `python 
+experiments_noise/2_ae-d_revduffing.
+py` for the reverse Duffing oscillator or `python 
+experiments_noise/3_ae-d_vanderpol.
 py` for the Saturated Van der Pol.
 
 ### If you use this toolbox, please cite:

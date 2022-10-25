@@ -19,9 +19,9 @@ plot_params = {
     'font.family': 'serif',
     'text.usetex': True,
     'pgf.rcfonts': False,
-    'axes.labelsize': 16,
-    'ytick.labelsize': 16,
-    'xtick.labelsize': 16,
+    'axes.labelsize': 18,
+    'ytick.labelsize': 18,
+    'xtick.labelsize': 18,
     "pgf.preamble": "\n".join([
         r'\usepackage{bm}',
     ]),

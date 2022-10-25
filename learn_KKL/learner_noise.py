@@ -17,9 +17,9 @@ plot_params = {
     'font.family': 'serif',
     'text.usetex': True,
     'pgf.rcfonts': False,
-    'axes.labelsize': 16,
-    'ytick.labelsize': 16,
-    'xtick.labelsize': 16,
+    'axes.labelsize': 18,
+    'ytick.labelsize': 18,
+    'xtick.labelsize': 18,
     "pgf.preamble": "\n".join([
         r'\usepackage{bm}',
     ]),
@@ -268,9 +268,6 @@ class LearnerNoise(Learner):
                 x_mesh = mesh[:, self.x_idx_out, j]
                 z_mesh = mesh[:, self.z_idx_in, j]
 
-                # noise = torch.normal(0, 0.01, size=(z_mesh.shape)
-                # z_mesh.add(noise)
-
                 # compute x_hat for every w_c
                 x_hat = self.model("T_star", z_mesh)
 
@@ -449,7 +446,7 @@ class LearnerNoise(Learner):
             os.makedirs(traj_folder, exist_ok=True)
             traj_error = 0.0
 
-            # plot_style = ["-", "--", "-."]
+            plot_style = ["-", "--", "-."]
 
             for i in range(nb_trajs):
                 # TODO run predictions in parallel for all test trajectories!!!
@@ -493,14 +490,12 @@ class LearnerNoise(Learner):
                     os.path.join(current_traj_folder, f"Error_traj_{i}.csv"),
                 )
 
-                # for i in range(simulation.shape[1]):
+                error_traj = RMSE(simulation, estimation, dim=-1)
                 name = "Traj" + str(1) + ".pdf"
                 plt.plot(
                     tq,
-                    # estimation[:, 1].cpu().numpy() - simulation[:, 1].cpu().numpy(),
-                    np.sum(estimation.cpu().numpy() - simulation.cpu().numpy(),
-                           axis=1),
-                    # plot_style[i],
+                    error_traj,
+                    plot_style[i],
                     linewidth=0.8,
                     markersize=1,
                     label=rf"$\omega_c = {float(w_c_arr[i]):0.2g}$",
@@ -508,11 +503,11 @@ class LearnerNoise(Learner):
 
             plt.legend(loc=1)
             plt.grid(visible=True)
-            plt.title(rf"Test trajectory error")
+            plt.title(rf"RMSE over test trajectory")
             plt.xlabel(rf"$t$")
-            # plt.ylabel(rf"$\hat{{x}}_{2}-x_{2}$")
-            plt.ylabel(rf"$\hat{{x}}-x$")
-            plt.savefig(os.path.join(current_traj_folder, name),
+            plt.ylabel(r'$|\hat{x}-x|$')
+            # plt.ylabel(rf"$\hat{{x}}-x$")
+            plt.savefig(os.path.join(traj_folder, name),
                         bbox_inches="tight")
             if verbose:
                 plt.show()
@@ -543,7 +538,6 @@ class LearnerNoise(Learner):
             # TODO run predictions in parallel for all test trajectories!!!
             # Need to figure out how to interpolate y in parallel for all
             # trajectories!!!
-            self.model.D = self.model.set_D(w_c_array[i])
             y = torch.cat((tq.unsqueeze(1), measurement), dim=1)
 
             estimation, z_hat = self.model.predict(
@@ -603,7 +597,7 @@ class LearnerNoise(Learner):
             os.makedirs(traj_folder, exist_ok=True)
             traj_error = 0.0
 
-            # plot_style = ["-", "--", "-.", ":"]
+            plot_style = ["-", "--", "-.", ":"]
 
             for i in range(nb_trajs):
                 # TODO run predictions in parallel for all test trajectories!!!
