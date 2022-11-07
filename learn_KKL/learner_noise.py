@@ -13,13 +13,12 @@ from .utils import RMSE, StandardScaler
 
 # To avoid Type 3 fonts for submission https://tex.stackexchange.com/questions/18687/how-to-generate-pdf-without-any-type3-fonts
 # https://jwalton.info/Matplotlib-latex-PGF/
+# https://stackoverflow.com/questions/12322738/how-do-i-change-the-axis-tick-font-in-a-matplotlib-plot-when-rendering-using-lat
 plot_params = {
     'font.family': 'serif',
     'text.usetex': True,
     'pgf.rcfonts': False,
-    'axes.labelsize': 18,
-    'ytick.labelsize': 18,
-    'xtick.labelsize': 18,
+    'font.size': 18,
     "pgf.preamble": "\n".join([
         r'\usepackage{bm}',
     ]),
@@ -27,6 +26,7 @@ plot_params = {
                             r'\usepackage{amssymb}',
                             r'\usepackage{cmbright}'],
 }
+plt.rcParams.update(plot_params)
 
 sb.set_style("whitegrid")
 

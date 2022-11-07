@@ -12,16 +12,17 @@ import seaborn as sb
 from functorch import vmap, jacfwd, jacrev
 
 from learn_KKL.utils import compute_h_infinity, RMSE
+from learn_KKL.filter_utils import interpolate_func
+from learn_KKL.system import QuanserQubeServo2
 
 # To avoid Type 3 fonts for submission https://tex.stackexchange.com/questions/18687/how-to-generate-pdf-without-any-type3-fonts
 # https://jwalton.info/Matplotlib-latex-PGF/
+# https://stackoverflow.com/questions/12322738/how-do-i-change-the-axis-tick-font-in-a-matplotlib-plot-when-rendering-using-lat
 plot_params = {
     'font.family': 'serif',
     'text.usetex': True,
     'pgf.rcfonts': False,
-    'axes.labelsize': 16,
-    'ytick.labelsize': 16,
-    'xtick.labelsize': 16,
+    'font.size': 18,
     "pgf.preamble": "\n".join([
         r'\usepackage{bm}',
     ]),
@@ -29,6 +30,7 @@ plot_params = {
                             r'\usepackage{amssymb}',
                             r'\usepackage{cmbright}'],
 }
+plt.rcParams.update(plot_params)
 
 sb.set_style("whitegrid")
 
@@ -307,7 +309,7 @@ def plot_crit(folder, N, verbose=False):
 
 # Save test trajectories for different values of noise std and wc
 def test_trajs(exp_folder, exp_subfolders, test_array, std_array, x0,
-               verbose=False):
+               verbose=False, true_traj=None):
     with torch.no_grad():
         for std in std_array:
             std_folder = os.path.join(exp_folder, f'Test_trajs_{std}')
@@ -324,14 +326,78 @@ def test_trajs(exp_folder, exp_subfolders, test_array, std_array, x0,
                 wc = learner.model.wc
                 traj_folder = os.path.join(std_folder, f'wc{wc:0.2g}')
 
-                learner.save_trj(init_state=x0, verbose=verbose, tsim=tsim,
-                                 dt=dt, std=std, traj_folder=traj_folder,
-                                 z_0=None)
+                # learner.save_trj(init_state=x0, verbose=verbose, tsim=tsim,
+                #                  dt=dt, std=std, traj_folder=traj_folder,
+                #                  z_0=None)
+                if traj_folder is None:
+                    traj_folder = os.path.join(learner.results_folder,
+                                               f"Test_trajectories/Traj_{std}")
+                if true_traj is None:
+                    tq, simulation = learner.system.simulate(x0, tsim, dt)
+                else:
+                    simulation = true_traj
+                    tq = torch.arange(tsim[0], tsim[1], dt)
+                measurement = learner.model.h(simulation)
+                noise = torch.normal(0, std, size=measurement.shape)
+                measurement = measurement.add(noise)
+                # Save these test trajectories
+                os.makedirs(traj_folder, exist_ok=True)
+                traj_error = 0.0
+
+                # TODO run predictions in parallel for all test trajectories!!!
+                # Need to figure out how to interpolate y in parallel for all
+                # trajectories!!!
+                y = torch.cat((tq.unsqueeze(1), measurement), dim=-1)
+                estimation = learner.model.predict(y, tsim, dt,
+                                                   z_0=None).detach()
+                error = RMSE(simulation, estimation)
+                traj_error += error
+                filename = f"RMSE.txt"
+                with open(os.path.join(traj_folder, filename), "w") as f:
+                    print(error.cpu().numpy(), file=f)
+
+                learner.save_csv(
+                    simulation.cpu().numpy(),
+                    os.path.join(traj_folder, f"True_traj.csv"),
+                )
+                learner.save_csv(
+                    estimation.cpu().numpy(),
+                    os.path.join(traj_folder, f"Estimated_traj.csv"),
+                )
+
+                for j in range(estimation.shape[1]):
+                    name = "Traj" + str(j) + ".pdf"
+                    if j == 0:
+                        plt.plot(tq, measurement.detach().numpy(), '-',
+                                 label=r"$y$")
+                    plt.plot(tq, simulation[:, j].detach().numpy(), '--',
+                             label=rf"$x_{j + 1}$")
+                    plt.plot(
+                        tq, estimation[:, j].detach().numpy(), '-.',
+                        label=rf"$\hat{{x}}_{j + 1}$"
+                    )
+                    plt.legend(loc=1)
+                    plt.grid(visible=True)
+                    plt.title(
+                        rf"Test trajectory, RMSE = {np.round(error.numpy(), 4)}")
+                    plt.xlabel(rf"$t$")
+                    plt.ylabel(rf"$x_{j + 1}$")
+                    plt.savefig(
+                        os.path.join(traj_folder, name), bbox_inches="tight"
+                    )
+                    if verbose:
+                        plt.show()
+                    plt.clf()
+                    plt.close("all")
+
+                filename = "RMSE_traj.txt"
+                with open(os.path.join(traj_folder, filename), "w") as f:
+                    print(traj_error, file=f)
 
 # Compute test trajectories for different values of noise std and wc and save
 # corresponding error plots
 def error_trajs(exp_folder, exp_subfolders, test_array, std_array, x0,
-               verbose=False):
+               verbose=False, true_traj=None):
     with torch.no_grad():
         for std in std_array:
             traj_folder = os.path.join(exp_folder, f'Test_trajs_{std}')
@@ -350,7 +416,11 @@ def error_trajs(exp_folder, exp_subfolders, test_array, std_array, x0,
                 wc = learner.model.wc
 
                 # Compute error
-                tq, simulation = learner.system.simulate(x0, tsim, dt)
+                if true_traj is None:
+                    tq, simulation = learner.system.simulate(x0, tsim, dt)
+                else:
+                    simulation = true_traj
+                    tq = torch.arange(tsim[0], tsim[1], dt)
                 measurement = learner.model.h(simulation)
                 if j == 0:
                     noise = torch.normal(0, std, size=measurement.shape)
@@ -420,20 +490,44 @@ if __name__ == "__main__":
     path = ''
     # plot_sensitiviy_wc(exp_folder=EXP_FOLDER, exp_subfolders=subdirs,
     #                    dim_z=dim_z, verbose=verbose, save=save, path=path)
-    plot_crit(os.path.join(EXP_FOLDER, 'xzi_mesh'), N=50000, verbose=verbose)
+    # plot_crit(os.path.join(EXP_FOLDER, 'xzi_mesh'), N=50000, verbose=verbose)
+
+    # Experimental test traj
+    dt_exp = 0.004
+    dt = 0.04
+    tsim = (0, 8)  # for generating test data
+    fileName = 'example_csv_fin4'
+    filepath = '../Data/QQS2_data_diffx0/' + fileName + '.csv'
+    exp_data = np.genfromtxt(filepath, delimiter=',')
+    tq_exp = torch.from_numpy(exp_data[1:2001, -1] - exp_data[1, -1])
+    exp_data = exp_data[1:2001, 1:-1]
+    system = QuanserQubeServo2()
+    exp_data = torch.from_numpy(system.remap_hardware(exp_data))
+    t_exp = torch.cat((tq_exp.unsqueeze(1), exp_data), dim=1)
+    exp_func = interpolate_func(x=t_exp, t0=tq_exp[0], init_value=exp_data[0])
+    tq = torch.arange(tsim[0], tsim[1], dt)
+    exp = exp_func(tq)
 
     # # Test trajectories
     std_array = [0.0, 0.025, 0.05]
-    test_array = np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, 40])
-    x_0 = torch.tensor([0.1, 0.1, 0., 0.])
-    test_trajs(exp_folder=EXP_FOLDER, exp_subfolders=subdirs,
-               test_array=test_array, std_array=std_array, x0=x_0,
-               verbose=verbose)
-
-    # Error trajectories
-    std_array = [0.0, 0.025, 0.05]
+    # test_array = np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, 40])
     test_array = np.array([0, 9, 40])
     x_0 = torch.tensor([0.1, 0.1, 0., 0.])
-    error_trajs(exp_folder=EXP_FOLDER, exp_subfolders=subdirs,
+    # test_trajs(exp_folder=EXP_FOLDER, exp_subfolders=subdirs,
+    #            test_array=test_array, std_array=std_array, x0=x_0,
+    #            verbose=verbose)
+    test_trajs(exp_folder=EXP_FOLDER, exp_subfolders=subdirs,
                test_array=test_array, std_array=std_array, x0=x_0,
-               verbose=verbose)
+               verbose=verbose, true_traj=exp)
+
+    # # Error trajectories
+    # std_array = [0.0, 0.025, 0.05]
+    # test_array = np.array([0, 9, 40])
+    # x_0 = torch.tensor([0.1, 0.1, 0., 0.])
+    # # Simulated test traj
+    # # error_trajs(exp_folder=EXP_FOLDER, exp_subfolders=subdirs,
+    # #            test_array=test_array, std_array=std_array, x0=x_0,
+    # #            verbose=verbose)
+    # error_trajs(exp_folder=EXP_FOLDER, exp_subfolders=subdirs,
+    #             test_array=test_array, std_array=std_array, x0=x_0,
+    #             verbose=verbose, true_traj=exp)
