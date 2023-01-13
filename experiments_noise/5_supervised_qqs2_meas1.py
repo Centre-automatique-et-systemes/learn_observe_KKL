@@ -331,7 +331,7 @@ if __name__ == "__main__":
     else:
         # Load learner  # TODO
         path = "runs/QuanserQubeServo2_meas1/Supervised_noise/T_star" \
-               "/N1000_wc1510"
+               "/Ntraj5000_wc1550"
         learner_path = path + "/learner.pkl"
         import dill as pkl
 
@@ -384,6 +384,22 @@ if __name__ == "__main__":
         torch.cat((x_0.expand(len(wc_arr), -1),
                    torch.as_tensor(wc_arr).reshape(-1, 1)), dim=1))
 
+    for std in std_array:
+        learner_T_star.save_trj(
+            x_0, wc_arr, 0, verbose, tsim, dt, std=std  # , z_0=z_0
+        )
+        learner_T_star.plot_traj_rmse(
+            x_0, wc_arr, verbose, tsim, dt, std=std  # , z_0=z_0
+        )
+
+    # TODO
+    # Test trajectories
+    std_array = [0.0, 0.025, 0.05]
+    wc_arr = np.array([1, 1.9, 5])
+    x_0 = torch.tensor([0.1, 0.1, 0., 0.])
+    z_0 = learner_T_star.model.encoder(
+        torch.cat((x_0.expand(len(wc_arr), -1),
+                   torch.as_tensor(wc_arr).reshape(-1, 1)), dim=1))
     for std in std_array:
         learner_T_star.save_trj(
             x_0, wc_arr, 0, verbose, tsim, dt, std=std  # , z_0=z_0

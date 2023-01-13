@@ -38,7 +38,7 @@ if __name__ == "__main__":
     size_hl = 50
     activation = nn.ReLU()
     recon_lambda = 0.1
-    sensitivity_lambda = 0.01
+    sensitivity_lambda = 0.
 
     # Define system
     system = RevDuffing()
@@ -46,7 +46,8 @@ if __name__ == "__main__":
     # Define data params
     x_limits = np.array([[-1.0, 1.0], [-1.0, 1.0]])
     num_samples = 70000
-    init_wc = 0.2
+    # init_wc = 0.1
+    init_wc = 1.
 
     # Solver options
     solver_options = {'method': 'rk4', 'options': {'step_size': 1e-3}}
@@ -61,6 +62,7 @@ if __name__ == "__main__":
         size_hl=size_hl,
         solver_options=solver_options,
         wc=init_wc,
+        D='diag',
         recon_lambda=recon_lambda,
         sensitivity_lambda=sensitivity_lambda
     )
@@ -137,13 +139,25 @@ if __name__ == "__main__":
     # Generate plots #########################################################
     ##########################################################################
 
+    # # Load learner  # TODO
+    # path = "runs/Reversed_Duffing_Oscillator/Autoencoder_jointly/N=70000/" \
+    #        "Dblock0.2_lambda0.1_batch100_2"
+    # learner_path = path + "/learner.pkl"
+    # import dill as pkl
+    # with open(learner_path, "rb") as rb_file:
+    #     learner = pkl.load(rb_file)
+    # learner.results_folder = path
+    # observer = learner.model
+    # verbose = False
+    # save = True
+
     learner.save_results(
-         limits=np.array([[-1, 1.0], [-1.0, 1.0]]),
+         limits=x_limits,
          nb_trajs=10,
          tsim=(0, 50),
          dt=1e-2,
          fast=True,
-         checkpoint_path=checkpoint_callback.best_model_path,
+         # checkpoint_path=checkpoint_callback.best_model_path,
      )
 
     # Trajectories

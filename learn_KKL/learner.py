@@ -16,11 +16,15 @@ from .utils import RMSE, StandardScaler
 # To avoid Type 3 fonts for submission https://tex.stackexchange.com/questions/18687/how-to-generate-pdf-without-any-type3-fonts
 # https://jwalton.info/Matplotlib-latex-PGF/
 # https://stackoverflow.com/questions/12322738/how-do-i-change-the-axis-tick-font-in-a-matplotlib-plot-when-rendering-using-lat
+plt.rcdefaults()
+# For manuscript
+sb.set_style('whitegrid')
 plot_params = {
     'font.family': 'serif',
     'text.usetex': True,
     'pgf.rcfonts': False,
-    'font.size': 18,
+    'font.serif': 'Palatino',
+    'font.size': 16,
     "pgf.preamble": "\n".join([
         r'\usepackage{bm}',
     ]),
@@ -29,8 +33,12 @@ plot_params = {
                             r'\usepackage{cmbright}'],
 }
 plt.rcParams.update(plot_params)
-
-sb.set_style("whitegrid")
+# # Previous papers
+# plt.rc('text', usetex=True)
+# plt.rc('text.latex', preamble=r'\usepackage{amsfonts}\usepackage{cmbright}')
+# plt.rc('font', family='serif')
+# plt.rcParams.update({'font.size': 22})
+# sb.set_style('whitegrid')
 
 # Set double precision by default
 torch.set_default_tensor_type(torch.DoubleTensor)
@@ -387,6 +395,23 @@ class Learner(pl.LightningModule):
                 )
                 cbar = plt.colorbar()
                 cbar.set_label("Log estimation error")
+
+                # # TODO add traj on top
+                # init_state = torch.tensor([0.1, 0.1])
+                # tsim = (0, 30)
+                # dt = 1e-2
+                # std = 0
+                # tq, simulation = self.system.simulate(init_state, tsim, dt)
+                # measurement = self.model.h(simulation)
+                # noise = torch.normal(0, std, size=measurement.shape)
+                # measurement = measurement.add(noise)
+                # y = torch.cat((tq.unsqueeze(1), measurement), dim=-1)
+                # estimation = self.model.predict(y, tsim, dt, w_c=wc).detach()
+                # # estimation = self.model.predict(y, tsim, dt).detach()
+                # plt.plot(simulation[:, 0], simulation[:, 1], label='True')
+                # plt.plot(estimation[:, 0], estimation[:, 1], label='Estimated')
+                # # plt.legend()
+
                 if wc is not None:
                     plt.title(
                         r"RMSE between $x$ and $\hat{x}$"
@@ -396,7 +421,6 @@ class Learner(pl.LightningModule):
                               rf"{np.mean(error.detach().numpy()):0.2g}")
                 plt.xlabel(rf"$x_{i}$")
                 plt.ylabel(rf"$x_{i + 1}$")
-                plt.legend()
                 plt.savefig(os.path.join(self.results_folder, name),
                             bbox_inches="tight")
                 if verbose:
@@ -458,6 +482,28 @@ class Learner(pl.LightningModule):
             plt.title(rf"Test trajectory, RMSE = {np.round(error.numpy(), 4)}")
             plt.xlabel(rf"$t$")
             plt.ylabel(rf"$x_{j + 1}$")
+            plt.savefig(
+                os.path.join(traj_folder, name), bbox_inches="tight"
+            )
+            if verbose:
+                plt.show()
+            plt.clf()
+            plt.close("all")
+
+        for j in range(estimation.shape[1] - 1):
+            name = "Phase_portrait" + str(j) + ".pdf"
+            plt.plot(simulation[:, j], simulation[:, j+1].detach().numpy(),
+                     label=rf"True")
+            plt.plot(
+                estimation[:, j].detach().numpy(),
+                estimation[:, j+1].detach().numpy(),
+                '--', label=rf"Estimated"
+            )
+            plt.legend(loc=1)
+            plt.grid(visible=True)
+            plt.title(rf"Test trajectory, RMSE = {np.round(error.numpy(), 4)}")
+            plt.xlabel(rf"$x_{j+1}$")
+            plt.ylabel(rf"$x_{j + 2}$")
             plt.savefig(
                 os.path.join(traj_folder, name), bbox_inches="tight"
             )
@@ -740,3 +786,83 @@ class Learner(pl.LightningModule):
             if not fast:  # Computing loss over grid is slow, most of all for AE
                 self.save_loss_grid(x_mesh, x_hat_AE, z_hat_T, x_hat_star,
                                     verbose)
+
+    def phase_portrait(self, init_state, verbose, tsim, dt, std=0.0,
+                       x_limits=None, z_0=None):
+        with torch.no_grad():
+            # Phase portrait with true and estimated trajs and training domain
+            # For several initial points
+            # Only for dim = 2!
+            traj_folder = os.path.join(
+                self.results_folder,
+                f"Test_trajectories_portrait_{std}")
+            tq, simulation = self.system.simulate(init_state, tsim, dt)
+
+            measurement = self.model.h(simulation)
+            noise = torch.normal(0, std, size=measurement.shape)
+            measurement = measurement.add(noise)
+
+            # Reshape
+            if len(simulation.shape) < len(init_state.shape) + 1:
+                simulation = torch.unsqueeze(simulation, 1)
+                measurement = torch.unsqueeze(measurement, 1)
+
+            # Save these test trajectories
+            os.makedirs(traj_folder, exist_ok=True)
+            traj_error = 0.0
+
+            for j in range(len(init_state)):
+                # TODO run predictions in parallel for all test trajectories!!!
+                # Need to figure out how to interpolate y in parallel for all
+                # trajectories!!!
+                y = torch.cat((tq.unsqueeze(1), measurement[:, j]), dim=1)
+
+                if z_0 == 'encoder':
+                    z0 = self.model.encoder(init_state[j])
+                else:
+                    z0 = None
+                estimation = self.model.predict(y, tsim, dt, z_0=z0).detach()
+
+                error = RMSE(simulation[:, j, :], estimation)
+                traj_error += error
+                filename = f"RMSE_{j}.txt"
+                with open(os.path.join(traj_folder, filename), "w") as f:
+                    print(error.cpu().numpy(), file=f)
+
+                self.save_csv(
+                    simulation[:, j, :].cpu().numpy(),
+                    os.path.join(traj_folder, f"True_traj_{j}.csv"),
+                )
+                self.save_csv(
+                    estimation.cpu().numpy(),
+                    os.path.join(traj_folder,
+                                 f"Estimated_traj_{j}.csv"),
+                )
+
+                plt.plot(simulation[:, j, 0], simulation[:, j, 1])
+                plt.plot(estimation[:, 0], estimation[:, 1])
+
+            if x_limits is not None:
+                xlim = np.linspace(x_limits[0][0], x_limits[0][1])
+                ymin = x_limits[1][0]
+                ymax = x_limits[1][1]
+                plt.fill_between(xlim, ymin, ymax, facecolor='grey',
+                                 alpha=0.3)
+            # Legend
+            from matplotlib.lines import Line2D
+            lines = [Line2D([0], [0], color='black', linewidth=3,
+                            linestyle='-'),
+                     Line2D([0], [0], color='black', linewidth=3,
+                            linestyle='--')]
+            labels = ['True', 'Estimated']
+            plt.legend(lines, labels)
+            plt.grid(visible=True)
+            plt.title(rf"Test trajectories")
+            plt.xlabel(rf"$x_1$")
+            plt.ylabel(rf"$x_2$")
+            plt.savefig(os.path.join(traj_folder, f'Traj.pdf'),
+                        bbox_inches="tight")
+            if verbose:
+                plt.show()
+            plt.clf()
+            plt.close("all")

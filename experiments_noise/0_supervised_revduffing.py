@@ -240,6 +240,7 @@ if __name__ == "__main__":
     learner_T_star.results_folder = path
     observer = learner_T_star.model
     verbose = False
+    save = True
 
     # Trajectories
     std_array = [0.0, 0.25, 0.5]
@@ -250,17 +251,24 @@ if __name__ == "__main__":
     z_0 = learner_T_star.model.encoder(
         torch.cat((x_0.expand(len(wc_arr), -1),
                    torch.as_tensor(wc_arr).reshape(-1, 1)), dim=1))
-
+    # if save:
+    #     mesh = learner_T_star.model.generate_data_svl(
+    #         x_limits, wc_arr, 10000 * len(wc_arr), method="uniform", stack=False
+    #     )
+    # else:
+    #     mesh = torch.randn((10, learner_T_star.model.dim_x +
+    #                         learner_T_star.model.dim_z, 1))
+    #
     # learner_T_star.plot_traj_rmse(x_0, wc_arr, verbose, tsim, dt, std=0.25)
-
+    #
     # for std in std_array:
-        # learner_T_star.save_trj(
-        #     x_0, wc_arr, 0, verbose, tsim, dt, std=std#, z_0=z_0
-        # )
-        # learner_T_star.plot_traj_error(
-        #     x_0, wc_arr, 0, verbose, tsim, dt, std=std#, z_0=z_0
-        # )
-
+    #     learner_T_star.save_trj(
+    #         x_0, wc_arr, 0, verbose, tsim, dt, std=std#, z_0=z_0
+    #     )
+    #     learner_T_star.plot_traj_error(
+    #         x_0, wc_arr, 0, verbose, tsim, dt, std=std#, z_0=z_0
+    #     )
+    #
     # # Heatmap
     # if not save:
     #     mesh = learner_T_star.model.generate_data_svl(
@@ -270,9 +278,16 @@ if __name__ == "__main__":
     # learner_T_star.save_pdf_heatmap(mesh, verbose)
     # learner_T_star.save_invert_heatmap(mesh, verbose)
     # # TODO bug heatmaps when z_0="encoder"?
+    #
+    # Criterion
+    # from eval_qqs2_results_individual import plot_crit
+    # import os
+    # plot_crit(os.path.join(path, 'xzi_mesh'), N=10000, verbose=verbose)
 
-    from eval_qqs2_results_individual import plot_crit
-    import os
-    plot_crit(os.path.join(path, 'xzi_mesh'), N=10000, verbose=verbose)
+    # Phase portrait
+    x0 = torch.tensor([[1., 1.], [0.6, 0.6]])
+    learner_T_star.phase_portrait(
+        init_state=x0, w_c_arr=wc_arr, verbose=verbose, tsim=(0, 20), dt=dt,
+        std=0.0, x_limits=x_limits, z_0='encoder')
 
 

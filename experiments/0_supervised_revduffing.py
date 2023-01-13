@@ -16,11 +16,13 @@ from functorch import vmap, jacfwd, jacrev
 # To avoid Type 3 fonts for submission https://tex.stackexchange.com/questions/18687/how-to-generate-pdf-without-any-type3-fonts
 # https://jwalton.info/Matplotlib-latex-PGF/
 # https://stackoverflow.com/questions/12322738/how-do-i-change-the-axis-tick-font-in-a-matplotlib-plot-when-rendering-using-lat
+sb.set_style('whitegrid')
 plot_params = {
     'font.family': 'serif',
     'text.usetex': True,
     'pgf.rcfonts': False,
-    'font.size': 18,
+    'font.serif': 'Palatino',
+    'font.size': 16,
     "pgf.preamble": "\n".join([
         r'\usepackage{bm}',
     ]),
@@ -29,8 +31,6 @@ plot_params = {
                             r'\usepackage{cmbright}'],
 }
 plt.rcParams.update(plot_params)
-
-sb.set_style("whitegrid")
 
 # In order to import learn_KKL we need to add the working dir to the system path
 working_path = str(pathlib.Path().resolve())

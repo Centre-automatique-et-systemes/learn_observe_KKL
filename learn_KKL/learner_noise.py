@@ -14,11 +14,15 @@ from .utils import RMSE, StandardScaler
 # To avoid Type 3 fonts for submission https://tex.stackexchange.com/questions/18687/how-to-generate-pdf-without-any-type3-fonts
 # https://jwalton.info/Matplotlib-latex-PGF/
 # https://stackoverflow.com/questions/12322738/how-do-i-change-the-axis-tick-font-in-a-matplotlib-plot-when-rendering-using-lat
+plt.rcdefaults()
+# For manuscript
+sb.set_style('whitegrid')
 plot_params = {
     'font.family': 'serif',
     'text.usetex': True,
     'pgf.rcfonts': False,
-    'font.size': 18,
+    'font.serif': 'Palatino',
+    'font.size': 16,
     "pgf.preamble": "\n".join([
         r'\usepackage{bm}',
     ]),
@@ -27,8 +31,12 @@ plot_params = {
                             r'\usepackage{cmbright}'],
 }
 plt.rcParams.update(plot_params)
-
-sb.set_style("whitegrid")
+# # Previous papers
+# plt.rc('text', usetex=True)
+# plt.rc('text.latex', preamble=r'\usepackage{amsfonts}\usepackage{cmbright}')
+# plt.rc('font', family='serif')
+# plt.rcParams.update({'font.size': 22})
+# sb.set_style('whitegrid')
 
 # Set double precision by default
 torch.set_default_tensor_type(torch.DoubleTensor)
@@ -250,6 +258,32 @@ class LearnerNoise(Learner):
                     plt.savefig(
                         os.path.join(current_traj_folder, name),
                         bbox_inches="tight"
+                    )
+                    if verbose:
+                        plt.show()
+                    plt.clf()
+                    plt.close("all")
+
+                for j in range(estimation.shape[1] - 1):
+                    name = "Phase_portrait" + str(j) + ".pdf"
+                    plt.plot(simulation[:, j],
+                             simulation[:, j + 1].detach().numpy(),
+                             label=rf"True")
+                    plt.plot(
+                        estimation[:, j].detach().numpy(),
+                        estimation[:, j + 1].detach().numpy(),
+                        '--', label=rf"Estimated"
+                    )
+                    plt.legend(loc=1)
+                    plt.grid(visible=True)
+                    plt.title(
+                        rf"Test trajectory for $\omega_c = $ "
+                        rf"{w_c:0.2g}, RMSE = {error:0.2g}"
+                    )
+                    plt.xlabel(rf"$x_{j + 1}$")
+                    plt.ylabel(rf"$x_{j + 2}$")
+                    plt.savefig(
+                        os.path.join(current_traj_folder, name), bbox_inches="tight"
                     )
                     if verbose:
                         plt.show()
@@ -632,13 +666,6 @@ class LearnerNoise(Learner):
                                  f"Estimated_traj_{i}.csv"),
                 )
 
-                os.makedirs(current_traj_folder, exist_ok=True)
-
-                filename = f"RMSE_{i}.txt"
-                with open(os.path.join(current_traj_folder, filename),
-                          "w") as f:
-                    print(error.cpu().numpy(), file=f)
-
                 # for i in range(simulation.shape[1]):
                 name = "Traj" + str(1) + ".pdf"
                 plt.plot(
@@ -665,6 +692,90 @@ class LearnerNoise(Learner):
             filename = "RMSE_traj.txt"
             with open(os.path.join(traj_folder, filename), "w") as f:
                 print(traj_error, file=f)
+
+    def phase_portrait(self, init_state, w_c_arr, verbose, tsim, dt, std=0.0,
+                       x_limits=None, z_0=None):
+        with torch.no_grad():
+            # Phase portrait with true and estimated trajs and training domain
+            # For several initial points
+            # Only for dim = 2!
+            for i in range(len(w_c_arr)):
+                wc = w_c_arr[i]
+
+                traj_folder = os.path.join(
+                    self.results_folder,
+                    f"Test_trajectories_portrait_{std}")
+                tq, simulation = self.system.simulate(init_state, tsim, dt)
+
+                measurement = self.model.h(simulation)
+                noise = torch.normal(0, std, size=measurement.shape)
+                measurement = measurement.add(noise)
+
+                # Reshape
+                if len(simulation.shape) < len(init_state.shape) + 1:
+                    simulation = torch.unsqueeze(simulation, 1)
+                    measurement = torch.unsqueeze(measurement, 1)
+
+                # Save these test trajectories
+                os.makedirs(traj_folder, exist_ok=True)
+                current_wc_folder = os.path.join(
+                    traj_folder, f'Traj_wc{wc:0.2g}')
+                os.makedirs(current_wc_folder, exist_ok=True)
+
+                for j in range(len(init_state)):
+                    # TODO run predictions in parallel for all test trajectories!!!
+                    # Need to figure out how to interpolate y in parallel for all
+                    # trajectories!!!
+                    y = torch.cat((tq.unsqueeze(1), measurement[:, j]), dim=1)
+
+                    if z_0 == 'encoder':
+                        z0 = self.model.encoder(
+                            torch.cat((init_state[j].expand(1, -1),
+                                       torch.as_tensor(wc).reshape(-1, 1)),
+                                      dim=1))
+                    else:
+                        z0 = None
+                    estimation = self.model.predict(y, tsim, dt, wc,
+                                                    z_0=z0).detach()
+
+                    self.save_csv(
+                        simulation[:, j, :].cpu().numpy(),
+                        os.path.join(current_wc_folder, f"True_traj_{j}.csv"),
+                    )
+                    self.save_csv(
+                        estimation.cpu().numpy(),
+                        os.path.join(current_wc_folder,
+                                     f"Estimated_traj_{j}.csv"),
+                    )
+
+                    plt.plot(simulation[:, j, 0], simulation[:, j, 1])
+                    plt.plot(estimation[:, 0], estimation[:, 1])
+
+                if x_limits is not None:
+                    xlim = np.linspace(x_limits[0][0], x_limits[0][1])
+                    ymin = x_limits[1][0]
+                    ymax = x_limits[1][1]
+                    plt.fill_between(xlim, ymin, ymax, facecolor='grey',
+                                     alpha=0.3)
+                # Legend
+                from matplotlib.lines import Line2D
+                lines = [Line2D([0], [0], color='black', linewidth=3,
+                                linestyle='-'),
+                         Line2D([0], [0], color='black', linewidth=3,
+                                linestyle='--')]
+                labels = ['True', 'Estimated']
+                plt.legend(lines, labels)
+                plt.grid(visible=True)
+                plt.title(
+                    rf"True and estimated trajectories for $\omega_c = $ {wc:0.2g}")
+                plt.xlabel(rf"$x_1$")
+                plt.ylabel(rf"$x_2$")
+                plt.savefig(os.path.join(current_wc_folder, f'Traj.pdf'),
+                            bbox_inches="tight")
+                if verbose:
+                    plt.show()
+                plt.clf()
+                plt.close("all")
 
     def save_results(
             self, checkpoint_path=None,

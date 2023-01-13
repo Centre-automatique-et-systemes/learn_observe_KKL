@@ -18,11 +18,15 @@ from learn_KKL.system import QuanserQubeServo2
 # To avoid Type 3 fonts for submission https://tex.stackexchange.com/questions/18687/how-to-generate-pdf-without-any-type3-fonts
 # https://jwalton.info/Matplotlib-latex-PGF/
 # https://stackoverflow.com/questions/12322738/how-do-i-change-the-axis-tick-font-in-a-matplotlib-plot-when-rendering-using-lat
+plt.rcdefaults()
+# For manuscript
+sb.set_style('whitegrid')
 plot_params = {
     'font.family': 'serif',
     'text.usetex': True,
     'pgf.rcfonts': False,
-    'font.size': 18,
+    'font.serif': 'Palatino',
+    'font.size': 16,
     "pgf.preamble": "\n".join([
         r'\usepackage{bm}',
     ]),
@@ -31,8 +35,12 @@ plot_params = {
                             r'\usepackage{cmbright}'],
 }
 plt.rcParams.update(plot_params)
-
-sb.set_style("whitegrid")
+# # Previous papers
+# plt.rc('text', usetex=True)
+# plt.rc('text.latex', preamble=r'\usepackage{amsfonts}\usepackage{cmbright}')
+# plt.rc('font', family='serif')
+# plt.rcParams.update({'font.size': 22})
+# sb.set_style('whitegrid')
 
 # Set double precision by default
 torch.set_default_tensor_type(torch.DoubleTensor)
@@ -416,16 +424,16 @@ def error_trajs(exp_folder, exp_subfolders, test_array, std_array, x0,
                 wc = learner.model.wc
 
                 # Compute error
-                if true_traj is None:
-                    tq, simulation = learner.system.simulate(x0, tsim, dt)
-                else:
-                    simulation = true_traj
-                    tq = torch.arange(tsim[0], tsim[1], dt)
-                measurement = learner.model.h(simulation)
                 if j == 0:
+                    if true_traj is None:
+                        tq, simulation = learner.system.simulate(x0, tsim, dt)
+                    else:
+                        simulation = true_traj
+                        tq = torch.arange(tsim[0], tsim[1], dt)
+                    measurement = learner.model.h(simulation)
                     noise = torch.normal(0, std, size=measurement.shape)
-                measurement = measurement.add(noise)
-                y = torch.cat((tq.unsqueeze(1), measurement), dim=-1)
+                    measurement = measurement.add(noise)
+                    y = torch.cat((tq.unsqueeze(1), measurement), dim=-1)
                 estimation = learner.model.predict(
                     y, tsim, dt, z_0=None).detach()
 
@@ -490,7 +498,7 @@ if __name__ == "__main__":
     path = ''
     # plot_sensitiviy_wc(exp_folder=EXP_FOLDER, exp_subfolders=subdirs,
     #                    dim_z=dim_z, verbose=verbose, save=save, path=path)
-    # plot_crit(os.path.join(EXP_FOLDER, 'xzi_mesh'), N=50000, verbose=verbose)
+    plot_crit(os.path.join(EXP_FOLDER, 'xzi_mesh'), N=50000, verbose=verbose)
 
     # Experimental test traj
     dt_exp = 0.004
@@ -513,21 +521,21 @@ if __name__ == "__main__":
     # test_array = np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, 40])
     test_array = np.array([0, 9, 40])
     x_0 = torch.tensor([0.1, 0.1, 0., 0.])
-    # test_trajs(exp_folder=EXP_FOLDER, exp_subfolders=subdirs,
-    #            test_array=test_array, std_array=std_array, x0=x_0,
-    #            verbose=verbose)
     test_trajs(exp_folder=EXP_FOLDER, exp_subfolders=subdirs,
                test_array=test_array, std_array=std_array, x0=x_0,
-               verbose=verbose, true_traj=exp)
+               verbose=verbose)
+    # test_trajs(exp_folder=EXP_FOLDER, exp_subfolders=subdirs,
+    #            test_array=test_array, std_array=std_array, x0=x_0,
+    #            verbose=verbose, true_traj=exp)
 
-    # # Error trajectories
-    # std_array = [0.0, 0.025, 0.05]
-    # test_array = np.array([0, 9, 40])
-    # x_0 = torch.tensor([0.1, 0.1, 0., 0.])
-    # # Simulated test traj
-    # # error_trajs(exp_folder=EXP_FOLDER, exp_subfolders=subdirs,
-    # #            test_array=test_array, std_array=std_array, x0=x_0,
-    # #            verbose=verbose)
+    # Error trajectories
+    std_array = [0.0, 0.025, 0.05]
+    test_array = np.array([0, 9, 40])
+    x_0 = torch.tensor([0.1, 0.1, 0., 0.])
+    # Simulated test traj
+    error_trajs(exp_folder=EXP_FOLDER, exp_subfolders=subdirs,
+               test_array=test_array, std_array=std_array, x0=x_0,
+               verbose=verbose)
     # error_trajs(exp_folder=EXP_FOLDER, exp_subfolders=subdirs,
     #             test_array=test_array, std_array=std_array, x0=x_0,
     #             verbose=verbose, true_traj=exp)
