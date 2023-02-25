@@ -34,6 +34,9 @@ possible to run the scripts of the **experiments** folder sequentially for
 many values of $D$, then evaluate the gain criterion a posteriori using 
 `experiments_noise/eval_qqs2_results_individual.py`.
 
+The **Data** folder contains a zip file with the Quanser Qube data: 
+unzip it in `Data/QQS2_data_diffx0` to reproduce the Qube results.
+
 ### To reproduce the results of the paper:
 Supervised learning with dependency on w_c: run `python 
 experiments_noise/0_supervised_revduffing.py` for the reverse Duffing 
