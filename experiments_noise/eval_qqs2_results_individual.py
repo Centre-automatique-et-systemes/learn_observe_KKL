@@ -550,7 +550,7 @@ if __name__ == "__main__":
     dt = 0.04
     tsim = (0, 8)  # for generating test data
     fileName = 'example_csv_fin4'
-    filepath = '../Data/QQS2_data_diffx0/' + fileName + '.csv'
+    filepath = 'Data/QQS2_data_diffx0/' + fileName + '.csv'
     exp_data = np.genfromtxt(filepath, delimiter=',')
     tq_exp = torch.from_numpy(exp_data[1:2001, -1] - exp_data[1, -1])
     exp_data = exp_data[1:2001, 1:-1]
