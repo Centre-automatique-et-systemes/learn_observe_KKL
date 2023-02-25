@@ -56,6 +56,11 @@ class LuenbergerObserverNoise(LuenbergerObserver):
                             n_hl=self.size_hl, n_out=self.dim_x,
                             activation=self.activation)
 
+        self.params_to_save.update(dict(
+            wc_array=self.wc_array,
+            nb_wc=len(self.wc_array)
+        ))
+
     def set_scalers(self, scaler_xin, scaler_xout, scaler_zin, scaler_zout):
         """
         Set the scaler objects for input and output data. Then, the internal
@@ -80,25 +85,25 @@ class LuenbergerObserverNoise(LuenbergerObserver):
         self.decoder.set_scalers(scaler_X=self.scaler_zin,
                                  scaler_Y=self.scaler_xout)
 
-    def __repr__(self):
-        return "\n".join(
-            [
-                "Luenberger Observer Noise object",
-                "dim_x " + str(self.dim_x),
-                "dim_y " + str(self.dim_y),
-                "dim_z " + str(self.dim_z),
-                "method_setD " + str(self.method_setD),
-                "wc_array " + str(self.wc_array),
-                "nb_wc " + str(len(self.wc_array)),
-                "D " + str(self.D),
-                "F " + str(self.F),
-                "encoder " + str(self.encoder),
-                "decoder " + str(self.decoder),
-                "method " + self.method,
-                "recon_lambda " + str(self.recon_lambda),
-                "solver_options " + str(self.solver_options)
-            ]
-        )
+    # def __repr__(self):
+    #     return "\n".join(
+    #         [
+    #             "Luenberger Observer Noise object",
+    #             "dim_x " + str(self.dim_x),
+    #             "dim_y " + str(self.dim_y),
+    #             "dim_z " + str(self.dim_z),
+    #             "method_setD " + str(self.method_setD),
+    #             "wc_array " + str(self.wc_array),
+    #             "nb_wc " + str(len(self.wc_array)),
+    #             "D " + str(self.D),
+    #             "F " + str(self.F),
+    #             "encoder " + str(self.encoder),
+    #             "decoder " + str(self.decoder),
+    #             "method " + self.method,
+    #             "recon_lambda " + str(self.recon_lambda),
+    #             "solver_options " + str(self.solver_options)
+    #         ]
+    #     )
 
     def generate_data_mesh(
             self,
@@ -407,6 +412,13 @@ class LuenbergerObserverNoise(LuenbergerObserver):
 
         dt: float 
             Step width of tsim.
+
+        out_z: bool
+            Whether to return both (x,z) estimated state and observer state,
+            or just x.
+
+        z_0: torch.tensor
+            Initial value for observer state (default: 0).
 
         Returns
         ----------

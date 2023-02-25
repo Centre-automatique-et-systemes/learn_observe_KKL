@@ -63,7 +63,7 @@ if __name__ == "__main__":
     tsim = (0, 8.)
     traj_data = True  # whether to generate data on grid or from trajectories
     add_forward = False
-    if traj_data:  # TODO
+    if traj_data:
         num_initial_conditions = 5000
         x_limits = np.array(
             [[-0.5, 0.5], [-0.5, 0.5], [-0.1, 0.1], [-0.1, 0.1]])
@@ -75,7 +75,6 @@ if __name__ == "__main__":
     D = 'block_diag'  # 'block_diag'
 
     # Solver options
-    # solver_options = {'method': 'rk4', 'options': {'step_size': 1e-3}}
     solver_options = {'method': 'dopri5'}
 
     if TRAIN:
@@ -101,7 +100,7 @@ if __name__ == "__main__":
             )
             data_ordered = copy.deepcopy(data)
             data = torch.cat(torch.unbind(data, dim=1), dim=0)
-            if add_forward:  # TODO add one forward trajectory to dataset
+            if add_forward:
                 init = torch.tensor([0., 0.1, 0., 0.] + [0.] * observer.dim_z)
                 data_forward = observer.generate_data_forward(
                     init=init, w_c=wc_arr, tsim=(0, 8),
@@ -110,7 +109,7 @@ if __name__ == "__main__":
         else:
             data = observer.generate_data_svl(
                 x_limits, wc_arr, num_samples, method="LHS", k=10)
-            if add_forward:  # TODO add forward trajectory to have stable data
+            if add_forward:  # add forward trajectory to have stable data
                 init = torch.tensor([0., 0.1, 0., 0.] + [0.] * observer.dim_z)
                 data_forward = observer.generate_data_forward(
                     init=init, w_c=wc_arr, tsim=(0, 8),
@@ -170,7 +169,7 @@ if __name__ == "__main__":
             scheduler=scheduler_method,
             scheduler_options=scheduler_options,
         )
-        learner_T.traj_data = traj_data  # TODO to keep track
+        learner_T.traj_data = traj_data  # to keep track
         learner_T.x0_limits = x_limits
         learner_T.add_forward = add_forward
         if traj_data:
@@ -244,7 +243,7 @@ if __name__ == "__main__":
             scheduler=scheduler_method,
             scheduler_options=scheduler_options,
         )
-        learner_T_star.traj_data = traj_data  # TODO to keep track
+        learner_T_star.traj_data = traj_data  #  to keep track
         learner_T_star.x0_limits = x_limits
         learner_T_star.add_forward = add_forward
         learner_T_star.data_dt = dt
@@ -273,10 +272,6 @@ if __name__ == "__main__":
 
         # Train and save results
         trainer.fit(learner_T_star)
-
-        ##########################################################################
-        # Generate plots #########################################################
-        ##########################################################################
 
         # To see logger in tensorboard, copy the following output name_of_folder
         print(f"Logs stored in {learner_T_star.results_folder}/tb_logs")
@@ -329,7 +324,7 @@ if __name__ == "__main__":
             )
 
     else:
-        # Load learner  # TODO
+        # Load learner
         path = "runs/QuanserQubeServo2_meas1/Supervised_noise/T_star" \
                "/Ntraj5000_wc1550"
         learner_path = path + "/learner.pkl"
@@ -341,7 +336,7 @@ if __name__ == "__main__":
         observer = learner_T_star.model
 
     ##########################################################################
-    # Gain criterion #########################################################
+    # Generate plots #########################################################
     ##########################################################################
 
     # Test parameters
@@ -355,7 +350,7 @@ if __name__ == "__main__":
                            size=(nb,), replace=False)
     verbose = False
     print('Computing our gain-tuning criterion can take some time but saves '
-          'intermediary data in a subfolder zi_mesh: if you have already run '
+          'intermediary data in a subfolder xzi_mesh: if you have already run '
           'this script, set save to False and path to this subfolder.')
     save = True
     path = ''
@@ -392,7 +387,6 @@ if __name__ == "__main__":
             x_0, wc_arr, verbose, tsim, dt, std=std  # , z_0=z_0
         )
 
-    # TODO
     # Test trajectories
     std_array = [0.0, 0.025, 0.05]
     wc_arr = np.array([1, 1.9, 5])
@@ -417,11 +411,9 @@ if __name__ == "__main__":
         else:
             mesh = learner_T_star.model.generate_data_svl(
                 x_limits, wc_arr, 10000 * len(wc_arr), method="LHS", stack=False
-                # , z_0="encoder"
             )
     learner_T_star.save_pdf_heatmap(mesh, verbose)
     learner_T_star.save_invert_heatmap(mesh, verbose)
-    # TODO bug heatmaps when z_0="encoder"?
 
     ##########################################################################
     # Test trajectory ########################################################

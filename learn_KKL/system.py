@@ -2,8 +2,8 @@
 
 """
 This module implements a system class for which linear or non-linear
-systems can be inherited. By inheritancing the system class
-the dynamical systems recieve a box of tools for generating data
+systems can be inherited. By inheriting the system class
+the dynamical systems receive a box of tools for generating data
 and setting the control input to different functions.
 
 This module also contains two non-linear example systems. The Reversed Duffing
@@ -17,8 +17,8 @@ dimension of the state).
 
 Examples
 --------
-The following example initates the Reversed Duffing oscillator and plots the simulation
-in time as well as the phase potrait.
+The following example imitates the Reversed Duffing oscillator and plots the
+simulation in time as well as the phase portrait.
 
 .. code-block:: Python
 

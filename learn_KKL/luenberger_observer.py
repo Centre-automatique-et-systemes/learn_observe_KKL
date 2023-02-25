@@ -275,6 +275,7 @@ class LuenbergerObserver(nn.Module):
             solver_options=None,
     ):
         super(LuenbergerObserver, self).__init__()
+        self.params_to_save = {}
 
         self.method = method
 
@@ -297,10 +298,10 @@ class LuenbergerObserver(nn.Module):
             self.method_setD = D
             self.D, self.F = self.set_DF(wc=self.wc, method=self.method_setD)
         else:
-            self.wc = 0.0
             self.method_setD = 'given'
-            self.D = torch.as_tensor(D)
-            self.F = torch.ones((self.dim_z, self.dim_y))
+            self.D0 = torch.as_tensor(D)
+            self.D, self.F = self.set_DF(wc=self.wc, method=self.method_setD)
+            self.params_to_save['D0'] = self.D0
         print(self.method_setD)
 
         # Model params
@@ -336,6 +337,22 @@ class LuenbergerObserver(nn.Module):
         else:
             self.solver_options = solver_options
 
+        # Parameters to be saved in model specifications
+        self.params_to_save.update(dict(
+            dim_x=self.dim_x,
+            dim_y=self.dim_y,
+            dim_z=self.dim_z,
+            method_setD=self.method_setD,
+            wc=self.wc,
+            D=self.D,
+            F=self.F,
+            encoder=self.encoder,
+            decoder=self.decoder,
+            method=self.method,
+            recon_lambda=self.recon_lambda,
+            solver_options=self.solver_options
+        ))
+
     def f(self, x: torch.tensor):
         return 0
 
@@ -352,23 +369,25 @@ class LuenbergerObserver(nn.Module):
         return 0
 
     def __repr__(self):
-        return "\n".join(
-            [
-                "Luenberger Observer object",
-                "dim_x " + str(self.dim_x),
-                "dim_y " + str(self.dim_y),
-                "dim_z " + str(self.dim_z),
-                "method_setD " + str(self.method_setD),
-                "wc " + str(self.wc),
-                "D " + str(self.D),
-                "F " + str(self.F),
-                "encoder " + str(self.encoder),
-                "decoder " + str(self.decoder),
-                "method " + self.method,
-                "recon_lambda " + str(self.recon_lambda),
-                "solver_options " + str(self.solver_options)
-            ]
-        )
+        # return "\n".join(
+        #     [
+        #         "Luenberger Observer object",
+        #         "dim_x " + str(self.dim_x),
+        #         "dim_y " + str(self.dim_y),
+        #         "dim_z " + str(self.dim_z),
+        #         "method_setD " + str(self.method_setD),
+        #         "wc " + str(self.wc),
+        #         "D " + str(self.D),
+        #         "F " + str(self.F),
+        #         "encoder " + str(self.encoder),
+        #         "decoder " + str(self.decoder),
+        #         "method " + self.method,
+        #         "recon_lambda " + str(self.recon_lambda),
+        #         "solver_options " + str(self.solver_options)
+        #     ]
+        # )
+        return "\n".join([key + ': ' + str(value) for key, value in
+                          self.params_to_save.items()])
 
     def __call__(self, method="Autoencoder", *input):
         if method == "T":
@@ -425,14 +444,8 @@ class LuenbergerObserver(nn.Module):
     def set_DF(self, wc: float = 1.0,
                method: str = "block_diag") -> torch.tensor:
         """
-        Returns a matrix from the eigenvalues of a dim_z order
-        bessel filter with a given cutoff frequency for a given
-        method.
-        Indirect:
-        D = A-BK has the same eigenvalues as the bessel filter.
-        Direct:
-
-        Diag:
+        Returns a pair (D, F) with different methods, given a scalar
+        parameter wc.
 
         Parameters
         ----------
@@ -558,12 +571,18 @@ class LuenbergerObserver(nn.Module):
             )
             F = torch.ones(self.dim_z, self.dim_y)
 
-        elif method.startswith('id'):
+        elif method == "given":
+            # D has been set manually by the user, multiply it by wc
+            wc = wc / (2 * np.pi)
+            D = wc * self.D0
+            F = torch.ones(self.dim_z, self.dim_y)
+
+        elif method == 'id':
             wc = wc / (2 * np.pi)
             D = - wc * torch.eye(self.dim_z)
             F = torch.ones(self.dim_z, self.dim_y)
 
-        elif method.startswith('randn'):
+        elif method == 'randn':
             D = torch.randn(self.dim_z, self.dim_z) / self.dim_z
             F = torch.ones(self.dim_z, self.dim_y)
 
@@ -1115,7 +1134,7 @@ class LuenbergerObserver(nn.Module):
         return x_hat
 
     def predict(self, measurement: torch.tensor, tsim: tuple,
-                dt: int, z_0=None) -> torch.tensor:
+                dt: int, out_z: bool = False, z_0=None) -> torch.tensor:
         """
         Forward function for autoencoder. Used for training the model.
         Computation follows as:
@@ -1133,6 +1152,13 @@ class LuenbergerObserver(nn.Module):
         dt: float 
             Step width of tsim.
 
+        out_z: bool
+            Whether to return both (x,z) estimated state and observer state,
+            or just x.
+
+        z_0: torch.tensor
+            Initial value for observer state (default: 0).
+
         Returns
         ----------
         x_hat: torch.tensor
@@ -1140,10 +1166,14 @@ class LuenbergerObserver(nn.Module):
         """
         _, sol = self.simulate(measurement, tsim, dt, z_0)
 
-        x_hat = self.decoder(torch.squeeze(sol))
+        z_hat = torch.squeeze(sol)
+        x_hat = self.decoder(z_hat)
 
         # Remap simulation data if necessary for this system
         if self.system.needs_remap:
-            return self.system.remap(x_hat)
+            x_hat = self.system.remap(x_hat)
+
+        if out_z:
+            return x_hat, z_hat
         else:
             return x_hat

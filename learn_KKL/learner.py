@@ -2,6 +2,7 @@ import os
 import sys
 
 import dill as pkl
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -380,21 +381,26 @@ class Learner(pl.LightningModule):
 
     def save_pdf_heatmap(self, x_mesh, x_hat, verbose, wc=None):
         with torch.no_grad():
-            error = RMSE(x_mesh, x_hat, dim=1)
+            error = RMSE(x_mesh, x_hat, dim=1).detach().numpy()
             for i in range(1, x_mesh.shape[1]):
                 # https://stackoverflow.com/questions/37822925/how-to-smooth-by-interpolation-when-using-pcolormesh
                 if wc is not None:
                     name = f"RMSE_heatmap_wc{wc:0.2g}_{i}.pdf"
                 else:
                     name = "RMSE_heatmap" + str(i) + ".pdf"
-                plt.scatter(
-                    x_mesh[:, i - 1],
-                    x_mesh[:, i],
+                plt.imshow(
+                    error.reshape(int(x_mesh.shape[0]**(1/x_mesh.shape[1])),
+                                  int(x_mesh.shape[0]**(1/x_mesh.shape[1]))).T,
+                    origin='lower',
+                    extent=(x_mesh[:, i - 1].min(), x_mesh[:, i - 1].max(),
+                            x_mesh[:, i].min(), x_mesh[:, i].max()),
                     cmap="jet",
-                    c=np.log(error.detach().numpy()),
+                    norm=matplotlib.colors.LogNorm(vmin=error.min(),
+                                                   vmax=error.max()),
+                    rasterized=True
                 )
                 cbar = plt.colorbar()
-                cbar.set_label("Log estimation error")
+                cbar.set_label("Estimation error")
 
                 # # TODO add traj on top
                 # init_state = torch.tensor([0.1, 0.1])
@@ -418,7 +424,7 @@ class Learner(pl.LightningModule):
                         + rf" with $\omega_c =$ {wc.item():0.2g}")
                 else:
                     plt.title(rf"RMSE between $x$ and $\hat{{x}}$: "
-                              rf"{np.mean(error.detach().numpy()):0.2g}")
+                              rf"{np.mean(error):0.2g}")
                 plt.xlabel(rf"$x_{i}$")
                 plt.ylabel(rf"$x_{i + 1}$")
                 plt.savefig(os.path.join(self.results_folder, name),
@@ -599,20 +605,34 @@ class Learner(pl.LightningModule):
     def save_invert_heatmap(self, x_mesh, x_hat, verbose, wc=None):
         with torch.no_grad():
             # Invertibility heatmap
-            error = RMSE(x_mesh, x_hat, dim=1)
+            error = RMSE(x_mesh, x_hat, dim=1).detach().numpy()
             for i in range(1, x_mesh.shape[1]):
                 if wc is not None:
                     name = f"Invertibility_heatmap_wc{wc:0.2g}_{i}.pdf"
                 else:
                     name = "Invertibility_heatmap" + str(i) + ".pdf"
-                plt.scatter(
-                    x_mesh[:, i - 1],
-                    x_mesh[:, i],
+                # plt.scatter(
+                #     x_mesh[:, i - 1],
+                #     x_mesh[:, i],
+                #     cmap="jet",
+                #     c=np.log(error.detach().numpy()),
+                # )
+                # cbar = plt.colorbar()
+                # cbar.set_label("Log estimation error")
+                plt.imshow(
+                    error.reshape(
+                        int(x_mesh.shape[0] ** (1 / x_mesh.shape[1])),
+                        int(x_mesh.shape[0] ** (1 / x_mesh.shape[1]))).T,
+                    origin='lower',
+                    extent=(x_mesh[:, i - 1].min(), x_mesh[:, i - 1].max(),
+                            x_mesh[:, i].min(), x_mesh[:, i].max()),
                     cmap="jet",
-                    c=np.log(error.detach().numpy()),
+                    norm=matplotlib.colors.LogNorm(vmin=error.min(),
+                                                   vmax=error.max()),
+                    rasterized=True
                 )
                 cbar = plt.colorbar()
-                cbar.set_label("Log estimation error")
+                cbar.set_label("Estimation error")
                 if wc is not None:
                     plt.title(
                         rf"RMSE between $x$ and $T^*(T(x))$, $\omega_c$ = {wc:0.2g}")

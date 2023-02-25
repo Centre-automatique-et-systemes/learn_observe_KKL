@@ -44,6 +44,8 @@ import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
 
+    TRAIN = True
+
     ##########################################################################
     # Setup observer #########################################################
     ##########################################################################
@@ -61,7 +63,7 @@ if __name__ == "__main__":
     tsim = (0, 8.)
     traj_data = True  # whether to generate data on grid or from trajectories
     add_forward = False
-    if traj_data:  # TODO
+    if traj_data:
         num_initial_conditions = 5000
         x_limits = np.array(
             [[-0.5, 0.5], [-0.5, 0.5], [-0.1, 0.1], [-0.1, 0.1]])
@@ -75,161 +77,173 @@ if __name__ == "__main__":
     D = 'block_diag'  # 'block_diag'
 
     # Solver options
-    # solver_options = {'method': 'rk4', 'options': {'step_size': 1e-3}}
     solver_options = {'method': 'dopri5'}
 
-    # Create the observer
-    observer = LuenbergerObserver(
-        dim_x=system.dim_x,
-        dim_y=system.dim_y,
-        method=learning_method,
-        wc=wc,
-        D=D,
-        activation=activation,
-        num_hl=num_hl,
-        size_hl=size_hl,
-        solver_options=solver_options
-    )
-    observer.set_dynamics(system)
-
-    # Generate data
-    if traj_data:
-        data = observer.generate_trajectory_data(
-            x_limits, num_initial_conditions, method="LHS", tsim=tsim,
-            stack=False, dt=dt
+    if TRAIN:
+        # Create the observer
+        observer = LuenbergerObserver(
+            dim_x=system.dim_x,
+            dim_y=system.dim_y,
+            method=learning_method,
+            wc=wc,
+            D=D,
+            activation=activation,
+            num_hl=num_hl,
+            size_hl=size_hl,
+            solver_options=solver_options
         )
-        data_ordered = copy.deepcopy(data)
-        data = torch.cat(torch.unbind(data, dim=1), dim=0)
-        if add_forward:  # TODO add one forward trajectory to dataset
-            init = torch.tensor([0., 0.1, 0., 0.] + [0.] * observer.dim_z)
-            data_forward = observer.generate_data_forward(
-                init=init, tsim=(0, 8),
-                num_datapoints=200, k=10, dt=dt, stack=True)
-            data = torch.cat((data, data_forward), dim=0)
+        observer.set_dynamics(system)
+
+        # Generate data
+        if traj_data:
+            data = observer.generate_trajectory_data(
+                x_limits, num_initial_conditions, method="LHS", tsim=tsim,
+                stack=False, dt=dt
+            )
+            data_ordered = copy.deepcopy(data)
+            data = torch.cat(torch.unbind(data, dim=1), dim=0)
+            if add_forward:  # add one forward trajectory to dataset
+                init = torch.tensor([0., 0.1, 0., 0.] + [0.] * observer.dim_z)
+                data_forward = observer.generate_data_forward(
+                    init=init, tsim=(0, 8),
+                    num_datapoints=200, k=10, dt=dt, stack=True)
+                data = torch.cat((data, data_forward), dim=0)
+        else:
+            data = observer.generate_data_svl(
+                x_limits, num_samples, method="LHS", k=10)
+            if add_forward:  # add forward trajectory to have stable data
+                init = torch.tensor([0., 0.1, 0., 0.] + [0.] * observer.dim_z)
+                data_forward = observer.generate_data_forward(
+                    init=init, tsim=(0, 8),
+                    num_datapoints=200, k=10, dt=dt, stack=True)
+                data = torch.cat((data, data_forward), dim=0)
+        data, val_data = train_test_split(data, test_size=0.3, shuffle=False)
+
+        print(data.shape)
+
+        ##########################################################################
+        # Setup learner ##########################################################
+        ##########################################################################
+
+        # Trainer options
+        num_epochs = 100
+        trainer_options = {"max_epochs": num_epochs}
+        if traj_data:
+            batch_size = 100
+            init_learning_rate = 1e-2
+        else:
+            batch_size = 20
+            init_learning_rate = 1e-2
+
+        # Optim options
+        optim_method = optim.Adam
+        if traj_data:
+            optimizer_options = {"weight_decay": 1e-6}
+        else:
+            optimizer_options = {"weight_decay": 1e-6}
+
+        # Scheduler options
+        scheduler_method = optim.lr_scheduler.ReduceLROnPlateau
+        scheduler_options = {
+            "mode": "min",
+            "factor": 0.5,
+            "patience": 5,
+            "threshold": 5e-4,
+            "verbose": True,
+        }
+        stopper = pl.callbacks.early_stopping.EarlyStopping(
+            monitor="val_loss", min_delta=1e-4, patience=7, verbose=False,
+            mode="min"
+        )
+
+        # Instantiate learner
+        learner = Learner(
+            observer=observer,
+            system=system,
+            training_data=data,
+            validation_data=val_data,
+            method='T_star',
+            batch_size=batch_size,
+            lr=init_learning_rate,
+            optimizer=optim_method,
+            optimizer_options=optimizer_options,
+            scheduler=scheduler_method,
+            scheduler_options=scheduler_options,
+        )
+        learner.traj_data = traj_data  # to keep track
+        learner.x0_limits = x_limits
+        learner.add_forward = add_forward
+        learner.data_dt = dt
+        if traj_data:
+            learner.num_initial_conditions = num_initial_conditions
+        else:
+            learner.num_samples = num_samples
+
+        # Define logger and checkpointing
+        logger = TensorBoardLogger(save_dir=learner.results_folder + "/tb_logs")
+        checkpoint_callback = ModelCheckpoint(monitor="val_loss")
+        trainer = pl.Trainer(
+            callbacks=[stopper, checkpoint_callback],
+            **trainer_options,
+            logger=logger,
+            log_every_n_steps=1,
+            check_val_every_n_epoch=2
+        )
+
+        # To see logger in tensorboard, copy the following output name_of_folder
+        print(f"Logs stored in {learner.results_folder}/tb_logs")
+        # which should be similar to jupyter_notebooks/runs/method/exp_0/tb_logs/
+        # Then type this in terminal:
+        # tensorboard --logdir=name_of_folder
+
+        # Train and save results
+        trainer.fit(learner)
+
+        # To see logger in tensorboard, copy the following output name_of_folder
+        print(f"Logs stored in {learner.results_folder}/tb_logs")
+
+        # Plot training data (as trajectories)
+        if traj_data:
+            n = 1000
+            N = data_ordered.shape[0]
+            data_ordered = data_ordered[::int(np.ceil(N / n)), :, :]
+            plt.plot(data_ordered[..., 0], 'x')
+            plt.title(r'Training data: $\theta$')
+            plt.savefig(os.path.join(learner.results_folder, 'Train_theta.pdf'))
+            plt.clf()
+            plt.close('all')
+            plt.plot(data_ordered[..., 1], 'x')
+            plt.title(r'Training data: $\alpha$')
+            plt.savefig(os.path.join(learner.results_folder, 'Train_alpha.pdf'))
+            plt.clf()
+            plt.close('all')
+            plt.plot(data_ordered[..., 2], 'x')
+            plt.title(r'Training data: $\dot{\theta}$')
+            plt.savefig(
+                os.path.join(learner.results_folder, 'Train_thetadot.pdf'))
+            plt.clf()
+            plt.close('all')
+            plt.plot(data_ordered[..., 3], 'x')
+            plt.title(r'Training data: $\dot{\alpha}$')
+            plt.savefig(
+                os.path.join(learner.results_folder, 'Train_alphadot.pdf'))
+            plt.clf()
+            plt.close('all')
     else:
-        data = observer.generate_data_svl(
-            x_limits, num_samples, method="LHS", k=10)
-        if add_forward:  # TODO add forward trajectory to have stable data
-            init = torch.tensor([0., 0.1, 0., 0.] + [0.] * observer.dim_z)
-            data_forward = observer.generate_data_forward(
-                init=init, tsim=(0, 8),
-                num_datapoints=200, k=10, dt=dt, stack=True)
-            data = torch.cat((data, data_forward), dim=0)
-    data, val_data = train_test_split(data, test_size=0.3, shuffle=False)
-
-    print(data.shape)
-
-    ##########################################################################
-    # Setup learner ##########################################################
-    ##########################################################################
-
-    # Trainer options
-    num_epochs = 100
-    trainer_options = {"max_epochs": num_epochs}
-    if traj_data:
-        batch_size = 100
-        init_learning_rate = 1e-2
-    else:
-        batch_size = 20
-        init_learning_rate = 1e-2
-
-    # Optim options
-    optim_method = optim.Adam
-    if traj_data:
-        optimizer_options = {"weight_decay": 1e-6}
-    else:
-        optimizer_options = {"weight_decay": 1e-6}
-
-    # Scheduler options
-    scheduler_method = optim.lr_scheduler.ReduceLROnPlateau
-    scheduler_options = {
-        "mode": "min",
-        "factor": 0.5,
-        "patience": 5,
-        "threshold": 5e-4,
-        "verbose": True,
-    }
-    stopper = pl.callbacks.early_stopping.EarlyStopping(
-        monitor="val_loss", min_delta=1e-4, patience=7, verbose=False,
-        mode="min"
-    )
-
-    # Instantiate learner
-    learner = Learner(
-        observer=observer,
-        system=system,
-        training_data=data,
-        validation_data=val_data,
-        method='T_star',
-        batch_size=batch_size,
-        lr=init_learning_rate,
-        optimizer=optim_method,
-        optimizer_options=optimizer_options,
-        scheduler=scheduler_method,
-        scheduler_options=scheduler_options,
-    )
-    learner.traj_data = traj_data  # TODO to keep track
-    learner.x0_limits = x_limits
-    learner.add_forward = add_forward
-    learner.data_dt = dt
-    if traj_data:
-        learner.num_initial_conditions = num_initial_conditions
-    else:
-        learner.num_samples = num_samples
-
-    # Define logger and checkpointing
-    logger = TensorBoardLogger(save_dir=learner.results_folder + "/tb_logs")
-    checkpoint_callback = ModelCheckpoint(monitor="val_loss")
-    trainer = pl.Trainer(
-        callbacks=[stopper, checkpoint_callback],
-        **trainer_options,
-        logger=logger,
-        log_every_n_steps=1,
-        check_val_every_n_epoch=2
-    )
-
-    # To see logger in tensorboard, copy the following output name_of_folder
-    print(f"Logs stored in {learner.results_folder}/tb_logs")
-    # which should be similar to jupyter_notebooks/runs/method/exp_0/tb_logs/
-    # Then type this in terminal:
-    # tensorboard --logdir=name_of_folder
-
-    # Train and save results
-    trainer.fit(learner)
+        # Load learner
+        path = "runs/QuanserQubeServo2_meas2/Supervised/T_star/Ntraj1000_wc3"
+        learner_path = path + "/learner.pkl"
+        import dill as pkl
+        with open(learner_path, "rb") as rb_file:
+            learner = pkl.load(rb_file)
+        learner.results_folder = path
+        observer = learner.model
 
     ##########################################################################
     # Generate plots #########################################################
     ##########################################################################
 
-    # To see logger in tensorboard, copy the following output name_of_folder
-    print(f"Logs stored in {learner.results_folder}/tb_logs")
-
-    # Plot training data (as trajectories)
-    if traj_data:
-        n = 1000
-        N = data_ordered.shape[0]
-        data_ordered = data_ordered[::int(np.ceil(N / n)), :, :]
-        plt.plot(data_ordered[..., 0], 'x')
-        plt.title(r'Training data: $\theta$')
-        plt.savefig(os.path.join(learner.results_folder, 'Train_theta.pdf'))
-        plt.clf()
-        plt.close('all')
-        plt.plot(data_ordered[..., 1], 'x')
-        plt.title(r'Training data: $\alpha$')
-        plt.savefig(os.path.join(learner.results_folder, 'Train_alpha.pdf'))
-        plt.clf()
-        plt.close('all')
-        plt.plot(data_ordered[..., 2], 'x')
-        plt.title(r'Training data: $\dot{\theta}$')
-        plt.savefig(os.path.join(learner.results_folder, 'Train_thetadot.pdf'))
-        plt.clf()
-        plt.close('all')
-        plt.plot(data_ordered[..., 3], 'x')
-        plt.title(r'Training data: $\dot{\alpha}$')
-        plt.savefig(os.path.join(learner.results_folder, 'Train_alphadot.pdf'))
-        plt.clf()
-        plt.close('all')
-
+    # Test parameters
     dt = 0.04
     tsim = (0, 8)  # for test trajectories
     with torch.no_grad():
@@ -241,15 +255,6 @@ if __name__ == "__main__":
     ##########################################################################
     # Test trajectory ########################################################
     ##########################################################################
-
-    # # Load learner  # TODO
-    # path = "runs/QuanserQubeServo2_meas2/Supervised/T_star/Ntraj1000_wc3"
-    # learner_path = path + "/learner.pkl"
-    # import dill as pkl
-    # with open(learner_path, "rb") as rb_file:
-    #     learner = pkl.load(rb_file)
-    # learner.results_folder = path
-    # observer = learner.model
 
     # Experiment
     dt_exp = 0.004

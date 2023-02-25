@@ -63,30 +63,31 @@ class LuenbergerObserverJointly(LuenbergerObserver):
         # Also scale it: D = D / ||D0||, KKL ODE with D * ||D0||
         # This is called in LuenbergerObserver.__init__ when self.D is set
         self.D_0 = D.detach().clone()
+        self.params_to_save['D_0'] = self.D_0.detach().clone()
         self.norm_D_0 = torch.linalg.norm(self.D_0.detach().clone())
         D_init = self.D_0.detach().clone() / self.norm_D_0
         self.D_scaled = torch.nn.parameter.Parameter(data=D_init,
                                                      requires_grad=True)
 
-    def __repr__(self):
-        return "\n".join(
-            [
-                "Luenberger Observer optimize D jointly object",
-                "dim_x " + str(self.dim_x),
-                "dim_y " + str(self.dim_y),
-                "dim_z " + str(self.dim_z),
-                "method_setD " + str(self.method_setD),
-                "wc " + str(self.wc),
-                "D_0 " + str(self.D_0),
-                "D " + str(self.D),
-                "F " + str(self.F),
-                "encoder " + str(self.encoder),
-                "decoder " + str(self.decoder),
-                "method " + self.method,
-                "recon_lambda " + str(self.recon_lambda),
-                "sensitivity_lambda " + str(self.sensitivity_lambda),
-            ]
-        )
+    # def __repr__(self):
+    #     return "\n".join(
+    #         [
+    #             "Luenberger Observer optimize D jointly object",
+    #             "dim_x " + str(self.dim_x),
+    #             "dim_y " + str(self.dim_y),
+    #             "dim_z " + str(self.dim_z),
+    #             "method_setD " + str(self.method_setD),
+    #             "wc " + str(self.wc),
+    #             "D_0 " + str(self.D_0),
+    #             "D " + str(self.D),
+    #             "F " + str(self.F),
+    #             "encoder " + str(self.encoder),
+    #             "decoder " + str(self.decoder),
+    #             "method " + self.method,
+    #             "recon_lambda " + str(self.recon_lambda),
+    #             "sensitivity_lambda " + str(self.sensitivity_lambda),
+    #         ]
+    #     )
 
     def loss_autoencoder_jointly(
              self, x: torch.tensor, x_hat: torch.tensor,

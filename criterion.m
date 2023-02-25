@@ -4,15 +4,15 @@ clear all
 dx = 2;
 dy = 1;
 dz = 3;
-wc_arr = linspace(0.03, 1., 100);
+wc_arr = linspace(0.1, 2., 200);
 %dx = 4;
 %dy = 1;
 %dz = 5;
 %wc_arr = linspace(1, 5., 50);
 
 %path = "runs/VanDerPol/Supervised_noise/T_star/exp_100_wc0.03-1_-11+1cycle_rk41e-2/xzi_mesh/";
-%path = "runs/Reversed_Duffing_Oscillator/Supervised_noise/T_star/exp_100_wc0.03-1_rk41e-3_k10_3/xzi_mesh/";
-path = "runs/SaturatedVanDerPol/Supervised_noise/T_star/exp_100_wc0.03-1_-2727_rk41e-3_2/xzi_mesh/";
+path = "runs/Reversed_Duffing_Oscillator/Supervised_noise/T_star/exp200_DoptimAE05_wc01-2_rk41e-3_k10/xzi_mesh/";
+%path = "runs/SaturatedVanDerPol/Supervised_noise/T_star/exp_100_wc0.03-1_-2727_rk41e-3_2/xzi_mesh/";
 %path = "runs/QuanserQubeServo2_meas1/Supervised_noise/T_star/Ntraj5000_wc1550/xzi_mesh/";
 Darr = table2array(readtable(append(path, 'D_arr.csv')));
 Darr = Darr(:, 2:end);

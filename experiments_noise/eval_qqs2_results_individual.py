@@ -137,7 +137,7 @@ def sensitivity_norm(model, x, z, wc, save=True, path='', version=9):
              sv.unsqueeze(0)), dim=0
         )
     elif version == 9:
-        # TODO right norms are implemented but results less good as Matlab!
+        # TODO right norms are implemented but results less smooth than Matlab!
         C = np.eye(model.dim_z)
         l2_norm = torch.linalg.norm(
             torch.linalg.matrix_norm(dTstar_dz, dim=(1, 2), ord=2))
@@ -282,7 +282,7 @@ def plot_sensitiviy_wc(exp_folder, exp_subfolders, verbose, dim_z, save=True,
     ax1.legend(lns, labs, loc=1)
     ax1.grid(False)
 
-    plt.title("Gain tuning criterion")
+    # plt.title("Gain tuning criterion")
 
     plt.savefig(os.path.join(learner.results_folder, name),
                 bbox_inches="tight")
@@ -307,7 +307,7 @@ def plot_crit(folder, N, verbose=False):
         color='orange',
     )
     plt.xlabel(r'$\omega_c$')
-    plt.title("Gain tuning criterion")
+    # plt.title("Gain tuning criterion")
     plt.legend()
     plt.savefig(os.path.join(folder, 'crit.pdf'), bbox_inches="tight")
     if verbose:
@@ -317,7 +317,7 @@ def plot_crit(folder, N, verbose=False):
 
 # Save test trajectories for different values of noise std and wc
 def test_trajs(exp_folder, exp_subfolders, test_array, std_array, x0,
-               verbose=False, true_traj=None):
+               verbose=False, true_traj=None, true_traj_compare=False):
     with torch.no_grad():
         for std in std_array:
             std_folder = os.path.join(exp_folder, f'Test_trajs_{std}')
@@ -342,6 +342,10 @@ def test_trajs(exp_folder, exp_subfolders, test_array, std_array, x0,
                                                f"Test_trajectories/Traj_{std}")
                 if true_traj is None:
                     tq, simulation = learner.system.simulate(x0, tsim, dt)
+                elif true_traj_compare == True:
+                    simulation = true_traj
+                    tq, simu = learner.system.simulate(x0, tsim, dt)
+                    meas = learner.model.h(simu)
                 else:
                     simulation = true_traj
                     tq = torch.arange(tsim[0], tsim[1], dt)
@@ -356,8 +360,12 @@ def test_trajs(exp_folder, exp_subfolders, test_array, std_array, x0,
                 # Need to figure out how to interpolate y in parallel for all
                 # trajectories!!!
                 y = torch.cat((tq.unsqueeze(1), measurement), dim=-1)
-                estimation = learner.model.predict(y, tsim, dt,
-                                                   z_0=None).detach()
+                estimation, z = learner.model.predict(
+                    y, tsim, dt, out_z=True, z_0=None)
+                if true_traj_compare:
+                    y_simu = torch.cat((tq.unsqueeze(1), meas), dim=-1)
+                    estim, z_simu = learner.model.predict(
+                        y_simu, tsim, dt, out_z=True, z_0=None)
                 error = RMSE(simulation, estimation)
                 traj_error += error
                 filename = f"RMSE.txt"
@@ -373,6 +381,43 @@ def test_trajs(exp_folder, exp_subfolders, test_array, std_array, x0,
                     os.path.join(traj_folder, f"Estimated_traj.csv"),
                 )
 
+                if true_traj_compare:
+                    name = "Meas.pdf"
+                    plt.plot(tq, measurement.detach().numpy(),
+                             label='Experiment')
+                    plt.plot(tq, meas.detach().numpy(), '--',
+                             label='Simulation')
+                    plt.legend(loc=1)
+                    plt.grid(visible=True)
+                    plt.title('Measurement')
+                    plt.xlabel(rf"$t$")
+                    plt.ylabel(rf"$y$")
+                    plt.savefig(
+                        os.path.join(traj_folder, name), bbox_inches="tight"
+                    )
+                    if verbose:
+                        plt.show()
+                    plt.clf()
+                    plt.close("all")
+                    for j in range(z.shape[1]):
+                        name = "Traj_z" + str(j) + ".pdf"
+                        plt.plot(tq, z[:, j].detach().numpy(),
+                                 label=rf"Experiment")
+                        plt.plot(tq, z_simu[:, j].detach().numpy(), '--',
+                                 label=rf"Simulation")
+                        plt.legend(loc=1)
+                        plt.grid(visible=True)
+                        # plt.title('Observer state over test trajectory')
+                        plt.xlabel(rf"$t$")
+                        plt.ylabel(rf"$z_{j + 1}$")
+                        plt.savefig(
+                            os.path.join(traj_folder, name), bbox_inches="tight"
+                        )
+                        if verbose:
+                            plt.show()
+                        plt.clf()
+                        plt.close("all")
+
                 for j in range(estimation.shape[1]):
                     name = "Traj" + str(j) + ".pdf"
                     if j == 0:
@@ -386,8 +431,8 @@ def test_trajs(exp_folder, exp_subfolders, test_array, std_array, x0,
                     )
                     plt.legend(loc=1)
                     plt.grid(visible=True)
-                    plt.title(
-                        rf"Test trajectory, RMSE = {np.round(error.numpy(), 4)}")
+                    # plt.title(
+                    #     rf"Test trajectory, RMSE = {np.round(error.numpy(), 4)}")
                     plt.xlabel(rf"$t$")
                     plt.ylabel(rf"$x_{j + 1}$")
                     plt.savefig(
@@ -459,9 +504,9 @@ def error_trajs(exp_folder, exp_subfolders, test_array, std_array, x0,
                     markersize=1,
                     label=rf"$\omega_c = {float(wc):0.2g}$",
                 )
-            plt.legend()
+            plt.legend(loc=1)
             plt.grid(visible=True)
-            plt.title(rf"RMSE over test trajectory")
+            # plt.title(rf"RMSE over test trajectory")
             plt.xlabel(rf"$t$")
             plt.ylabel(r'$|\hat{x}-x|$')
             # plt.ylabel(rf"$\hat{{x}}-x$")
@@ -492,7 +537,7 @@ if __name__ == "__main__":
     # Compute gradients for each wc
     verbose = False
     print('Computing our gain-tuning criterion can take some time but saves '
-          'intermediary data in a subfolder zi_mesh: if you have already run '
+          'intermediary data in a subfolder xzi_mesh: if you have already run '
           'this script, set save to False and path to that subfolder.')
     save = True
     path = ''
@@ -520,22 +565,31 @@ if __name__ == "__main__":
     std_array = [0.0, 0.025, 0.05]
     # test_array = np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, 40])
     test_array = np.array([0, 9, 40])
-    x_0 = torch.tensor([0.1, 0.1, 0., 0.])
+    # x_0 = torch.tensor([0.1, 0.1, 0., 0.])
+    x_0 = torch.tensor(
+        [0.0337475773334841, 0.5062136600022615, 1.0925699983931834,
+         1.7034324073882772])
     test_trajs(exp_folder=EXP_FOLDER, exp_subfolders=subdirs,
                test_array=test_array, std_array=std_array, x0=x_0,
-               verbose=verbose)
+               verbose=verbose)  # simu test traj
     # test_trajs(exp_folder=EXP_FOLDER, exp_subfolders=subdirs,
     #            test_array=test_array, std_array=std_array, x0=x_0,
-    #            verbose=verbose, true_traj=exp)
+    #            verbose=verbose, true_traj=exp)  # exp test traj
+    # test_trajs(exp_folder=EXP_FOLDER, exp_subfolders=subdirs,
+    #            test_array=test_array, std_array=std_array, x0=x_0,
+    #            verbose=verbose, true_traj=exp,
+    #            true_traj_compare=True)  # compare simu and exp test traj
 
     # Error trajectories
     std_array = [0.0, 0.025, 0.05]
     test_array = np.array([0, 9, 40])
-    x_0 = torch.tensor([0.1, 0.1, 0., 0.])
-    # Simulated test traj
+    # x_0 = torch.tensor([0.1, 0.1, 0., 0.])
+    x_0 = torch.tensor(
+        [0.0337475773334841, 0.5062136600022615, 1.0925699983931834,
+         1.7034324073882772])
     error_trajs(exp_folder=EXP_FOLDER, exp_subfolders=subdirs,
                test_array=test_array, std_array=std_array, x0=x_0,
-               verbose=verbose)
+               verbose=verbose)  # simu test traj
     # error_trajs(exp_folder=EXP_FOLDER, exp_subfolders=subdirs,
     #             test_array=test_array, std_array=std_array, x0=x_0,
-    #             verbose=verbose, true_traj=exp)
+    #             verbose=verbose, true_traj=exp)  # exp test traj

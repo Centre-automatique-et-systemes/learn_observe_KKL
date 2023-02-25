@@ -247,6 +247,10 @@ class LearnerNoise(Learner):
                         "-.",
                         label=rf"$\hat{{x}}_{j + 1}$",
                     )
+                    # # TODO for formatting revDuff test trajectories
+                    # from matplotlib import ticker
+                    # plt.gca().yaxis.set_major_formatter(
+                    #     ticker.StrMethodFormatter("{x:.1f}"))
                     plt.legend(loc=1)
                     plt.grid(visible=True)
                     plt.title(
@@ -749,7 +753,7 @@ class LearnerNoise(Learner):
                     )
 
                     plt.plot(simulation[:, j, 0], simulation[:, j, 1])
-                    plt.plot(estimation[:, 0], estimation[:, 1])
+                    plt.plot(estimation[:, 0], estimation[:, 1], '--')
 
                 if x_limits is not None:
                     xlim = np.linspace(x_limits[0][0], x_limits[0][1])
