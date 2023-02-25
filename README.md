@@ -3,7 +3,7 @@
 ### To run the code:
 - create a directory (further named dir), `cd dir`
 - clone the repo in dir/repo
-- unzip Data.zip in dir/Data
+- unzip `Data/QQS2_data_diffx0.zip` in dir/repo/Data
 - create a virtual environment in dir (with pip: `python3 -m venv 
   venv`), source it (`source venv/bin/activate`)
 - go to dir/repo, then run `pip install -e .` to install the package
