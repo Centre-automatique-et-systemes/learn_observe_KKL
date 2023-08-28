@@ -76,7 +76,7 @@ import numpy as np
 import torch
 from scipy import signal
 from torchdiffeq import odeint
-from functorch import vmap, jacrev
+from functorch import vmap, jacrev, hessian
 
 # Set double precision by default
 torch.set_default_tensor_type(torch.DoubleTensor)
@@ -644,6 +644,12 @@ class QuanserQubeServo2(System):
     def predict_deriv(self, x, f):
         # Compute Jacobian of f with respect to input x
         dfdh = vmap(jacrev(f))(x)
+        dfdx = torch.squeeze(dfdh)
+        return dfdx
+
+    def predict_double_deriv(self, x, f):
+        # Compute Jacobian of f with respect to input x
+        dfdh = vmap(hessian(f))(x)
         dfdx = torch.squeeze(dfdh)
         return dfdx
 

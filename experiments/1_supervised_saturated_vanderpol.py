@@ -180,6 +180,10 @@ if __name__ == "__main__":
         # Train the transformation function using the learner class
         trainer.fit(learner_T_star)
 
+        learner_T_star.save_results(
+            limits=x_limits, nb_trajs=10, tsim=(0, 60), dt=1e-2,
+            checkpoint_path=checkpoint_callback.best_model_path)
+
     else:
         # Load learner
         path = "runs/SaturatedVanDerPol/Supervised/T_star" \
@@ -199,5 +203,4 @@ if __name__ == "__main__":
     ##########################################################################
 
     learner_T_star.save_results(
-        limits=x_limits, nb_trajs=10, tsim=(0, 60), dt=1e-2,
-        checkpoint_path=checkpoint_callback.best_model_path)
+        limits=x_limits, nb_trajs=10, tsim=(0, 60), dt=1e-2)

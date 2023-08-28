@@ -206,23 +206,23 @@ if __name__ == "__main__":
             n = 1000
             N = data_ordered.shape[0]
             data_ordered = data_ordered[::int(np.ceil(N / n)), :, :]
-            plt.plot(data_ordered[..., 0], 'x')
+            plt.plot(data_ordered[..., 0], 'x', rasterized=True)
             plt.title(r'Training data: $\theta$')
             plt.savefig(os.path.join(learner.results_folder, 'Train_theta.pdf'))
             plt.clf()
             plt.close('all')
-            plt.plot(data_ordered[..., 1], 'x')
+            plt.plot(data_ordered[..., 1], 'x', rasterized=True)
             plt.title(r'Training data: $\alpha$')
             plt.savefig(os.path.join(learner.results_folder, 'Train_alpha.pdf'))
             plt.clf()
             plt.close('all')
-            plt.plot(data_ordered[..., 2], 'x')
+            plt.plot(data_ordered[..., 2], 'x', rasterized=True)
             plt.title(r'Training data: $\dot{\theta}$')
             plt.savefig(
                 os.path.join(learner.results_folder, 'Train_thetadot.pdf'))
             plt.clf()
             plt.close('all')
-            plt.plot(data_ordered[..., 3], 'x')
+            plt.plot(data_ordered[..., 3], 'x', rasterized=True)
             plt.title(r'Training data: $\dot{\alpha}$')
             plt.savefig(
                 os.path.join(learner.results_folder, 'Train_alphadot.pdf'))

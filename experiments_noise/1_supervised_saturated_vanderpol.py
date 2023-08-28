@@ -26,7 +26,7 @@ import torch.optim as optim
 
 if __name__ == "__main__":
 
-    TRAIN = True
+    TRAIN = False
 
     ##########################################################################
     # Setup observer #########################################################
@@ -195,6 +195,9 @@ if __name__ == "__main__":
         # Train the transformation function using the learner class
         trainer.fit(learner_T_star)
 
+        learner_T_star.save_results(
+            checkpoint_path=checkpoint_callback.best_model_path)
+
         learner_T_star.save_plot(
             "Train_loss.pdf",
             "Training loss over time",
@@ -226,9 +229,6 @@ if __name__ == "__main__":
     # Generate plots #########################################################
     ##########################################################################
 
-    learner_T_star.save_results(
-        checkpoint_path=checkpoint_callback.best_model_path,)
-
     # Params
     nb = int(np.min([len(learner_T_star.training_data), 10000]))
     idx = np.random.choice(np.arange(len(learner_T_star.training_data)),
@@ -241,7 +241,7 @@ if __name__ == "__main__":
     print('Computing our gain-tuning criterion can take some time but saves '
           'intermediary data in a subfolder xzi_mesh: if you have already run '
           'this script, set save to False and path to this subfolder.')
-    save = True
+    save = False
     path = ''
     if save:
         mesh = learner_T_star.model.generate_data_svl(
@@ -250,9 +250,9 @@ if __name__ == "__main__":
     else:
         mesh = torch.randn((10, learner_T_star.model.dim_x +
                            learner_T_star.model.dim_z, 1))
-    learner_T_star.save_rmse_wc(mesh, wc_arr, verbose)
-    learner_T_star.plot_sensitiviy_wc(mesh, wc_arr, verbose, save=save,
-                                      path=path)
+    # learner_T_star.save_rmse_wc(mesh, wc_arr, verbose)
+    # learner_T_star.plot_sensitiviy_wc(mesh, wc_arr, verbose, save=save,
+    #                                   path=path)
 
     # Trajectories
     std_array = [0.0, 0.25, 0.5]
@@ -263,23 +263,23 @@ if __name__ == "__main__":
     z_0 = learner_T_star.model.encoder(
         torch.cat((x_0.expand(len(wc_arr), -1),
                    torch.as_tensor(wc_arr).reshape(-1, 1)), dim=1))
-    if save:
-        mesh = learner_T_star.model.generate_data_svl(
-            x_limits, wc_arr, 10000 * len(wc_arr), method="uniform", stack=False
-        )
-    else:
-        mesh = torch.randn((10, learner_T_star.model.dim_x +
-                            learner_T_star.model.dim_z, 1))
-
-    learner_T_star.plot_traj_rmse(x_0, wc_arr, verbose, tsim, dt, std=0.25)
-
-    for std in std_array:
-        learner_T_star.save_trj(
-           x_0, wc_arr, 0, verbose, tsim, dt, std=std#, z_0=z_0
-        )
-        learner_T_star.plot_traj_error(
-            x_0, wc_arr, 0, verbose, tsim, dt, std=std#, z_0=z_0
-        )
+    # if save:
+    #     mesh = learner_T_star.model.generate_data_svl(
+    #         x_limits, wc_arr, 10000 * len(wc_arr), method="uniform", stack=False
+    #     )
+    # else:
+    #     mesh = torch.randn((10, learner_T_star.model.dim_x +
+    #                         learner_T_star.model.dim_z, 1))
+    #
+    # learner_T_star.plot_traj_rmse(x_0, wc_arr, verbose, tsim, dt, std=0.25)
+    #
+    # for std in std_array:
+    #     learner_T_star.save_trj(
+    #        x_0, wc_arr, 0, verbose, tsim, dt, std=std#, z_0=z_0
+    #     )
+    #     learner_T_star.plot_traj_error(
+    #         x_0, wc_arr, 0, verbose, tsim, dt, std=std#, z_0=z_0
+    #     )
 
     # Heatmap
     if not save:

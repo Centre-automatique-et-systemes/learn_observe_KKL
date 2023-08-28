@@ -201,6 +201,9 @@ if __name__ == "__main__":
         # Train the transformation function using the learner class
         trainer.fit(learner_T_star)
 
+        learner_T_star.save_results(
+            checkpoint_path=checkpoint_callback.best_model_path)
+
         learner_T_star.save_plot(
             "Train_loss.pdf",
             "Training loss over time",
@@ -231,9 +234,6 @@ if __name__ == "__main__":
     ##########################################################################
     # Generate plots #########################################################
     ##########################################################################
-
-    learner_T_star.save_results(
-        checkpoint_path=checkpoint_callback.best_model_path,)
 
     # Params
     nb = int(np.min([len(learner_T_star.training_data), 10000]))

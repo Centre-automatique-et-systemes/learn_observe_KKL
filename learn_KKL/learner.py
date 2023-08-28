@@ -402,21 +402,21 @@ class Learner(pl.LightningModule):
                 cbar = plt.colorbar()
                 cbar.set_label("Estimation error")
 
-                # # TODO add traj on top
-                # init_state = torch.tensor([0.1, 0.1])
-                # tsim = (0, 30)
-                # dt = 1e-2
-                # std = 0
-                # tq, simulation = self.system.simulate(init_state, tsim, dt)
-                # measurement = self.model.h(simulation)
-                # noise = torch.normal(0, std, size=measurement.shape)
-                # measurement = measurement.add(noise)
-                # y = torch.cat((tq.unsqueeze(1), measurement), dim=-1)
-                # estimation = self.model.predict(y, tsim, dt, w_c=wc).detach()
-                # # estimation = self.model.predict(y, tsim, dt).detach()
-                # plt.plot(simulation[:, 0], simulation[:, 1], label='True')
-                # plt.plot(estimation[:, 0], estimation[:, 1], label='Estimated')
-                # # plt.legend()
+                # TODO add traj on top
+                init_state = torch.tensor([0.1, 0.1])
+                tsim = (0, 30)
+                dt = 1e-2
+                std = 0
+                tq, simulation = self.system.simulate(init_state, tsim, dt)
+                measurement = self.model.h(simulation)
+                noise = torch.normal(0, std, size=measurement.shape)
+                measurement = measurement.add(noise)
+                y = torch.cat((tq.unsqueeze(1), measurement), dim=-1)
+                estimation = self.model.predict(y, tsim, dt, w_c=wc).detach()
+                # estimation = self.model.predict(y, tsim, dt).detach()
+                plt.plot(simulation[:, 0], simulation[:, 1], label='True')
+                plt.plot(estimation[:, 0], estimation[:, 1], label='Estimated')
+                # plt.legend()
 
                 if wc is not None:
                     plt.title(
@@ -640,7 +640,7 @@ class Learner(pl.LightningModule):
                     plt.title(r"RMSE between $x$ and $T^*(T(x))$")
                 plt.xlabel(rf"$x_{i}$")
                 plt.ylabel(rf"$x_{i + 1}$")
-                plt.legend()
+                # plt.legend()
                 plt.savefig(os.path.join(self.results_folder, name),
                             bbox_inches="tight")
                 if verbose:

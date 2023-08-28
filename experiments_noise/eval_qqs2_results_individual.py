@@ -389,7 +389,7 @@ def test_trajs(exp_folder, exp_subfolders, test_array, std_array, x0,
                              label='Simulation')
                     plt.legend(loc=1)
                     plt.grid(visible=True)
-                    plt.title('Measurement')
+                    # plt.title('Measurement')
                     plt.xlabel(rf"$t$")
                     plt.ylabel(rf"$y$")
                     plt.savefig(
@@ -539,7 +539,7 @@ if __name__ == "__main__":
     print('Computing our gain-tuning criterion can take some time but saves '
           'intermediary data in a subfolder xzi_mesh: if you have already run '
           'this script, set save to False and path to that subfolder.')
-    save = True
+    save = False
     path = ''
     # plot_sensitiviy_wc(exp_folder=EXP_FOLDER, exp_subfolders=subdirs,
     #                    dim_z=dim_z, verbose=verbose, save=save, path=path)
@@ -561,14 +561,14 @@ if __name__ == "__main__":
     tq = torch.arange(tsim[0], tsim[1], dt)
     exp = exp_func(tq)
 
-    # # Test trajectories
+    # Test trajectories
     std_array = [0.0, 0.025, 0.05]
     # test_array = np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, 40])
     test_array = np.array([0, 9, 40])
-    # x_0 = torch.tensor([0.1, 0.1, 0., 0.])
-    x_0 = torch.tensor(
-        [0.0337475773334841, 0.5062136600022615, 1.0925699983931834,
-         1.7034324073882772])
+    x_0 = torch.tensor([0.1, 0.1, 0., 0.])
+    # x_0 = torch.tensor(
+    #     [0.0337475773334841, 0.5062136600022615, 1.0925699983931834,
+    #      1.7034324073882772])
     test_trajs(exp_folder=EXP_FOLDER, exp_subfolders=subdirs,
                test_array=test_array, std_array=std_array, x0=x_0,
                verbose=verbose)  # simu test traj
@@ -583,13 +583,27 @@ if __name__ == "__main__":
     # Error trajectories
     std_array = [0.0, 0.025, 0.05]
     test_array = np.array([0, 9, 40])
-    # x_0 = torch.tensor([0.1, 0.1, 0., 0.])
-    x_0 = torch.tensor(
-        [0.0337475773334841, 0.5062136600022615, 1.0925699983931834,
-         1.7034324073882772])
+    x_0 = torch.tensor([0.1, 0.1, 0., 0.])
+    # x_0 = torch.tensor(
+    #     [0.0337475773334841, 0.5062136600022615, 1.0925699983931834,
+    #      1.7034324073882772])
     error_trajs(exp_folder=EXP_FOLDER, exp_subfolders=subdirs,
                test_array=test_array, std_array=std_array, x0=x_0,
                verbose=verbose)  # simu test traj
     # error_trajs(exp_folder=EXP_FOLDER, exp_subfolders=subdirs,
     #             test_array=test_array, std_array=std_array, x0=x_0,
     #             verbose=verbose, true_traj=exp)  # exp test traj
+
+    # # EKF test trajectories  # TODO compare EKF and KKL on test trajs
+    # std_array = [0.0, 0.025, 0.05]
+    # test_array = np.array([0, 9, 40])
+    # # x_0 = torch.tensor([0.1, 0.1, 0., 0.])
+    # x_0 = torch.tensor(
+    #     [0.0337475773334841, 0.5062136600022615, 1.0925699983931834,
+    #      1.7034324073882772])
+    # test_trajs(exp_folder=EXP_FOLDER, exp_subfolders=subdirs,
+    #             test_array=test_array, std_array=std_array, x0=x_0,
+    #             verbose=verbose, EKF=True)  # simu test traj
+    # test_trajs(exp_folder=EXP_FOLDER, exp_subfolders=subdirs,
+    #             test_array=test_array, std_array=std_array, x0=x_0,
+    #             verbose=verbose, true_traj=exp, EKF=True)  # exp test traj
